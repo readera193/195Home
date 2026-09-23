@@ -1,5 +1,22 @@
 <!--
 Sync Impact Report
+- Version change: 1.0.0 → 1.1.0（新增文件決策記錄範圍規範，屬治理流程的實質補充）
+- Modified principles: 無（Core Principles I~VII 內容未變更）
+- Added sections:
+  - 開發與品質流程（Development & Quality Workflow）新增一項規範：
+    「決策過程與決策結果的記錄範圍」— 僅 spec.md 的 Clarifications session 可保留決策過程，
+    其餘所有章節與所有其他文件一律只記錄最新決策結果。
+- Removed sections: 無
+- Templates requiring updates:
+  - .specify/templates/plan-template.md ⚠ pending（尚未檢查是否引用本 constitution 的具體原則名稱，建議下次執行 /speckit-plan 時交叉確認）
+  - .specify/templates/spec-template.md ✅ 無需變更（Clarifications session 由 /speckit-clarify 動態產生，範本本身不需修改）
+  - .specify/templates/tasks-template.md ✅ 無需變更
+  - .specify/templates/checklist-template.md ✅ 無需變更
+- Follow-up TODOs: 無
+
+---
+
+Sync Impact Report（歷史紀錄，1.0.0 初次制定）
 - Version change: [TEMPLATE] → 1.0.0（初次制定，未經正式版本，視為初始採用）
 - Modified principles: 無（模板佔位符全部由具體內容取代）
 - Added sections:
@@ -10,11 +27,6 @@ Sync Impact Report
   - 開發與品質流程（Development & Quality Workflow）
   - Governance（含修訂程序、版本規則、合規審查）
 - Removed sections: 無（原檔案僅為模板佔位符）
-- Templates requiring updates:
-  - .specify/templates/plan-template.md ⚠ pending（尚未檢查是否引用本 constitution 的具體原則名稱，建議下次執行 /speckit-plan 時交叉確認）
-  - .specify/templates/spec-template.md ✅ 無需變更（不涉及技術棧特定內容）
-  - .specify/templates/tasks-template.md ✅ 無需變更（不涉及技術棧特定內容）
-  - .specify/templates/checklist-template.md ✅ 無需變更
 - Follow-up TODOs:
   - TODO(RATIFICATION_DATE): 使用者未提供正式批准日期，暫以本次制定日期 2026-08-08 作為批准日，如有更早的專案啟動日期請於下次修訂時更正。
   - 部署目標平台尚未決定，將於 /speckit-plan 階段補齊技術規劃細節（本 constitution 僅約束「CI/CD 必須含實際部署」此一原則，不預先指定平台）。
@@ -105,6 +117,11 @@ Spring Cloud Gateway 等）用於呈現微服務治理知識；具備實際部�
   至少包含「為什麼不用 .NET」與「為什麼不用訊息佇列」的具體回答。
 - 每個服務的關鍵設計決策（服務邊界劃分、技術選型取捨）須以文字說明保留，供未來規劃或
   面試展示時查閱，不要求正式 ADR 格式，但須清楚可讀。
+- **決策過程與決策結果的記錄範圍**：僅 `spec.md` 的 Clarifications session（釐清問答小節）
+  MUST 保留完整決策過程（例如討論脈絡、曾考慮但未採用的選項、問答往返記錄）。
+  除此之外，spec.md 的其餘章節，以及 plan.md、tasks.md、README、本 constitution 在內的
+  所有其他文件，一律 MUST NOT 保留決策過程，只記錄當下最新的決策結果；
+  決策若有變更，直接更新為最新結論即可，不需保留被取代的舊版本說明。
 - 程式碼審查（含自我審查）時，MUST 檢查是否違反技術邊界（原則 II、III）與資料自主權
   （原則 I），發現違反須先修正或於 constitution 修訂後才可合併。
 
@@ -135,5 +152,5 @@ Spring Cloud Gateway 等）用於呈現微服務治理知識；具備實際部�
 Core Principles 與技術範疇邊界逐項確認是否合規；發現複雜度或範疇擴張須先在本文件中
 說明理由並完成修訂，才可繼續實作。
 
-**Version**: 1.0.0 | **Ratified**: 2026-08-08 | **Last Amended**: 2026-08-08
+**Version**: 1.1.0 | **Ratified**: 2026-08-08 | **Last Amended**: 2026-09-22
 </content>
