@@ -1,0 +1,192 @@
+package com.family195home.app.family.service;
+
+import com.family195home.app.common.ApiException;
+import com.family195home.app.family.application.FamilyGroupRepository;
+import com.family195home.app.family.application.FamilyMemberRepository;
+import com.family195home.app.family.domain.FamilyGroup;
+import com.family195home.app.family.domain.FamilyGroupStatus;
+import com.family195home.app.family.domain.FamilyMember;
+import com.family195home.app.family.domain.MemberRole;
+import com.family195home.app.family.domain.MemberStatus;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+
+import java.security.SecureRandom;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * 家庭群組核心業務邏輯（US1）。{@link #assertMemberAuthorized} 是本次架構收斂後
+ * 供 expense、statistics 模組直接呼叫（同進程方法呼叫）確認呼叫者角色與在職狀態的
+ * 唯一入口，取代原本跨服務的 HTTP authorize 端點（見 research.md 決策 7）。
+ */
+@Service
+public class FamilyService {
+
+    private static final String INVITE_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    private static final int INVITE_CODE_LENGTH = 10;
+
+    private final FamilyGroupRepository familyGroupRepository;
+    private final FamilyMemberRepository familyMemberRepository;
+    private final SecureRandom random = new SecureRandom();
+
+    public FamilyService(FamilyGroupRepository familyGroupRepository, FamilyMemberRepository familyMemberRepository) {
+        this.familyGroupRepository = familyGroupRepository;
+        this.familyMemberRepository = familyMemberRepository;
+    }
+
+    // FR-001, FR-026
+    public FamilyGroup createGroup(Long userId, String name) {
+        assertNotAlreadyInGroup(userId);
+        if (familyGroupRepository.existsByName(name)) {
+            throw new ApiException(HttpStatus.CONFLICT, "GROUP_NAME_TAKEN", "此家庭群組名稱已被使用");
+        }
+        FamilyGroup group = new FamilyGroup(name, FamilyGroupStatus.ACTIVE, generateUniqueInviteCode(), LocalDateTime.now());
+        familyGroupRepository.save(group);
+        FamilyMember admin = new FamilyMember(group.getId(), userId, MemberStatus.ACTIVE, MemberRole.ADMIN, LocalDateTime.now());
+        familyMemberRepository.save(admin);
+        return group;
+    }
+
+    // FR-002, FR-025, FR-026
+    public FamilyMember joinGroup(Long userId, String inviteCode) {
+        assertNotAlreadyInGroup(userId);
+        FamilyGroup group = familyGroupRepository.findByInviteCode(inviteCode)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "INVALID_INVITE_CODE", "邀請碼無效"));
+        if (group.getStatus() == FamilyGroupStatus.DISSOLVED) {
+            throw new ApiException(HttpStatus.CONFLICT, "GROUP_DISSOLVED", "此家庭群組已解散");
+        }
+
+        // FR-025：已離開成員以原邀請碼重新加入，恢復為 ACTIVE 並沿用原 FamilyMember，保留歷史紀錄歸屬
+        Optional<FamilyMember> existing = familyMemberRepository.findByUserIdAndGroupId(userId, group.getId());
+        if (existing.isPresent()) {
+            FamilyMember member = existing.get();
+            member.setStatus(MemberStatus.ACTIVE);
+            member.setLeftAt(null);
+            familyMemberRepository.update(member);
+            return member;
+        }
+
+        FamilyMember member = new FamilyMember(group.getId(), userId, MemberStatus.ACTIVE, MemberRole.MEMBER, LocalDateTime.now());
+        familyMemberRepository.save(member);
+        return member;
+    }
+
+    private void assertNotAlreadyInGroup(Long userId) {
+        if (familyMemberRepository.findActiveByUserId(userId).isPresent()) {
+            throw new ApiException(HttpStatus.CONFLICT, "ALREADY_IN_A_GROUP", "您已屬於一個家庭群組，請先離開才能建立或加入新群組");
+        }
+    }
+
+    /** 取得目前使用者所屬家庭群組與成員資訊（若未加入任何群組則回傳 empty）。 */
+    public Optional<FamilyMember> getMyMembership(Long userId) {
+        return familyMemberRepository.findActiveByUserId(userId);
+    }
+
+    public Optional<FamilyGroup> getGroup(Long familyGroupId) {
+        return familyGroupRepository.findById(familyGroupId);
+    }
+
+    // FR-007, FR-021
+    public List<FamilyMember> getMembers(Long familyGroupId, boolean includeLeft) {
+        return familyMemberRepository.findByGroupId(familyGroupId, includeLeft);
+    }
+
+    // FR-018, FR-029
+    public LeaveResult leave(Long familyGroupId, Long memberId, Long callerUserId) {
+        FamilyMember member = requireActiveMemberInGroup(familyGroupId, memberId);
+        if (!member.getUserId().equals(callerUserId)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "NOT_SELF", "僅能操作自己的成員身分");
+        }
+        return doLeave(member);
+    }
+
+    // FR-028
+    public FamilyMember kick(Long familyGroupId, Long memberId, Long callerUserId) {
+        assertMemberAuthorized(familyGroupId, callerUserId, RequiredRole.ADMIN);
+        FamilyMember target = requireActiveMemberInGroup(familyGroupId, memberId);
+        if (target.getUserId().equals(callerUserId)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "CANNOT_KICK_SELF", "無法移出自己，請使用離開群組");
+        }
+        doLeave(target);
+        return target;
+    }
+
+    private FamilyMember requireActiveMemberInGroup(Long familyGroupId, Long memberId) {
+        FamilyMember member = familyMemberRepository.findById(memberId)
+                .filter(m -> m.getFamilyGroupId().equals(familyGroupId))
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND", "找不到成員"));
+        if (!member.isActive()) {
+            throw new ApiException(HttpStatus.CONFLICT, "MEMBER_NOT_ACTIVE", "此成員目前不是在職狀態");
+        }
+        return member;
+    }
+
+    private LeaveResult doLeave(FamilyMember member) {
+        Long familyGroupId = member.getFamilyGroupId();
+        int activeCountBeforeLeaving = familyMemberRepository.countActiveByGroupId(familyGroupId);
+
+        member.setStatus(MemberStatus.LEFT);
+        member.setLeftAt(LocalDateTime.now());
+        familyMemberRepository.update(member);
+
+        // FR-018：唯一在職成員離開時，群組自動解散
+        if (activeCountBeforeLeaving <= 1) {
+            FamilyGroup group = familyGroupRepository.findById(familyGroupId)
+                    .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "GROUP_NOT_FOUND", "找不到家庭群組"));
+            group.setStatus(FamilyGroupStatus.DISSOLVED);
+            familyGroupRepository.update(group);
+            return new LeaveResult(MemberStatus.LEFT, FamilyGroupStatus.DISSOLVED, null);
+        }
+
+        // FR-029：管理者離開仍有其他在職成員的群組時，自動轉移給 joinedAt 最早的其他在職成員
+        Long newAdminMemberId = null;
+        if (member.isAdmin()) {
+            FamilyMember newAdmin = familyMemberRepository.findEarliestOtherActiveMember(familyGroupId, member.getId())
+                    .orElseThrow(() -> new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "NO_ELIGIBLE_ADMIN", "找不到可接任的管理者"));
+            newAdmin.setRole(MemberRole.ADMIN);
+            familyMemberRepository.update(newAdmin);
+            newAdminMemberId = newAdmin.getId();
+        }
+        return new LeaveResult(MemberStatus.LEFT, FamilyGroupStatus.ACTIVE, newAdminMemberId);
+    }
+
+    /**
+     * 同進程方法呼叫入口（取代原本跨服務 HTTP authorize 端點）：確認 callerUserId 是否為
+     * familyGroupId 的在職成員，並視需要要求 ADMIN 角色（FR-017、FR-019）。
+     */
+    public FamilyMember assertMemberAuthorized(Long familyGroupId, Long callerUserId, RequiredRole requiredRole) {
+        FamilyMember member = familyMemberRepository.findActiveByUserId(callerUserId)
+                .filter(m -> m.getFamilyGroupId().equals(familyGroupId))
+                .orElseThrow(() -> new ApiException(HttpStatus.FORBIDDEN, "NOT_GROUP_MEMBER", "您不是該家庭群組成員"));
+        if (requiredRole == RequiredRole.ADMIN && !member.isAdmin()) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "NOT_GROUP_ADMIN", "僅群組管理者可執行此操作");
+        }
+        return member;
+    }
+
+    private String generateUniqueInviteCode() {
+        String code;
+        do {
+            code = randomCode(INVITE_CODE_LENGTH);
+        } while (familyGroupRepository.findByInviteCode(code).isPresent());
+        return code;
+    }
+
+    private String randomCode(int length) {
+        StringBuilder sb = new StringBuilder(length);
+        for (int i = 0; i < length; i++) {
+            sb.append(INVITE_CODE_ALPHABET.charAt(random.nextInt(INVITE_CODE_ALPHABET.length())));
+        }
+        return sb.toString();
+    }
+
+    public enum RequiredRole {
+        ANY_MEMBER,
+        ADMIN
+    }
+
+    public record LeaveResult(MemberStatus status, FamilyGroupStatus familyGroupStatus, Long newAdminMemberId) {
+    }
+}

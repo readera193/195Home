@@ -24,6 +24,12 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 
 ## 家庭群組（公開 API）
 
+### `GET /api/families/me`
+- Header: `Authorization`
+- Response 200（已加入群組）: `{ familyGroupId, name, status: "ACTIVE"|"DISSOLVED", role: "ADMIN"|"MEMBER", inviteCode }`
+- Response 200（未加入任何群組）: `{ familyGroupId: null, name: null, status: null, role: null, inviteCode: null }`
+- 說明：實作階段補上的查詢端點，供前端取得目前使用者所屬家庭群組與角色（原規劃遺漏，實作時補齊）
+
 ### `POST /api/families`
 - Header: `Authorization`
 - Request: `{ name: string }`
