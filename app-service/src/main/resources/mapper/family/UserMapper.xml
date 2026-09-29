@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.family195home.app.family.infrastructure.persistence.UserMapper">
+
+    <resultMap id="UserResultMap" type="com.family195home.app.family.domain.User">
+        <id property="id" column="id"/>
+        <result property="email" column="email"/>
+        <result property="passwordHash" column="password_hash"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <select id="countByEmail" resultType="int">
+        SELECT COUNT(*) FROM users WHERE email = #{email}
+    </select>
+
+    <insert id="insert" parameterType="com.family195home.app.family.domain.User" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO users (email, password_hash, created_at)
+        VALUES (#{email}, #{passwordHash}, #{createdAt})
+    </insert>
+
+    <select id="selectByEmail" resultMap="UserResultMap">
+        SELECT id, email, password_hash, created_at FROM users WHERE email = #{email}
+    </select>
+
+    <select id="selectById" resultMap="UserResultMap">
+        SELECT id, email, password_hash, created_at FROM users WHERE id = #{id}
+    </select>
+
+</mapper>

@@ -56,13 +56,13 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 **⚠️ CRITICAL**: 本階段完成前，不可開始任何 User Story 的開發
 
-- [ ] T009 [P] 建立 User 資料模型（POJO）、repository 介面與 MyBatis Mapper 於 `app-service/src/main/java/com/family195home/app/family/domain/User.java`、`application/UserRepository.java`、`infrastructure/persistence/UserRepositoryImpl.java`、`infrastructure/persistence/UserMapper.java`、`resources/mapper/family/UserMapper.xml`（對應 `appdb`）
-- [ ] T010 [P] 實作 BCrypt 密碼雜湊設定與 JWT 簽發/驗證工具類別（HS256、Claim 含 `sub`/`email`/`iat`/`exp`，2 小時過期）於 `app-service/src/main/java/com/family195home/app/security/JwtTokenProvider.java`
-- [ ] T011 實作 `POST /api/users/register`、`POST /api/users/login` API（含 Email 全系統唯一性檢查，重複則回傳 `409 EMAIL_ALREADY_REGISTERED`，FR-024）於 `app-service/src/main/java/com/family195home/app/family/controller/UserController.java` 與對應 service 層（依賴 T009、T010）
-- [ ] T012 [P] 於 `app-service/src/main/java/com/family195home/app/security/JwtAuthFilter.java` 實作 Spring Security filter chain：對 `/api/**`（排除 `/api/users/register`、`/api/users/login`、`/api/internal/**`、靜態資源）以簽章密鑰本地驗證 JWT 與過期時間，失敗回傳 `401`（同進程完成驗證，不再有獨立 Gateway 進程，見 research.md 決策 7）
-- [ ] T013 [P] 於 `app-service/src/main/java/com/family195home/app/security/InternalTokenFilter.java` 實作 `X-Internal-Token` 驗證 filter，套用於 `/api/internal/**`，僅允許持有共用密鑰的呼叫者存取（僅供 notification-service 呼叫，見 contracts/app-service.md）
-- [ ] T014 [P] 前端建立登入/註冊頁面與 Axios 攔截器（自動帶入 `Authorization: Bearer <JWT>`、401 導回登入頁）於 `frontend/src/pages/LoginPage.tsx`、`frontend/src/pages/RegisterPage.tsx`、`frontend/src/services/apiClient.ts`
-- [ ] T015 [P] 前端建立路由骨架與受保護路由（React Router，未登入導向登入頁）於 `frontend/src/App.tsx`
+- [X] T009 [P] 建立 User 資料模型（POJO）、repository 介面與 MyBatis Mapper 於 `app-service/src/main/java/com/family195home/app/family/domain/User.java`、`application/UserRepository.java`、`infrastructure/persistence/UserRepositoryImpl.java`、`infrastructure/persistence/UserMapper.java`、`resources/mapper/family/UserMapper.xml`（對應 `appdb`）
+- [X] T010 [P] 實作 BCrypt 密碼雜湊設定與 JWT 簽發/驗證工具類別（HS256、Claim 含 `sub`/`email`/`iat`/`exp`，2 小時過期）於 `app-service/src/main/java/com/family195home/app/security/JwtTokenProvider.java`
+- [X] T011 實作 `POST /api/users/register`、`POST /api/users/login` API（含 Email 全系統唯一性檢查，重複則回傳 `409 EMAIL_ALREADY_REGISTERED`，FR-024）於 `app-service/src/main/java/com/family195home/app/family/controller/UserController.java` 與對應 service 層（依賴 T009、T010）
+- [X] T012 [P] 於 `app-service/src/main/java/com/family195home/app/security/JwtAuthFilter.java` 實作 Spring Security filter chain：對 `/api/**`（排除 `/api/users/register`、`/api/users/login`、`/api/internal/**`、靜態資源）以簽章密鑰本地驗證 JWT 與過期時間，失敗回傳 `401`（同進程完成驗證，不再有獨立 Gateway 進程，見 research.md 決策 7）
+- [X] T013 [P] 於 `app-service/src/main/java/com/family195home/app/security/InternalTokenFilter.java` 實作 `X-Internal-Token` 驗證 filter，套用於 `/api/internal/**`，僅允許持有共用密鑰的呼叫者存取（僅供 notification-service 呼叫，見 contracts/app-service.md）
+- [X] T014 [P] 前端建立登入/註冊頁面與 Axios 攔截器（自動帶入 `Authorization: Bearer <JWT>`、401 導回登入頁）於 `frontend/src/pages/LoginPage.tsx`、`frontend/src/pages/RegisterPage.tsx`、`frontend/src/services/apiClient.ts`
+- [X] T015 [P] 前端建立路由骨架與受保護路由（React Router，未登入導向登入頁）於 `frontend/src/App.tsx`
 
 **Checkpoint**: 帳號註冊/登入、JWT 簽發與本地驗證、內部 API 驗證機制就緒，可開始平行進行各 User Story 開發
 
