@@ -126,9 +126,9 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 ### Implementation for User Story 3
 
-- [ ] T040 [US3] 實作 `GET /api/expenses?familyGroupId=&paymentAccountId=&authorMemberId=&month=` 列表與篩選邏輯（`paymentAccountId`、`authorMemberId` 可單獨或同時套用，FR-008/FR-009/FR-010；家庭範圍隔離：呼叫 T021 的 `assertMemberAuthorized` 確認呼叫者屬於 `familyGroupId`，否則回傳 `403`，FR-017）於 `app-service/src/main/java/com/family195home/app/expense/controller/ExpenseController.java` 與 `ExpenseService.java`（依賴 T021、T034）
-- [ ] T041 [P] [US3] 前端支出紀錄列表頁面（顯示家庭內所有成員紀錄、支付帳戶篩選下拉、成員篩選下拉，含已離開成員標示）於 `frontend/src/pages/ExpenseListPage.tsx`
-- [ ] T042 [US3] 前端 `expenseApi.ts` 擴充篩選查詢參數支援（依賴 T039、T040）
+- [X] T040 [US3] 實作 `GET /api/expenses?familyGroupId=&paymentAccountId=&authorMemberId=&month=` 列表與篩選邏輯（`paymentAccountId`、`authorMemberId` 可單獨或同時套用，FR-008/FR-009/FR-010；家庭範圍隔離：呼叫 T021 的 `assertMemberAuthorized` 確認呼叫者屬於 `familyGroupId`，否則回傳 `403`，FR-017）於 `app-service/src/main/java/com/family195home/app/expense/controller/ExpenseController.java` 與 `ExpenseService.java`（依賴 T021、T034）
+- [X] T041 [P] [US3] 前端支出紀錄列表頁面（顯示家庭內所有成員紀錄、支付帳戶篩選下拉、成員篩選下拉，含已離開成員標示）於 `frontend/src/pages/ExpenseListPage.tsx`
+- [X] T042 [US3] 前端 `expenseApi.ts` 擴充篩選查詢參數支援（依賴 T039、T040）
 
 **Checkpoint**: User Story 1、2、3 應皆可獨立運作
 

@@ -17,6 +17,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/expenses")
@@ -43,6 +44,21 @@ public class ExpenseController {
         ExpenseRecord record = expenseService.create(
                 request.familyGroupId(), member.getId(), request.paymentAccountId(), request.amount(), request.note(), occurredAt);
         return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(record));
+    }
+
+    @GetMapping
+    public ResponseEntity<List<ExpenseResponse>> list(
+            @AuthenticationPrincipal AuthenticatedUser caller,
+            @RequestParam Long familyGroupId,
+            @RequestParam(required = false) Long paymentAccountId,
+            @RequestParam(required = false) Long authorMemberId,
+            @RequestParam(required = false) String month) {
+        // FR-017：家庭範圍隔離，呼叫者須為該家庭群組成員，否則回傳 403
+        familyService.assertMemberAuthorized(familyGroupId, caller.userId(), FamilyService.RequiredRole.ANY_MEMBER);
+        List<ExpenseResponse> responses = expenseService.list(familyGroupId, paymentAccountId, authorMemberId, month).stream()
+                .map(this::toResponse)
+                .toList();
+        return ResponseEntity.ok(responses);
     }
 
     @PutMapping("/{expenseId}")

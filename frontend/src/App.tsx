@@ -9,6 +9,7 @@ import FamilyGroupPage from './pages/FamilyGroupPage';
 import MembersPage from './pages/MembersPage';
 import PaymentAccountsPage from './pages/PaymentAccountsPage';
 import ExpenseFormPage from './pages/ExpenseFormPage';
+import ExpenseListPage from './pages/ExpenseListPage';
 
 export default function App() {
   return (
@@ -54,6 +55,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <ExpenseFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/expenses"
+            element={
+              <ProtectedRoute>
+                <ExpenseListPage />
               </ProtectedRoute>
             }
           />
