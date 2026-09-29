@@ -1,0 +1,72 @@
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: appdb
+      MYSQL_USER: app
+      MYSQL_PASSWORD: app
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./scripts/init-notificationdb.sql:/docker-entrypoint-initdb.d/10-notificationdb.sql:ro
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app-service:
+    build:
+      context: .
+      dockerfile: app-service/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      APPDB_NAME: appdb
+      DB_USERNAME: app
+      DB_PASSWORD: app
+      JWT_SECRET: dev-only-secret-key-change-me-please-32bytes+
+      INTERNAL_TOKEN: dev-only-internal-token-change-me
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  notification-service:
+    build: ./notification-service
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      app-service:
+        condition: service_healthy
+    environment:
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      NOTIFICATIONDB_NAME: notificationdb
+      DB_USERNAME: notification
+      DB_PASSWORD: notification
+      APP_SERVICE_BASE_URL: http://app-service:8080
+      INTERNAL_TOKEN: dev-only-internal-token-change-me
+      LINE_CHANNEL_TOKEN: ${LINE_CHANNEL_TOKEN:-}
+      LINE_CHANNEL_SECRET: ${LINE_CHANNEL_SECRET:-}
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mysql-data:

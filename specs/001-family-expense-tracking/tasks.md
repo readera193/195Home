@@ -37,14 +37,14 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 **Purpose**: 建立兩個服務專案骨架與前端專案，尚不含商業邏輯
 
-- [ ] T001 建立根目錄專案結構：`app-service/`（含 `family/`、`expense/`、`statistics/`、`security/`、`config/` 套件骨架）、`notification-service/`、`frontend/` 目錄骨架（依 plan.md Project Structure）
-- [ ] T002 [P] 初始化 app-service Spring Boot 專案骨架（Web、Validation、MyBatis（mybatis-spring-boot-starter）、Flyway（flyway-mysql）、MySQL Connector/J（mysql-connector-j）、Spring Security、`jjwt`、Spring Boot Actuator）於 `app-service/`，套件命名 `com.family195home.app`，含 `Dockerfile`
-- [ ] T003 [P] 初始化 notification-service Spring Boot 專案骨架（Web、MyBatis、Flyway、MySQL Connector/J、`line-bot-sdk-java`、Spring Scheduling、Spring WebClient）於 `notification-service/`，含 `Dockerfile`
-- [ ] T004 [P] 初始化前端 React + TypeScript 專案（Vite）於 `frontend/`，安裝 React Router、Axios、TanStack Query (React Query)
-- [ ] T005 [P] 建立 app-service、notification-service 的 `application.yml` 骨架（含 DB 連線字串、JWT 簽章密鑰、`X-Internal-Token` 共用密鑰 placeholder，見 research.md 決策 5、7；正式環境改由 Northflank Secret Group 覆寫，本機開發由 docker-compose `environment` 區塊注入）
-- [ ] T006 建立 `docker-compose.yml` 骨架：MySQL 容器 + app-service + notification-service 兩項服務（含 `depends_on` 啟動順序）
-- [ ] T007 [P] 建立 `.github/workflows/ci.yml`：PR/push 時對 app-service、notification-service 執行 `./mvnw test`，對前端執行 `npm run build && npm test`（不通過測試不得合併，依 constitution 開發流程規範）
-- [ ] T008 [P] 為 app-service（`appdb`）、notification-service（`notificationdb`）各自建立初版 Flyway migration script `src/main/resources/db/migration/V1__create_initial_tables.sql`（MySQL DDL 語法），對應 data-model.md 定義的資料表；`expense_records` 表額外建立複合索引 `(family_group_id, payment_account_id, author_member_id, occurred_at)`，支援 FR-008/FR-009/FR-010 篩選與 SC-003（篩選後列表 2 秒內回應）
+- [X] T001 建立根目錄專案結構：`app-service/`（含 `family/`、`expense/`、`statistics/`、`security/`、`config/` 套件骨架）、`notification-service/`、`frontend/` 目錄骨架（依 plan.md Project Structure）
+- [X] T002 [P] 初始化 app-service Spring Boot 專案骨架（Web、Validation、MyBatis（mybatis-spring-boot-starter）、Flyway（flyway-mysql）、MySQL Connector/J（mysql-connector-j）、Spring Security、`jjwt`、Spring Boot Actuator）於 `app-service/`，套件命名 `com.family195home.app`，含 `Dockerfile`
+- [X] T003 [P] 初始化 notification-service Spring Boot 專案骨架（Web、MyBatis、Flyway、MySQL Connector/J、`line-bot-sdk-java`、Spring Scheduling、Spring WebClient）於 `notification-service/`，含 `Dockerfile`
+- [X] T004 [P] 初始化前端 React + TypeScript 專案（Vite）於 `frontend/`，安裝 React Router、Axios、TanStack Query (React Query)
+- [X] T005 [P] 建立 app-service、notification-service 的 `application.yml` 骨架（含 DB 連線字串、JWT 簽章密鑰、`X-Internal-Token` 共用密鑰 placeholder，見 research.md 決策 5、7；正式環境改由 Northflank Secret Group 覆寫，本機開發由 docker-compose `environment` 區塊注入）
+- [X] T006 建立 `docker-compose.yml` 骨架：MySQL 容器 + app-service + notification-service 兩項服務（含 `depends_on` 啟動順序）
+- [X] T007 [P] 建立 `.github/workflows/ci.yml`：PR/push 時對 app-service、notification-service 執行 `./mvnw test`，對前端執行 `npm run build && npm test`（不通過測試不得合併，依 constitution 開發流程規範）
+- [X] T008 [P] 為 app-service（`appdb`）、notification-service（`notificationdb`）各自建立初版 Flyway migration script `src/main/resources/db/migration/V1__create_initial_tables.sql`（MySQL DDL 語法），對應 data-model.md 定義的資料表；`expense_records` 表額外建立複合索引 `(family_group_id, payment_account_id, author_member_id, occurred_at)`，支援 FR-008/FR-009/FR-010 篩選與 SC-003（篩選後列表 2 秒內回應）
 
 **Checkpoint**: 兩個服務骨架與前端專案就緒，可開始 Foundational 開發
 

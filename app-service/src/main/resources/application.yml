@@ -1,0 +1,48 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: app-service
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${APPDB_NAME:appdb}?useUnicode=true&characterEncoding=utf8mb4&serverTimezone=UTC
+    username: ${DB_USERNAME:app}
+    password: ${DB_PASSWORD:app}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  web:
+    resources:
+      static-locations: classpath:/static/
+
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:dev-only-secret-key-change-me-please-32bytes+}
+    expiration-minutes: 120
+  internal:
+    token: ${INTERNAL_TOKEN:dev-only-internal-token-change-me}
+  line-binding-code:
+    ttl-minutes: 10
+  expense-lock:
+    ttl-minutes: 5
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+logging:
+  level:
+    com.family195home: DEBUG
