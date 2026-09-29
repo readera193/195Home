@@ -198,15 +198,15 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 **Purpose**: 跨 Story 的收尾工作與部署完整性
 
-- [ ] T064 [P] 實作 `GET /api/notifications/logs?familyGroupId=&month=` 通知發送紀錄查詢端點（維運/測試用途）於 `notification-service/src/main/java/com/family195home/notification/controller/NotificationLogController.java`
-- [ ] T065 [P] 前端建置產物整合：於 CI（`.github/workflows/ci.yml`）中 `frontend` build 完成後，將 `frontend/dist` 產物複製進 `app-service/src/main/resources/static/`，供 app-service 一併打包進映像檔（依 plan.md Project Structure）
-- [ ] T066 [P] 完善 `docker-compose.yml`：加入 app-service、notification-service 健康檢查（Spring Boot Actuator）與 `depends_on` 條件式啟動順序、注入 `application.yml` 對應環境變數
-- [ ] T067 [P] 建立 `.github/workflows/cd.yml`：build app-service、notification-service 映像檔 → 推送 GHCR → 觸發 Northflank 對應兩個 service 拉取並部署最新映像檔（見 research.md 決策 1、quickstart.md「部署到 Northflank」段落）
-- [ ] T068 [P] 撰寫 `README.md`：系統架構圖、app-service（含 family/expense/statistics 模組）與 notification-service 職責說明、技術選型理由（含「為什麼不用 .NET」「為什麼不用訊息佇列」「為什麼只拆兩個服務，不是完整微服務」之具體回答，依 constitution v3.0.0 開發流程規範）
-- [ ] T069 依 [quickstart.md](./quickstart.md) 逐項執行 US1-US6 驗證場景，確認端對端可正常運作
-- [ ] T070 [P] 前端關鍵元件測試（Vitest + React Testing Library）：登入表單、支出新增表單驗證邏輯於 `frontend/tests/`
-- [ ] T071 [P] app-service（family、expense 模組）、notification-service 補上 MyBatis Mapper slice 測試，驗證自訂 SQL 查詢語意（例如依 `familyGroupId`/`status` 篩選、分頁、排序），於各自 `src/test/java/.../infrastructure/persistence/`
-- [ ] T072 [P] app-service、notification-service 補上正式資料庫 integration 測試（Testcontainers + MySQL，比照 task-board-practice `MySqlRepositoryIntegrationTest` 模式），驗證 Flyway migration 可於真實 MySQL 執行且 Mapper SQL 與 MySQL 方言相容，於各自 `src/test/java/.../`
+- [X] T064 [P] 實作 `GET /api/notifications/logs?familyGroupId=&month=` 通知發送紀錄查詢端點（維運/測試用途）於 `notification-service/src/main/java/com/family195home/notification/controller/NotificationLogController.java`
+- [X] T065 [P] 前端建置產物整合：於 CI（`.github/workflows/ci.yml`）中 `frontend` build 完成後，將 `frontend/dist` 產物複製進 `app-service/src/main/resources/static/`，供 app-service 一併打包進映像檔（依 plan.md Project Structure）
+- [X] T066 [P] 完善 `docker-compose.yml`：加入 app-service、notification-service 健康檢查（Spring Boot Actuator）與 `depends_on` 條件式啟動順序、注入 `application.yml` 對應環境變數
+- [X] T067 [P] 建立 `.github/workflows/cd.yml`：build app-service、notification-service 映像檔 → 推送 GHCR → 觸發 Northflank 對應兩個 service 拉取並部署最新映像檔（見 research.md 決策 1、quickstart.md「部署到 Northflank」段落）
+- [X] T068 [P] 撰寫 `README.md`：系統架構圖、app-service（含 family/expense/statistics 模組）與 notification-service 職責說明、技術選型理由（含「為什麼不用 .NET」「為什麼不用訊息佇列」「為什麼只拆兩個服務，不是完整微服務」之具體回答，依 constitution v3.0.0 開發流程規範）
+- [X] T069 依 [quickstart.md](./quickstart.md) 逐項執行 US1-US6 驗證場景，確認端對端可正常運作
+- [X] T070 [P] 前端關鍵元件測試（Vitest + React Testing Library）：登入表單、支出新增表單驗證邏輯於 `frontend/tests/`
+- [X] T071 [P] app-service（family、expense 模組）、notification-service 補上 MyBatis Mapper slice 測試，驗證自訂 SQL 查詢語意（例如依 `familyGroupId`/`status` 篩選、分頁、排序），於各自 `src/test/java/.../infrastructure/persistence/`
+- [X] T072 [P] app-service、notification-service 補上正式資料庫 integration 測試（Testcontainers + MySQL，比照 task-board-practice `MySqlRepositoryIntegrationTest` 模式），驗證 Flyway migration 可於真實 MySQL 執行且 Mapper SQL 與 MySQL 方言相容，於各自 `src/test/java/.../`
 
 ---
 

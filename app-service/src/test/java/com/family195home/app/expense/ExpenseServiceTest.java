@@ -80,7 +80,7 @@ class ExpenseServiceTest {
     @Test
     void lock_succeedsWhenNotCurrentlyLocked() {
         // FR-027
-        when(expenseRecordRepository.tryLock(eq(1L), eq(2L), any(), any())).thenReturn(1);
+        when(expenseRecordRepository.tryLock(eq(1L), eq(2L), any(), anyLong())).thenReturn(1);
         ExpenseRecord locked = new ExpenseRecord();
         locked.setId(1L);
         locked.setLockedByMemberId(2L);
@@ -95,7 +95,7 @@ class ExpenseServiceTest {
     @Test
     void lock_rejectsWhenAlreadyLockedByOther() {
         // FR-027
-        when(expenseRecordRepository.tryLock(eq(1L), eq(2L), any(), any())).thenReturn(0);
+        when(expenseRecordRepository.tryLock(eq(1L), eq(2L), any(), anyLong())).thenReturn(0);
 
         assertThatThrownBy(() -> expenseService.lock(1L, 2L))
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("RECORD_LOCKED"));
