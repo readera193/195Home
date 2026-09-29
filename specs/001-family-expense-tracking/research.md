@@ -8,8 +8,8 @@
 - **Rationale**: 直接沿用本機一致的 `docker-compose.yml` 設定，學習成本最低、能快速驗證整套系統可運作，且不綁定特定雲端 PaaS 廠商的專屬部署流程，符合原則 V（CI/CD 需含實際部署）與原則 VII（容器化與一鍵啟動）的精神一致性。
 - **Alternatives considered**:
   - Kubernetes：複雜度超出本階段學習目標，且明確列於非目標範圍。
-  - Azure App Service / AWS ECS：需額外學習雲端專屬部署模型，且 MSSQL 相容性與費用需另外處理。
-  - Render / Railway 等 PaaS：對多服務 docker-compose 架構與 MSSQL 支援有限，不易對應 6 個服務 + 資料庫的完整拓樸。
+  - Azure App Service / AWS ECS：需額外學習雲端專屬部署模型，且 MySQL 相容性與費用需另外處理。
+  - Render / Railway 等 PaaS：對多服務 docker-compose 架構與 MySQL 支援有限，不易對應 6 個服務 + 資料庫的完整拓樸。
 
 ## 2. LINE Messaging API 整合方式
 
@@ -19,11 +19,11 @@
 
 ## 3. 併發編輯鎖定機制（FR-027）
 
-- **Decision**: 於 `expense_records` 資料表新增 `locked_by_member_id`、`locked_at` 欄位。取得編輯權時以單一交易執行條件式 UPDATE：`WHERE id = ? AND (locked_by_member_id IS NULL OR locked_at < DATEADD(MINUTE, -5, SYSUTCDATETIME()))`，影響列數為 1 才視為取得鎖；儲存或取消編輯時清除鎖定欄位；鎖定 TTL 設為 5 分鐘，避免使用者異常關閉頁面導致永久鎖死。
-- **Rationale**: 善用既有 MSSQL 交易機制即可達成互斥控制，不需引入 Redis 等分散式鎖工具，符合技術邊界限制（不得新增資料庫技術）與原則 VI（可讀性優先）。
+- **Decision**: 於 `expense_records` 資料表新增 `locked_by_member_id`、`locked_at` 欄位。取得編輯權時以單一交易執行條件式 UPDATE：`WHERE id = ? AND (locked_by_member_id IS NULL OR locked_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 MINUTE))`，影響列數為 1 才視為取得鎖；儲存或取消編輯時清除鎖定欄位；鎖定 TTL 設為 5 分鐘，避免使用者異常關閉頁面導致永久鎖死。
+- **Rationale**: 善用既有 MySQL 交易機制即可達成互斥控制，不需引入 Redis 等分散式鎖工具，符合技術邊界限制（不得新增資料庫技術）與原則 VI（可讀性優先）。
 - **Alternatives considered**:
-  - Redis 分散式鎖：違反 constitution 技術邊界（不允許引入 MSSQL 以外的資料庫技術）。
-  - MSSQL 原生 `SELECT ... FOR UPDATE` / 交易鎖：編輯行為可能持續數分鐘，長時間持有資料庫鎖易造成資源占用與交易逾時風險，不適用於此情境。
+  - Redis 分散式鎖：違反 constitution 技術邊界（不允許引入 MySQL 以外的資料庫技術）。
+  - MySQL 原生 `SELECT ... FOR UPDATE` / 交易鎖：編輯行為可能持續數分鐘，長時間持有資料庫鎖易造成資源占用與交易逾時風險，不適用於此情境。
 
 ## 4. 統計資料計算策略（FR-011）
 
@@ -68,6 +68,24 @@
 - **Decision**: React + TypeScript 搭配 Axios 處理 API 呼叫，並使用 TanStack Query (React Query) 管理伺服器狀態快取與重新驗證。
 - **Rationale**: 屬於「已具備技術」範疇內的常見周邊工具，能簡化列表篩選、統計月份切換等需重複查詢情境的狀態管理。
 - **Alternatives considered**: 純 `useEffect` + `useState` 手刻資料流——對篩選/月份切換等重複查詢情境會產生較多重複邏輯，可讀性較低，不採用。
+
+## 10. 資料庫存取技術（ORM/Mapper 選型）
+
+- **Decision**: 改用 MyBatis（`mybatis-spring-boot-starter`）取代 Spring Data JPA。各服務資料存取層採 port/adapter 分層：domain 層定義 repository 介面，infrastructure 層以 `RepositoryImpl` 實作介面並委派給 MyBatis `@Mapper` 介面；SQL 以 XML Mapper（`src/main/resources/mapper/*.xml`）撰寫。
+- **Rationale**: 顯式撰寫 SQL 能更清楚掌控查詢語意與效能，避免 JPA 延遲載入、N+1 查詢等隱性行為造成不易解釋的效能問題，與原則 VI（可讀性與可解釋性優先）呼應；同時比照 task-board-practice 的 `TaskRepository`／`TaskRepositoryImpl`／`JpaTaskRepository` 分層模式（僅將最底層由 `JpaRepository` 換成 MyBatis Mapper），維持介面與實作分離的可測試性。
+- **Alternatives considered**: 繼續使用 Spring Data JPA——與本次規劃目標（改用 MyBatis）不符，不採用。
+
+## 11. 資料庫技術（MSSQL → MySQL）
+
+- **Decision**: 資料庫技術由 MSSQL 改為 MySQL，各服務 JDBC 驅動改用 `mysql-connector-j`；docker-compose 的資料庫容器改用官方 `mysql` image（例如 `mysql:8.x`）。
+- **Rationale**: 與參考練習專案 task-board-practice 的技術棧一致（該專案採 MySQL + `mysql-connector-j` + `flyway-mysql`），可直接沿用其 migration 與測試作法；MySQL 為開源免費授權，對個人練習專案而言部署與授權成本較 MSSQL 低。
+- **Alternatives considered**: 繼續使用 MSSQL——與 task-board-practice 技術棧不一致，且與本次改用 MyBatis + Flyway 一併重新檢討資料庫存取層時，無明確理由需保留 MSSQL 專屬依賴，不採用。
+
+## 12. Schema Migration 工具
+
+- **Decision**: 各擁有獨立資料庫的服務（family-service、expense-service、notification-service）採用 Flyway（`flyway-mysql`）管理 MySQL schema，migration script 置於 `src/main/resources/db/migration/`，命名慣例 `V{n}__{description}.sql`。
+- **Rationale**: MyBatis 不像 JPA 有 `ddl-auto` 可隱含建表，需要顯式、可版本控制的 schema 定義；`flyway-mysql` 與 MySQL 相容，且與 constitution 原則 VI（可讀性、可解釋性）一致，比照 task-board-practice 的 `V1__create_initial_tables.sql` 慣例。
+- **Alternatives considered**: 手動 SQL script + 人工執行——不易追蹤版本與 CI/CD 自動化，不採用。
 
 ---
 

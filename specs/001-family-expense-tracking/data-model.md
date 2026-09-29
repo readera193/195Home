@@ -4,6 +4,8 @@
 
 ## family-service（資料庫：`familydb`）
 
+schema 定義對應 `family-service/src/main/resources/db/migration/`（Flyway migration script）。
+
 ### User（使用者帳號）
 
 | 欄位 | 型別 | 說明 |
@@ -11,7 +13,7 @@
 | id | BIGINT PK | |
 | email | VARCHAR(255) UNIQUE NOT NULL | 全系統唯一（FR-024） |
 | passwordHash | VARCHAR(255) NOT NULL | BCrypt 雜湊 |
-| createdAt | DATETIME2 NOT NULL | |
+| createdAt | DATETIME(6) NOT NULL | |
 
 **驗證規則**：註冊時 email 已存在 → 拒絕並提示「此 Email 已被註冊，請改用登入」（FR-024）。
 
@@ -23,7 +25,7 @@
 | name | VARCHAR(100) UNIQUE NOT NULL | 全系統唯一（FR-001） |
 | status | VARCHAR(20) NOT NULL | `ACTIVE` \| `DISSOLVED` |
 | inviteCode | VARCHAR(32) UNIQUE NOT NULL | 可重複使用、無時限（FR-002） |
-| createdAt | DATETIME2 NOT NULL | |
+| createdAt | DATETIME(6) NOT NULL | |
 
 **狀態轉換**：`ACTIVE` → `DISSOLVED`（唯一在職成員離開時，FR-018）。`DISSOLVED` 群組 MUST NOT 允許新增支付帳戶或支出紀錄。
 
@@ -36,8 +38,8 @@
 | userId | BIGINT FK → User | |
 | status | VARCHAR(20) NOT NULL | `ACTIVE` \| `LEFT` |
 | role | VARCHAR(20) NOT NULL | `ADMIN` \| `MEMBER` |
-| joinedAt | DATETIME2 NOT NULL | |
-| leftAt | DATETIME2 NULL | |
+| joinedAt | DATETIME(6) NOT NULL | |
+| leftAt | DATETIME(6) NULL | |
 
 **驗證規則**：
 - 同一 `userId` 在整個系統中同時只能有一筆 `status = ACTIVE` 的 FamilyMember（FR-026）。
@@ -57,9 +59,9 @@
 | id | BIGINT PK | |
 | familyMemberId | BIGINT FK → FamilyMember | |
 | code | VARCHAR(16) UNIQUE NOT NULL | |
-| expiresAt | DATETIME2 NOT NULL | 產生後 10 分鐘（FR-023） |
-| used | BIT NOT NULL DEFAULT 0 | |
-| createdAt | DATETIME2 NOT NULL | |
+| expiresAt | DATETIME(6) NOT NULL | 產生後 10 分鐘（FR-023） |
+| used | TINYINT(1) NOT NULL DEFAULT 0 | |
+| createdAt | DATETIME(6) NOT NULL | |
 
 **驗證規則**：`used = 1` 或 `expiresAt < now` 的綁定碼不可再使用，須重新產生（FR-023）。
 
@@ -70,13 +72,15 @@
 | id | BIGINT PK | |
 | familyMemberId | BIGINT FK → FamilyMember UNIQUE | 每個成員身分僅一個綁定 |
 | lineUserId | VARCHAR(64) UNIQUE NOT NULL | 每個 LINE 帳號僅能綁定一個成員身分（FR-020） |
-| boundAt | DATETIME2 NOT NULL | |
+| boundAt | DATETIME(6) NOT NULL | |
 
 **登入驗證**：採 JWT（見 research.md 決策 7），不儲存 Session 資料表；token 本身即攜帶 `userId`、`email`、簽發/過期時間，由 family-service 簽發，其餘服務與 gateway 以共用密鑰本地驗證簽章，無需查詢資料庫。
 
 ---
 
 ## expense-service（資料庫：`expensedb`）
+
+schema 定義對應 `expense-service/src/main/resources/db/migration/`（Flyway migration script）。
 
 ### PaymentAccount（支付帳戶）
 
@@ -87,7 +91,7 @@
 | familyGroupId | BIGINT NOT NULL | 供家庭範圍查詢與資料隔離（FR-017） |
 | name | VARCHAR(100) NOT NULL | 例如「現金」「銀行帳戶」「信用卡」（FR-003） |
 | status | VARCHAR(20) NOT NULL | `ACTIVE` \| `DISABLED` |
-| createdAt | DATETIME2 NOT NULL | |
+| createdAt | DATETIME(6) NOT NULL | |
 
 **驗證規則**：`DISABLED` 帳戶不可供新增支出紀錄選用，但既有支出紀錄仍完整顯示原帳戶名稱；已有支出紀錄關聯的帳戶 MUST NOT 真正刪除，僅能軟停用（FR-022）。
 
@@ -102,12 +106,12 @@
 | paymentAccountId | BIGINT FK → PaymentAccount NOT NULL | |
 | authorMemberId | BIGINT NOT NULL | 參照 family-service 成員 id，新增者身分（FR-004） |
 | amount | INT NOT NULL | 整數，可正可負可零；正數=流入，負數=流出（FR-016） |
-| note | NVARCHAR(500) NOT NULL | 必填自由文字（FR-004） |
-| occurredAt | DATETIME2 NOT NULL | 未指定時預設當下（FR-005）；可手動指定（FR-006） |
-| createdAt | DATETIME2 NOT NULL | |
-| updatedAt | DATETIME2 NOT NULL | |
+| note | VARCHAR(500) NOT NULL | 必填自由文字，資料庫／欄位 charset 採 `utf8mb4`（FR-004） |
+| occurredAt | DATETIME(6) NOT NULL | 未指定時預設當下（FR-005）；可手動指定（FR-006） |
+| createdAt | DATETIME(6) NOT NULL | |
+| updatedAt | DATETIME(6) NOT NULL | |
 | lockedByMemberId | BIGINT NULL | 併發編輯鎖定（FR-027），見 research.md 決策 3 |
-| lockedAt | DATETIME2 NULL | |
+| lockedAt | DATETIME(6) NULL | |
 
 **驗證規則**：
 - `amount` 必須為整數（不接受小數點）；可正可負可零（FR-016）。
@@ -135,6 +139,8 @@
 
 ## notification-service（資料庫：`notificationdb`）
 
+schema 定義對應 `notification-service/src/main/resources/db/migration/`（Flyway migration script）。
+
 ### NotificationLog（月結通知發送紀錄）
 
 | 欄位 | 型別 | 說明 |
@@ -146,8 +152,8 @@
 | yearMonth | VARCHAR(7) NOT NULL | 格式 `YYYY-MM` |
 | status | VARCHAR(20) NOT NULL | `SUCCESS` \| `FAILED` |
 | attempts | INT NOT NULL DEFAULT 0 | 最多重試 3 次（FR-013） |
-| lastAttemptAt | DATETIME2 NOT NULL | |
-| errorMessage | NVARCHAR(500) NULL | |
+| lastAttemptAt | DATETIME(6) NOT NULL | |
+| errorMessage | VARCHAR(500) NULL | 資料庫／欄位 charset 採 `utf8mb4` |
 
 **驗證規則**：單一成員單一月份發送失敗達重試上限（3 次）後標記 `FAILED` 並記錄錯誤，不影響其他成員發送（FR-013）。
 
