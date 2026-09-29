@@ -10,6 +10,7 @@ import MembersPage from './pages/MembersPage';
 import PaymentAccountsPage from './pages/PaymentAccountsPage';
 import ExpenseFormPage from './pages/ExpenseFormPage';
 import ExpenseListPage from './pages/ExpenseListPage';
+import StatisticsPage from './pages/StatisticsPage';
 
 export default function App() {
   return (
@@ -63,6 +64,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <ExpenseListPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/statistics"
+            element={
+              <ProtectedRoute>
+                <StatisticsPage />
               </ProtectedRoute>
             }
           />

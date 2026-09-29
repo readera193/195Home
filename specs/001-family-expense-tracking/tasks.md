@@ -142,11 +142,11 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 ### Implementation for User Story 4
 
-- [ ] T043 [US4] 實作 StatisticsService：同進程直接呼叫 `ExpenseService` 取得指定家庭、指定月份的支出紀錄（Java 方法呼叫，取代原本跨服務 WebClient 呼叫，見 research.md 決策 4），依 `paymentAccountId` 加總 `amount` 為 `netAmount`，當月無資料時回傳空陣列與 `totalNetAmount: 0`（非錯誤或空白畫面，FR-011）於 `app-service/src/main/java/com/family195home/app/statistics/service/StatisticsService.java`（依賴 T040）
-- [ ] T044 [P] [US4] 實作 `GET /api/statistics/monthly?familyGroupId=&month=` 公開端點（呼叫 T021 的 `assertMemberAuthorized` 確認呼叫者屬於該家庭群組，FR-017）於 `app-service/src/main/java/com/family195home/app/statistics/controller/StatisticsController.java`（依賴 T043、T021）
-- [ ] T045 [P] [US4] 單元測試：各帳戶彙總淨額加總等於當月支出紀錄總和（SC-004）、無資料月份回傳 0 而非錯誤於 `app-service/src/test/java/com/family195home/app/statistics/StatisticsServiceTest.java`
-- [ ] T046 [P] [US4] 前端統計頁面（月份選擇器、各支付帳戶淨額列表、總計）於 `frontend/src/pages/StatisticsPage.tsx`
-- [ ] T047 [US4] 前端封裝統計 API 呼叫於 `frontend/src/services/statisticsApi.ts`（依賴 T014 的 apiClient）
+- [X] T043 [US4] 實作 StatisticsService：同進程直接呼叫 `ExpenseService` 取得指定家庭、指定月份的支出紀錄（Java 方法呼叫，取代原本跨服務 WebClient 呼叫，見 research.md 決策 4），依 `paymentAccountId` 加總 `amount` 為 `netAmount`，當月無資料時回傳空陣列與 `totalNetAmount: 0`（非錯誤或空白畫面，FR-011）於 `app-service/src/main/java/com/family195home/app/statistics/service/StatisticsService.java`（依賴 T040）
+- [X] T044 [P] [US4] 實作 `GET /api/statistics/monthly?familyGroupId=&month=` 公開端點（呼叫 T021 的 `assertMemberAuthorized` 確認呼叫者屬於該家庭群組，FR-017）於 `app-service/src/main/java/com/family195home/app/statistics/controller/StatisticsController.java`（依賴 T043、T021）
+- [X] T045 [P] [US4] 單元測試：各帳戶彙總淨額加總等於當月支出紀錄總和（SC-004）、無資料月份回傳 0 而非錯誤於 `app-service/src/test/java/com/family195home/app/statistics/StatisticsServiceTest.java`
+- [X] T046 [P] [US4] 前端統計頁面（月份選擇器、各支付帳戶淨額列表、總計）於 `frontend/src/pages/StatisticsPage.tsx`
+- [X] T047 [US4] 前端封裝統計 API 呼叫於 `frontend/src/services/statisticsApi.ts`（依賴 T014 的 apiClient）
 
 **Checkpoint**: 核心記帳、查看、統計功能（User Story 1-4）應皆可獨立運作，構成完整可用產品
 
