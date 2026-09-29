@@ -21,7 +21,11 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 ## Path Conventions（依 plan.md Project Structure）
 
-- 後端微服務：`gateway-service/`、`config-service/`、`family-service/`、`expense-service/`、`statistics-service/`、`notification-service/`，各自 `src/main/java/.../<service>/{controller,service,repository,domain,dto}`、`src/test/java/.../<service>/`
+- 後端微服務：`gateway-service/`、`config-service/`、`family-service/`、`expense-service/`、`statistics-service/`、`notification-service/`，各自 `src/main/java/.../<service>/{controller,service,domain,dto}`、`src/test/java/.../<service>/`
+- 擁有獨立資料庫的服務（family-service、expense-service、notification-service）另含：
+  `application/`（repository 介面/port）、`infrastructure/persistence/`（RepositoryImpl adapter +
+  MyBatis Mapper 介面）、`src/main/resources/mapper/`（MyBatis XML Mapper）、
+  `src/main/resources/db/migration/`（Flyway migration script）
 - 設定集中管理：`config-repo/`
 - 前端：`frontend/src/{components,pages,services,hooks}`、`frontend/tests/`
 - 根目錄：`docker-compose.yml`、`.github/workflows/{ci.yml,cd.yml}`、`README.md`
@@ -34,16 +38,17 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 **Purpose**: 建立各服務專案骨架與集中設定，尚不含商業邏輯
 
 - [ ] T001 建立根目錄專案結構：`gateway-service/`、`config-service/`、`family-service/`、`expense-service/`、`statistics-service/`、`notification-service/`、`frontend/`、`config-repo/` 目錄骨架（依 plan.md Project Structure）
-- [ ] T002 [P] 建立 `config-repo/` 集中設定檔骨架：`config-repo/gateway-service.yml`、`config-repo/family-service.yml`、`config-repo/expense-service.yml`、`config-repo/statistics-service.yml`、`config-repo/notification-service.yml`（含各服務 DB 連線字串、port、JWT 共用簽章密鑰、`X-Internal-Token` 共用密鑰 placeholder，見 research.md 決策 5、7）
+- [ ] T002 [P] 建立 `config-repo/` 集中設定檔骨架：`config-repo/gateway-service.yml`、`config-repo/family-service.yml`、`config-repo/expense-service.yml`、`config-repo/statistics-service.yml`、`config-repo/notification-service.yml`（含各服務 DB 連線字串 `jdbc:mysql://...`、port、JWT 共用簽章密鑰、`X-Internal-Token` 共用密鑰 placeholder，見 research.md 決策 5、7）
 - [ ] T003 [P] 初始化 config-service（Spring Cloud Config Server，native file-based backend 指向 `config-repo/`）於 `config-service/`，含 `Dockerfile`
 - [ ] T004 [P] 初始化 gateway-service（Spring Cloud Gateway）於 `gateway-service/`，含 `Dockerfile`
-- [ ] T005 [P] 初始化 family-service Spring Boot 專案骨架（Web、Validation、Data JPA、MSSQL JDBC Driver、Spring Security、`jjwt`）於 `family-service/`，含 `Dockerfile`
-- [ ] T006 [P] 初始化 expense-service Spring Boot 專案骨架（Web、Validation、Data JPA、MSSQL JDBC Driver）於 `expense-service/`，含 `Dockerfile`
+- [ ] T005 [P] 初始化 family-service Spring Boot 專案骨架（Web、Validation、MyBatis（mybatis-spring-boot-starter）、Flyway（flyway-mysql）、MySQL Connector/J（mysql-connector-j）、Spring Security、`jjwt`）於 `family-service/`，含 `Dockerfile`
+- [ ] T006 [P] 初始化 expense-service Spring Boot 專案骨架（Web、Validation、MyBatis（mybatis-spring-boot-starter）、Flyway（flyway-mysql）、MySQL Connector/J（mysql-connector-j））於 `expense-service/`，含 `Dockerfile`
 - [ ] T007 [P] 初始化 statistics-service Spring Boot 專案骨架（Web、WebClient，無獨立資料庫）於 `statistics-service/`，含 `Dockerfile`
-- [ ] T008 [P] 初始化 notification-service Spring Boot 專案骨架（Web、Data JPA、MSSQL JDBC Driver、`line-bot-sdk-java`、Spring Scheduling）於 `notification-service/`，含 `Dockerfile`
+- [ ] T008 [P] 初始化 notification-service Spring Boot 專案骨架（Web、MyBatis（mybatis-spring-boot-starter）、Flyway（flyway-mysql）、MySQL Connector/J（mysql-connector-j）、`line-bot-sdk-java`、Spring Scheduling）於 `notification-service/`，含 `Dockerfile`
 - [ ] T009 [P] 初始化前端 React + TypeScript 專案（Vite）於 `frontend/`，安裝 React Router、Axios、TanStack Query (React Query)
-- [ ] T010 建立 `docker-compose.yml` 骨架：定義 MSSQL 容器與 config-service、gateway-service、family-service、expense-service、statistics-service、notification-service、frontend 七項服務（含服務啟動順序 `depends_on`）
+- [ ] T010 建立 `docker-compose.yml` 骨架：定義 MySQL 容器與 config-service、gateway-service、family-service、expense-service、statistics-service、notification-service、frontend 七項服務（含服務啟動順序 `depends_on`）
 - [ ] T011 [P] 建立 `.github/workflows/ci.yml`：PR/push 時對所有後端服務執行 `./mvnw test`、對前端執行 `npm test`（不通過測試不得合併，依 constitution 開發流程規範）
+- [ ] T011a [P] 為 family-service、expense-service、notification-service 各自建立初版 Flyway migration script `src/main/resources/db/migration/V1__create_initial_tables.sql`（MySQL DDL 語法），對應 data-model.md 定義的資料表，供後續 Foundational/各 User Story 任務建表使用
 
 **Checkpoint**: 所有服務骨架與集中設定就緒，可開始 Foundational 開發
 
@@ -55,7 +60,7 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 **⚠️ CRITICAL**: 本階段完成前，不可開始任何 User Story 的開發
 
-- [ ] T012 [P] 建立 User entity 與 repository 於 `family-service/src/main/java/com/family195home/family/domain/User.java`、`repository/UserRepository.java`（對應 `familydb`）
+- [ ] T012 [P] 建立 User 資料模型（POJO）、repository 介面與 MyBatis Mapper 於 `family-service/src/main/java/com/family195home/family/domain/User.java`、`application/UserRepository.java`、`infrastructure/persistence/UserRepositoryImpl.java`、`infrastructure/persistence/UserMapper.java`、`resources/mapper/UserMapper.xml`（對應 `familydb`）
 - [ ] T013 [P] 實作 BCrypt 密碼雜湊與 JWT 簽發/驗證工具類別（HS256、Claim 含 `sub`/`email`/`iat`/`exp`，2 小時過期）於 `family-service/src/main/java/com/family195home/family/security/JwtTokenProvider.java`
 - [ ] T014 實作 `POST /api/users/register`、`POST /api/users/login` API（含 Email 全系統唯一性檢查，重複則回傳 `409 EMAIL_ALREADY_REGISTERED`，FR-024）於 `family-service/src/main/java/com/family195home/family/controller/UserController.java` 與對應 service 層（依賴 T012、T013）
 - [ ] T015 [P] 於 gateway-service 實作 JWT 本地驗證 GlobalFilter（以共用密鑰驗證簽章與過期時間，`/api/users/register`、`/api/users/login`、`/api/line/webhook` 除外皆需驗證，失敗回傳 `401`，並原樣轉發 JWT 給下游服務）於 `gateway-service/src/main/java/com/family195home/gateway/filter/JwtAuthGlobalFilter.java`
@@ -76,8 +81,8 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 ### Implementation for User Story 1
 
-- [ ] T020 [P] [US1] 建立 FamilyGroup entity 與 repository（`name` 全系統唯一、`status` ACTIVE/DISSOLVED、`inviteCode`）於 `family-service/src/main/java/com/family195home/family/domain/FamilyGroup.java`、`repository/FamilyGroupRepository.java`
-- [ ] T021 [P] [US1] 建立 FamilyMember entity 與 repository（`status` ACTIVE/LEFT、`role` ADMIN/MEMBER、`joinedAt`/`leftAt`）於 `family-service/src/main/java/com/family195home/family/domain/FamilyMember.java`、`repository/FamilyMemberRepository.java`
+- [ ] T020 [P] [US1] 建立 FamilyGroup 資料模型（POJO）、repository 介面與 MyBatis Mapper（`name` 全系統唯一、`status` ACTIVE/DISSOLVED、`inviteCode`）於 `family-service/src/main/java/com/family195home/family/domain/FamilyGroup.java`、`application/FamilyGroupRepository.java`、`infrastructure/persistence/FamilyGroupRepositoryImpl.java`、`infrastructure/persistence/FamilyGroupMapper.java`、`resources/mapper/FamilyGroupMapper.xml`
+- [ ] T021 [P] [US1] 建立 FamilyMember 資料模型（POJO）、repository 介面與 MyBatis Mapper（`status` ACTIVE/LEFT、`role` ADMIN/MEMBER、`joinedAt`/`leftAt`）於 `family-service/src/main/java/com/family195home/family/domain/FamilyMember.java`、`application/FamilyMemberRepository.java`、`infrastructure/persistence/FamilyMemberRepositoryImpl.java`、`infrastructure/persistence/FamilyMemberMapper.java`、`resources/mapper/FamilyMemberMapper.xml`
 - [ ] T022 [US1] 實作 FamilyService 建立群組邏輯：群組名稱唯一性檢查（重複回傳 `409 GROUP_NAME_TAKEN`，FR-001）、建立者自動成為 `ADMIN`；加入群組邏輯：邀請碼驗證（`404 INVALID_INVITE_CODE`）、群組已解散拒絕（`409 GROUP_DISSOLVED`）、單一在職群組限制（已屬於群組者拒絕，`409 ALREADY_IN_A_GROUP`，FR-026）於 `family-service/src/main/java/com/family195home/family/service/FamilyService.java`（依賴 T020、T021）
 - [ ] T023 [US1] 實作離開群組邏輯：唯一在職成員離開 → 群組標記 `DISSOLVED`（FR-018）；`ADMIN` 離開且尚有其他在職成員 → 自動將 `ADMIN` 轉移給群組內 `joinedAt` 最早的其他在職成員（FR-029）於 `FamilyService.java`
 - [ ] T024 [US1] 實作移出成員（kick）邏輯：限該群組 `ADMIN` 呼叫，否則回傳 `403 NOT_GROUP_ADMIN`；被移出成員狀態變更為 `LEFT`（FR-028）於 `FamilyService.java`
@@ -100,8 +105,8 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 ### Implementation for User Story 2
 
-- [ ] T031 [P] [US2] 建立 PaymentAccount entity 與 repository（`status` ACTIVE/DISABLED）於 `expense-service/src/main/java/com/family195home/expense/domain/PaymentAccount.java`、`repository/PaymentAccountRepository.java`
-- [ ] T032 [P] [US2] 建立 ExpenseRecord entity 與 repository（含 `amount`、`note`、`occurredAt`、`lockedByMemberId`、`lockedAt` 欄位）於 `expense-service/src/main/java/com/family195home/expense/domain/ExpenseRecord.java`、`repository/ExpenseRecordRepository.java`
+- [ ] T031 [P] [US2] 建立 PaymentAccount 資料模型（POJO）、repository 介面與 MyBatis Mapper（`status` ACTIVE/DISABLED）於 `expense-service/src/main/java/com/family195home/expense/domain/PaymentAccount.java`、`application/PaymentAccountRepository.java`、`infrastructure/persistence/PaymentAccountRepositoryImpl.java`、`infrastructure/persistence/PaymentAccountMapper.java`、`resources/mapper/PaymentAccountMapper.xml`
+- [ ] T032 [P] [US2] 建立 ExpenseRecord 資料模型（POJO）、repository 介面與 MyBatis Mapper（含 `amount`、`note`、`occurredAt`、`lockedByMemberId`、`lockedAt` 欄位）於 `expense-service/src/main/java/com/family195home/expense/domain/ExpenseRecord.java`、`application/ExpenseRecordRepository.java`、`infrastructure/persistence/ExpenseRecordRepositoryImpl.java`、`infrastructure/persistence/ExpenseRecordMapper.java`、`resources/mapper/ExpenseRecordMapper.xml`
 - [ ] T033 [US2] 實作 PaymentAccountService：建立支付帳戶（FR-003）、軟停用邏輯（`DISABLED` 後不可供新支出選用，且不允許真正刪除已使用過的帳戶，FR-022）於 `expense-service/src/main/java/com/family195home/expense/service/PaymentAccountService.java`（依賴 T031）
 - [ ] T034 [P] [US2] 實作 `POST /api/accounts`、`GET /api/accounts?familyGroupId=&status=`、`POST /api/accounts/{id}/disable` 端點於 `expense-service/src/main/java/com/family195home/expense/controller/PaymentAccountController.java`（依賴 T033）
 - [ ] T035 [US2] 實作 ExpenseService 新增邏輯：金額須為整數且可正可負可零（非整數回傳 `400 AMOUNT_MUST_BE_INTEGER`，FR-016）、備註與支付帳戶必填驗證（`400 NOTE_REQUIRED`/`400 PAYMENT_ACCOUNT_REQUIRED`）、未指定日期時預設伺服器當下時間（FR-005）、群組已解散拒絕新增（`409 GROUP_DISSOLVED`，FR-018）於 `expense-service/src/main/java/com/family195home/expense/service/ExpenseService.java`（依賴 T032）
@@ -161,12 +166,12 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 ### Implementation for User Story 5
 
-- [ ] T053 [P] [US5] 建立 LineBindingCode entity 與 repository（10 分鐘有效期、單次使用）於 `family-service/src/main/java/com/family195home/family/domain/LineBindingCode.java`、`repository/LineBindingCodeRepository.java`
-- [ ] T054 [P] [US5] 建立 LineBinding entity 與 repository（每個 `lineUserId` 唯一，僅能綁定一個成員身分，FR-020）於 `family-service/src/main/java/com/family195home/family/domain/LineBinding.java`、`repository/LineBindingRepository.java`
+- [ ] T053 [P] [US5] 建立 LineBindingCode 資料模型（POJO）、repository 介面與 MyBatis Mapper（10 分鐘有效期、單次使用）於 `family-service/src/main/java/com/family195home/family/domain/LineBindingCode.java`、`application/LineBindingCodeRepository.java`、`infrastructure/persistence/LineBindingCodeRepositoryImpl.java`、`infrastructure/persistence/LineBindingCodeMapper.java`、`resources/mapper/LineBindingCodeMapper.xml`
+- [ ] T054 [P] [US5] 建立 LineBinding 資料模型（POJO）、repository 介面與 MyBatis Mapper（每個 `lineUserId` 唯一，僅能綁定一個成員身分，FR-020）於 `family-service/src/main/java/com/family195home/family/domain/LineBinding.java`、`application/LineBindingRepository.java`、`infrastructure/persistence/LineBindingRepositoryImpl.java`、`infrastructure/persistence/LineBindingMapper.java`、`resources/mapper/LineBindingMapper.xml`
 - [ ] T055 [US5] 實作 `POST /api/families/members/{id}/line-binding-codes` 產生綁定碼邏輯（限本人，10 分鐘有效，FR-023）於 `family-service/src/main/java/com/family195home/family/service/LineBindingService.java`（依賴 T053）
 - [ ] T056 [US5] 實作 `POST /api/line-bindings`（驗證碼有效性與單次使用，過期/已用回傳 `410 CODE_EXPIRED_OR_USED`；LINE 帳號重複綁定回傳 `409 LINE_ACCOUNT_ALREADY_BOUND`，FR-020）、`GET /api/line-bindings/by-line-user/{lineUserId}`（`404 NOT_BOUND`）、`GET /api/line-bindings`（皆以 `X-Internal-Token` 驗證）於 `family-service/src/main/java/com/family195home/family/controller/LineBindingController.java`（依賴 T054、T055）
 - [ ] T057 [P] [US5] 單元測試：綁定碼過期/已使用拒絕、同一 LINE 帳號重複綁定拒絕（FR-020）於 `family-service/src/test/java/com/family195home/family/LineBindingServiceTest.java`
-- [ ] T058 [P] [US5] 建立 NotificationLog entity 與 repository 於 `notification-service/src/main/java/com/family195home/notification/domain/NotificationLog.java`、`repository/NotificationLogRepository.java`
+- [ ] T058 [P] [US5] 建立 NotificationLog 資料模型（POJO）、repository 介面與 MyBatis Mapper 於 `notification-service/src/main/java/com/family195home/notification/domain/NotificationLog.java`、`application/NotificationLogRepository.java`、`infrastructure/persistence/NotificationLogRepositoryImpl.java`、`infrastructure/persistence/NotificationLogMapper.java`、`resources/mapper/NotificationLogMapper.xml`
 - [ ] T059 [US5] 實作 LINE Webhook 綁定碼處理分支：`POST /api/line/webhook` 收到綁定碼格式訊息時呼叫 family-service 完成綁定並回覆結果（FR-023）於 `notification-service/src/main/java/com/family195home/notification/controller/LineWebhookController.java`（依賴 T056）
 - [ ] T060 [US5] 實作每月排程通知邏輯：`@Scheduled(cron = "0 0 23 L * ?")` 呼叫 family-service `GET /api/line-bindings` 取得所有綁定（跨家庭）、無綁定成員的家庭略過、呼叫 statistics-service 取得當月彙總、透過 LINE Push API 發送、失敗自動重試最多 3 次仍失敗則寫入 `NotificationLog(status=FAILED)` 並不影響其他成員（FR-013）於 `notification-service/src/main/java/com/family195home/notification/scheduler/MonthlyNotificationScheduler.java`（依賴 T058）
 - [ ] T061 [P] [US5] 單元測試：發送失敗重試邏輯（達重試上限標記 FAILED、不影響其他已綁定成員，FR-013）於 `notification-service/src/test/java/com/family195home/notification/MonthlyNotificationSchedulerTest.java`
@@ -202,6 +207,8 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 - [ ] T069 [P] 撰寫 `README.md`：系統架構圖、各服務職責說明、技術選型理由（含「為什麼不用 .NET」「為什麼不用訊息佇列」之具體回答，依 constitution 開發流程規範）
 - [ ] T070 依 [quickstart.md](./quickstart.md) 逐項執行 US1-US6 驗證場景，確認端對端可正常運作
 - [ ] T071 [P] 前端關鍵元件測試（Vitest + React Testing Library）：登入表單、支出新增表單驗證邏輯於 `frontend/tests/`
+- [ ] T072 [P] 各擁有資料庫的服務（family-service、expense-service、notification-service）補上 MyBatis Mapper slice 測試，驗證自訂 SQL 查詢語意（例如依 `familyGroupId`/`status` 篩選、分頁、排序），於 `src/test/java/.../<service>/infrastructure/persistence/`
+- [ ] T073 [P] 各擁有資料庫的服務補上正式資料庫 integration 測試（Testcontainers + MySQL，比照 task-board-practice `MySqlRepositoryIntegrationTest` 模式），驗證 Flyway migration 可於真實 MySQL 執行且 Mapper SQL 與 MySQL 方言相容，於 `src/test/java/.../<service>/`
 
 ---
 

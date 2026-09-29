@@ -8,19 +8,19 @@
 
 建立一個家庭共享支出記帳平台，讓使用者以 Email + 密碼建立帳號，建立/加入單一家庭群組，於群組內建立個人支付帳戶並記錄金額可正可負可零的整數支出紀錄（備註必填），家庭成員可共同檢視、依支付帳戶或成員篩選紀錄，並查看依支付帳戶彙總的月結淨額統計；系統另外透過 LINE Bot 於每月最後一天 23:00 主動推播當月支出匯總，並支援成員以「YYYY-MM」訊息主動查詢。
 
-技術方案依 constitution 採 Java 17 + Spring Boot 微服務架構，依業務職責拆分為 4 個核心服務（家庭與成員管理、支出與帳戶管理、統計彙總、LINE 通知整合）並輔以 Spring Cloud Gateway（統一入口）與 Spring Cloud Config（集中設定），前端採 React + TypeScript，資料庫統一使用 MSSQL（服務各自擁有獨立資料庫，不跨服務共用資料表），全系統以 docker-compose 一鍵啟動，並透過 GitHub Actions 建置映像檔、推送至 GHCR 後以 SSH 部署到可存取的 VM 完成 CD。
+技術方案依 constitution 採 Java 17 + Spring Boot 微服務架構，依業務職責拆分為 4 個核心服務（家庭與成員管理、支出與帳戶管理、統計彙總、LINE 通知整合）並輔以 Spring Cloud Gateway（統一入口）與 Spring Cloud Config（集中設定），前端採 React + TypeScript，資料庫統一使用 MySQL（服務各自擁有獨立資料庫，不跨服務共用資料表），全系統以 docker-compose 一鍵啟動，並透過 GitHub Actions 建置映像檔、推送至 GHCR 後以 SSH 部署到可存取的 VM 完成 CD。
 
 ## Technical Context
 
 **Language/Version**: Java 17（所有後端微服務，Spring Boot 3.2+）；TypeScript 5.x + React 18（前端）
 
-**Primary Dependencies**: Spring Boot Web / Validation / Data JPA、Spring Cloud Gateway（統一 API 入口，並本地驗證 JWT）、Spring Cloud Config Server（集中設定管理，含共用 JWT 簽章密鑰）、Spring Boot Actuator（健康檢查）、Spring Security + `jjwt`（BCrypt 密碼雜湊、JWT 簽發與驗證，非完整 OAuth2 體系）、MSSQL JDBC Driver、line-bot-sdk-java（LINE Messaging API 官方 SDK）；前端：React Router、Axios、TanStack Query (React Query)
+**Primary Dependencies**: Spring Boot Web / Validation、MyBatis（`mybatis-spring-boot-starter`，資料庫存取層採 repository 介面 + RepositoryImpl adapter + MyBatis Mapper 分層）、Flyway（`flyway-mysql`，schema migration）、Spring Cloud Gateway（統一 API 入口，並本地驗證 JWT）、Spring Cloud Config Server（集中設定管理，含共用 JWT 簽章密鑰）、Spring Boot Actuator（健康檢查）、Spring Security + `jjwt`（BCrypt 密碼雜湊、JWT 簽發與驗證，非完整 OAuth2 體系）、MySQL Connector/J（`mysql-connector-j`）、line-bot-sdk-java（LINE Messaging API 官方 SDK）；前端：React Router、Axios、TanStack Query (React Query)
 
-**Storage**: MSSQL Server（Docker 容器：`mcr.microsoft.com/mssql/server`）；每個擁有持久狀態的服務各自獨立資料庫（`familydb`、`expensedb`、`notificationdb`），MUST NOT 跨服務直接讀寫他人資料表；statistics-service 不建立獨立資料庫，即時彙總 expense-service 資料
+**Storage**: MySQL（Docker 容器：官方 `mysql` image，例如 `mysql:8.x`）；每個擁有持久狀態的服務各自獨立資料庫（`familydb`、`expensedb`、`notificationdb`），MUST NOT 跨服務直接讀寫他人資料表；statistics-service 不建立獨立資料庫，即時彙總 expense-service 資料
 
 **Testing**: JUnit 5 + Mockito + Spring Boot Test（後端核心商業邏輯單元/整合測試：權限判斷、金額驗證、併發鎖定、月結彙總、LINE 綁定唯一性、排程重試邏輯）；Vitest + React Testing Library（前端關鍵元件測試）
 
-**Target Platform**: Docker 容器化服務，本機以單一 `docker-compose.yml` 一鍵啟動（含 MSSQL）；正式環境透過 GitHub Actions CI/CD 建置映像檔並推送至 GitHub Container Registry (GHCR)，以 SSH 部署到已安裝 Docker 的雲端/自有 VM 執行 `docker compose pull && up -d`
+**Target Platform**: Docker 容器化服務，本機以單一 `docker-compose.yml` 一鍵啟動（含 MySQL）；正式環境透過 GitHub Actions CI/CD 建置映像檔並推送至 GitHub Container Registry (GHCR)，以 SSH 部署到已安裝 Docker 的雲端/自有 VM 執行 `docker compose pull && up -d`
 
 **Project Type**: web application（微服務後端：gateway-service、config-service、family-service、expense-service、statistics-service、notification-service + React 前端 frontend/）
 
@@ -42,9 +42,9 @@
 | IV. 核心商業邏輯測試優先 | PASS（規劃階段確認） | 已識別須測試之核心邏輯：家庭成員權限判斷、金額整數驗證、併發編輯鎖定、月結彙總計算、LINE 綁定唯一性、通知重試邏輯；實際測試將於 tasks/implement 階段落實 |
 | V. CI/CD 需含實際部署 | PASS | CD pipeline 建置映像檔推送 GHCR 後，透過 SSH 部署到可存取 VM 執行 docker-compose，非僅 image push（見 research.md 決策 1） |
 | VI. 可讀性與可解釋性優先於炫技 | PASS | 未引入服務註冊中心、分散式鎖、快取層等非必要基礎設施（見 research.md 決策 3、4、6）；服務拆分理由與技術選型均於 research.md 說明 |
-| VII. 容器化與一鍵啟動 | PASS | 每服務含 Dockerfile；單一 `docker-compose.yml` 於本機啟動全部服務（含 MSSQL） |
+| VII. 容器化與一鍵啟動 | PASS | 每服務含 Dockerfile；單一 `docker-compose.yml` 於本機啟動全部服務（含 MySQL） |
 
-**技術範疇邊界檢查**：資料庫維持單一 MSSQL（未引入 Redis/Mongo）；LINE Bot 整合封裝於 notification-service 單一服務內，未額外拆分；前端統一透過 Spring Cloud Gateway 呼叫後端，未繞過閘道分散呼叫。
+**技術範疇邊界檢查**：資料庫維持單一 MySQL（未引入 Redis/Mongo/MSSQL）；LINE Bot 整合封裝於 notification-service 單一服務內，未額外拆分；前端統一透過 Spring Cloud Gateway 呼叫後端，未繞過閘道分散呼叫。
 
 無違反項目，Complexity Tracking 表格無需填寫。
 
@@ -88,12 +88,32 @@ config-service/                   # Spring Cloud Config Server
 └── Dockerfile
 
 family-service/                   # 使用者帳號、家庭群組、成員、邀請碼、LINE 綁定關係
-├── src/main/java/.../family/{controller,service,repository,domain,dto}
+├── src/main/java/.../family/
+│   ├── controller/
+│   ├── service/
+│   ├── application/              # repository 介面（port）
+│   ├── domain/                   # 純 POJO 資料模型
+│   ├── infrastructure/
+│   │   └── persistence/          # RepositoryImpl（adapter）+ MyBatis Mapper 介面
+│   └── dto/
+├── src/main/resources/
+│   ├── mapper/                   # MyBatis XML Mapper（*.xml）
+│   └── db/migration/             # Flyway 版本化 migration script（V1__xxx.sql）
 ├── src/test/java/.../family/
 └── Dockerfile
 
 expense-service/                  # 支付帳戶、支出紀錄（含併發編輯鎖定）
-├── src/main/java/.../expense/{controller,service,repository,domain,dto}
+├── src/main/java/.../expense/
+│   ├── controller/
+│   ├── service/
+│   ├── application/              # repository 介面（port）
+│   ├── domain/                   # 純 POJO 資料模型
+│   ├── infrastructure/
+│   │   └── persistence/          # RepositoryImpl（adapter）+ MyBatis Mapper 介面
+│   └── dto/
+├── src/main/resources/
+│   ├── mapper/                   # MyBatis XML Mapper（*.xml）
+│   └── db/migration/             # Flyway 版本化 migration script（V1__xxx.sql）
 ├── src/test/java/.../expense/
 └── Dockerfile
 
@@ -103,7 +123,18 @@ statistics-service/               # 依支付帳戶彙總月結淨額（無獨�
 └── Dockerfile
 
 notification-service/             # LINE Bot 整合：Webhook、每月排程推播、關鍵字查詢、發送重試紀錄
-├── src/main/java/.../notification/{controller,service,repository,domain,dto,scheduler}
+├── src/main/java/.../notification/
+│   ├── controller/
+│   ├── service/
+│   ├── application/               # repository 介面（port）
+│   ├── domain/                    # 純 POJO 資料模型
+│   ├── infrastructure/
+│   │   └── persistence/           # RepositoryImpl（adapter）+ MyBatis Mapper 介面
+│   ├── dto/
+│   └── scheduler/
+├── src/main/resources/
+│   ├── mapper/                    # MyBatis XML Mapper（*.xml）
+│   └── db/migration/              # Flyway 版本化 migration script（V1__xxx.sql）
 ├── src/test/java/.../notification/
 └── Dockerfile
 
@@ -115,13 +146,13 @@ frontend/                         # React + TypeScript 前端
 │   └── hooks/
 └── tests/
 
-docker-compose.yml                # 一鍵啟動：MSSQL + 全部後端服務 + frontend
+docker-compose.yml                # 一鍵啟動：MySQL + 全部後端服務 + frontend
 .github/workflows/ci.yml          # PR/push 觸發 build + test
 .github/workflows/cd.yml          # build image → push GHCR → SSH 部署至 VM
 README.md
 ```
 
-**Structure Decision**: 採用 Option 2（Web application）並依 constitution 的微服務要求擴充為多個獨立後端服務目錄（取代單一 `backend/`），每個服務目錄即一個獨立可建置、可容器化的 Spring Boot 專案；`frontend/` 維持標準 React + TypeScript 結構；`config-repo/` 為 Spring Cloud Config 的集中設定來源，不屬於任何單一服務。
+**Structure Decision**: 採用 Option 2（Web application）並依 constitution 的微服務要求擴充為多個獨立後端服務目錄（取代單一 `backend/`），每個服務目錄即一個獨立可建置、可容器化的 Spring Boot 專案；`frontend/` 維持標準 React + TypeScript 結構；`config-repo/` 為 Spring Cloud Config 的集中設定來源，不屬於任何單一服務。擁有獨立資料庫的服務（family-service、expense-service、notification-service）的資料存取層採 application（repository 介面/port）與 infrastructure/persistence（RepositoryImpl adapter + MyBatis Mapper 介面）分層，SQL 以 `src/main/resources/mapper/` 下的 MyBatis XML Mapper 撰寫；資料庫 schema 以 Flyway migration script（`src/main/resources/db/migration/V{n}__{description}.sql`）版本化管理。
 
 ## Complexity Tracking
 

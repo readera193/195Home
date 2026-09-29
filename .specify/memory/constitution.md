@@ -1,35 +1,25 @@
 <!--
 Sync Impact Report
-- Version change: 1.0.0 → 1.1.0（新增文件決策記錄範圍規範，屬治理流程的實質補充）
-- Modified principles: 無（Core Principles I~VII 內容未變更）
-- Added sections:
-  - 開發與品質流程（Development & Quality Workflow）新增一項規範：
-    「決策過程與決策結果的記錄範圍」— 僅 spec.md 的 Clarifications session 可保留決策過程，
-    其餘所有章節與所有其他文件一律只記錄最新決策結果。
+- Version change: 1.1.0 → 2.0.0（資料庫存取技術棧變更：資料庫由 MSSQL 改為 MySQL，屬於對既有
+  技術邊界條款「資料庫 MUST 維持 MSSQL」做不相容於原意的重新定義，依版本規則須為 MAJOR）
+- Modified principles:
+  - II. Java 17 + Spring Boot 技術棧一致性：允許使用的周邊元件範例由 Spring Data JPA 改為
+    MyBatis（mybatis-spring-boot-starter），並新增 Flyway 作為 schema migration 範例元件
+- Modified sections:
+  - 技術範疇與邊界：「已具備技術」的資料庫由 MSSQL 改為 MySQL；「技術邊界（不可跨越）」
+    的資料庫鎖定條款由「MUST 維持 MSSQL」改為「MUST 維持 MySQL」，並將 MSSQL 併入
+    MUST NOT 額外引入的資料庫技術清單
+- Added sections: 無
 - Removed sections: 無
+- Rationale：對齊參考練習專案 task-board-practice 的資料存取技術棧（MyBatis + MySQL +
+  Flyway/flyway-mysql），本次僅涉及資料庫存取層，不影響其餘 Core Principles 與業務範疇。
 - Templates requiring updates:
-  - .specify/templates/plan-template.md ⚠ pending（尚未檢查是否引用本 constitution 的具體原則名稱，建議下次執行 /speckit-plan 時交叉確認）
-  - .specify/templates/spec-template.md ✅ 無需變更（Clarifications session 由 /speckit-clarify 動態產生，範本本身不需修改）
+  - .specify/templates/plan-template.md ⚠ pending（尚未檢查是否引用 MSSQL/Spring Data JPA
+    等具體技術名稱，建議下次執行 /speckit-plan 時交叉確認）
+  - .specify/templates/spec-template.md ✅ 無需變更
   - .specify/templates/tasks-template.md ✅ 無需變更
   - .specify/templates/checklist-template.md ✅ 無需變更
 - Follow-up TODOs: 無
-
----
-
-Sync Impact Report（歷史紀錄，1.0.0 初次制定）
-- Version change: [TEMPLATE] → 1.0.0（初次制定，未經正式版本，視為初始採用）
-- Modified principles: 無（模板佔位符全部由具體內容取代）
-- Added sections:
-  - Core Principles: I~VII（微服務邊界與資料自主權、Java/Spring Boot 技術棧一致性、
-    同步 REST 通訊（不用訊息佇列）、核心商業邏輯測試優先、CI/CD 需含實際部署、
-    可讀性與可解釋性優先於炫技、容器化與一鍵啟動）
-  - 技術範疇與邊界（Technology Scope & Boundaries）
-  - 開發與品質流程（Development & Quality Workflow）
-  - Governance（含修訂程序、版本規則、合規審查）
-- Removed sections: 無（原檔案僅為模板佔位符）
-- Follow-up TODOs:
-  - TODO(RATIFICATION_DATE): 使用者未提供正式批准日期，暫以本次制定日期 2026-08-08 作為批准日，如有更早的專案啟動日期請於下次修訂時更正。
-  - 部署目標平台尚未決定，將於 /speckit-plan 階段補齊技術規劃細節（本 constitution 僅約束「CI/CD 必須含實際部署」此一原則，不預先指定平台）。
 -->
 
 # 家庭共享支出平台 Constitution
@@ -46,7 +36,7 @@ Sync Impact Report（歷史紀錄，1.0.0 初次制定）
 
 ### II. Java 17 + Spring Boot 技術棧一致性（Consistent Java/Spring Boot Stack）
 所有後端服務一律使用 Java 17 + Spring Boot 實作，MUST NOT 引入 .NET 或其他後端語言/框架。
-允許使用 Spring Boot 生態系內的常見周邊元件（如 Spring Data JPA、Spring Cloud Config、
+允許使用 Spring Boot 生態系內的常見周邊元件（如 MyBatis、Flyway、Spring Cloud Config、
 Spring Boot Actuator、Spring Cloud Gateway 等）以展示微服務治理相關知識，但除此之外
 MUST NOT 引入專案團隊完全未學過的新技術框架（例如 Kubernetes、Service Mesh）。
 **Rationale**：本專案的核心學習與展示目標是 Java/Spring Boot 生態系的深度，技術棧分散會
@@ -89,7 +79,7 @@ image build/push 之外，MUST 包含將至少一個服務實際部署到可存�
 ## 技術範疇與邊界（Technology Scope & Boundaries）
 
 **已具備技術（可直接大量使用）**：Docker / Docker Compose、React + TypeScript（前端）、
-MSSQL（資料庫）、LINE Bot（整合為通知或簡易記帳輸入管道）。這些技術不視為學習風險，
+MySQL（資料庫）、LINE Bot（整合為通知或簡易記帳輸入管道）。這些技術不視為學習風險，
 可依需求自由運用，不需額外論證選型理由。
 
 **本次學習並應用技術（核心學習目標，須刻意展示）**：Java 17 + Spring Boot 作為所有後端服務的
@@ -101,7 +91,7 @@ Spring Cloud Gateway 等）用於呈現微服務治理知識；具備實際部�
 - MUST NOT 使用 .NET 或其他非 Java 的後端語言/框架。
 - 除 Java/Spring Boot 生態系相關技術外，MUST NOT 引入完全未學過的新技術或框架
   （例如訊息佇列、Kubernetes、Service Mesh）。
-- 資料庫 MUST 維持 MSSQL，MUST NOT 額外引入其他資料庫技術（如 MongoDB、Redis），
+- 資料庫 MUST 維持 MySQL，MUST NOT 額外引入其他資料庫技術（如 MongoDB、Redis、MSSQL），
   除非有明確且可清楚解釋的理由，且該理由須記錄於相關規劃文件中。
 - 對外整合（如 LINE Bot 通知）MUST 封裝在合適的業務服務內，MUST NOT 為了展示技術
   而拆成不必要的獨立服務。
@@ -152,5 +142,5 @@ Spring Cloud Gateway 等）用於呈現微服務治理知識；具備實際部�
 Core Principles 與技術範疇邊界逐項確認是否合規；發現複雜度或範疇擴張須先在本文件中
 說明理由並完成修訂，才可繼續實作。
 
-**Version**: 1.1.0 | **Ratified**: 2026-08-08 | **Last Amended**: 2026-09-22
+**Version**: 2.0.0 | **Ratified**: 2026-08-08 | **Last Amended**: 2026-09-29
 </content>
