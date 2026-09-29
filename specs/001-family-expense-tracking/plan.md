@@ -92,7 +92,7 @@ family-service/                   # 使用者帳號、家庭群組、成員、�
 │   ├── controller/
 │   ├── service/
 │   ├── application/              # repository 介面（port）
-│   ├── domain/                   # 純 POJO 資料模型（非 JPA @Entity）
+│   ├── domain/                   # 純 POJO 資料模型
 │   ├── infrastructure/
 │   │   └── persistence/          # RepositoryImpl（adapter）+ MyBatis Mapper 介面
 │   └── dto/
@@ -107,7 +107,7 @@ expense-service/                  # 支付帳戶、支出紀錄（含併發編�
 │   ├── controller/
 │   ├── service/
 │   ├── application/              # repository 介面（port）
-│   ├── domain/                   # 純 POJO 資料模型（非 JPA @Entity）
+│   ├── domain/                   # 純 POJO 資料模型
 │   ├── infrastructure/
 │   │   └── persistence/          # RepositoryImpl（adapter）+ MyBatis Mapper 介面
 │   └── dto/
@@ -127,7 +127,7 @@ notification-service/             # LINE Bot 整合：Webhook、每月排程推�
 │   ├── controller/
 │   ├── service/
 │   ├── application/               # repository 介面（port）
-│   ├── domain/                    # 純 POJO 資料模型（非 JPA @Entity）
+│   ├── domain/                    # 純 POJO 資料模型
 │   ├── infrastructure/
 │   │   └── persistence/           # RepositoryImpl（adapter）+ MyBatis Mapper 介面
 │   ├── dto/
@@ -152,7 +152,7 @@ docker-compose.yml                # 一鍵啟動：MySQL + 全部後端服務 + 
 README.md
 ```
 
-**Structure Decision**: 採用 Option 2（Web application）並依 constitution 的微服務要求擴充為多個獨立後端服務目錄（取代單一 `backend/`），每個服務目錄即一個獨立可建置、可容器化的 Spring Boot 專案；`frontend/` 維持標準 React + TypeScript 結構；`config-repo/` 為 Spring Cloud Config 的集中設定來源，不屬於任何單一服務。擁有獨立資料庫的服務（family-service、expense-service、notification-service）的資料存取層採 application（repository 介面/port）與 infrastructure/persistence（RepositoryImpl adapter + MyBatis Mapper 介面）分層，SQL 以 `src/main/resources/mapper/` 下的 MyBatis XML Mapper 撰寫；資料庫 schema 以 Flyway migration script（`src/main/resources/db/migration/V{n}__{description}.sql`）版本化管理，取代原本依賴 JPA `ddl-auto` 隱含建表的作法。
+**Structure Decision**: 採用 Option 2（Web application）並依 constitution 的微服務要求擴充為多個獨立後端服務目錄（取代單一 `backend/`），每個服務目錄即一個獨立可建置、可容器化的 Spring Boot 專案；`frontend/` 維持標準 React + TypeScript 結構；`config-repo/` 為 Spring Cloud Config 的集中設定來源，不屬於任何單一服務。擁有獨立資料庫的服務（family-service、expense-service、notification-service）的資料存取層採 application（repository 介面/port）與 infrastructure/persistence（RepositoryImpl adapter + MyBatis Mapper 介面）分層，SQL 以 `src/main/resources/mapper/` 下的 MyBatis XML Mapper 撰寫；資料庫 schema 以 Flyway migration script（`src/main/resources/db/migration/V{n}__{description}.sql`）版本化管理。
 
 ## Complexity Tracking
 
