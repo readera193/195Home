@@ -6,6 +6,7 @@ import com.family195home.notification.domain.NotificationLog;
 import com.family195home.notification.domain.NotificationStatus;
 import com.family195home.notification.dto.LineBindingView;
 import com.family195home.notification.dto.MonthlySummaryView;
+import com.family195home.notification.service.MonthlySummaryFormatter;
 import com.linecorp.bot.client.LineMessagingClient;
 import com.linecorp.bot.model.PushMessage;
 import com.linecorp.bot.model.message.TextMessage;
@@ -56,7 +57,7 @@ public class MonthlyNotificationScheduler {
 
     private void sendToOneMember(LineBindingView binding, String yearMonth) {
         MonthlySummaryView summary = appServiceClient.getMonthlySummary(binding.familyGroupId(), yearMonth);
-        String text = formatSummary(summary);
+        String text = MonthlySummaryFormatter.format(summary);
 
         int attempts = 0;
         Exception lastError = null;
@@ -82,19 +83,5 @@ public class MonthlyNotificationScheduler {
         logEntry.setLastAttemptAt(LocalDateTime.now());
         logEntry.setErrorMessage(errorMessage);
         notificationLogRepository.save(logEntry);
-    }
-
-    private String formatSummary(MonthlySummaryView summary) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(summary.month()).append(" 家庭支出匯總\n");
-        if (summary.accounts().isEmpty()) {
-            sb.append("本月尚無任何支出紀錄，淨額為 0");
-        } else {
-            for (var account : summary.accounts()) {
-                sb.append(account.paymentAccountName()).append("：").append(account.netAmount()).append("\n");
-            }
-            sb.append("總計：").append(summary.totalNetAmount());
-        }
-        return sb.toString();
     }
 }

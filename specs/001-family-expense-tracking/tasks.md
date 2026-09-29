@@ -186,9 +186,9 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 ### Implementation for User Story 6
 
-- [ ] T061 [US6] 擴充 LINE Webhook 邏輯：解析 `YYYY-MM` 格式訊息，呼叫 `AppServiceClient` 依 `lineUserId` 確認綁定身分（未綁定回覆「此帳號尚未綁定家庭成員身分」，不洩漏家庭資料，FR-015），已綁定則呼叫 `AppServiceClient` 取得月結彙總並回覆結果（FR-014）於 `notification-service/src/main/java/com/family195home/notification/controller/LineWebhookController.java`（依賴 T057）
-- [ ] T062 [US6] 擴充 LINE Webhook 邏輯：非綁定碼、非 `YYYY-MM` 格式訊息一律回覆格式提示訊息，不視為有效查詢（FR-014）於 `LineWebhookController.java`（依賴 T061）
-- [ ] T063 [P] [US6] 單元測試：`YYYY-MM` 格式解析正確性、未綁定帳號查詢阻擋（FR-015）、無效格式回覆提示於 `notification-service/src/test/java/com/family195home/notification/LineWebhookControllerTest.java`
+- [X] T061 [US6] 擴充 LINE Webhook 邏輯：解析 `YYYY-MM` 格式訊息，呼叫 `AppServiceClient` 依 `lineUserId` 確認綁定身分（未綁定回覆「此帳號尚未綁定家庭成員身分」，不洩漏家庭資料，FR-015），已綁定則呼叫 `AppServiceClient` 取得月結彙總並回覆結果（FR-014）於 `notification-service/src/main/java/com/family195home/notification/controller/LineWebhookController.java`（依賴 T057）
+- [X] T062 [US6] 擴充 LINE Webhook 邏輯：非綁定碼、非 `YYYY-MM` 格式訊息一律回覆格式提示訊息，不視為有效查詢（FR-014）於 `LineWebhookController.java`（依賴 T061）
+- [X] T063 [P] [US6] 單元測試：`YYYY-MM` 格式解析正確性、未綁定帳號查詢阻擋（FR-015）、無效格式回覆提示於 `notification-service/src/test/java/com/family195home/notification/LineWebhookControllerTest.java`
 
 **Checkpoint**: 所有 User Story（US1-US6）應皆可獨立運作
 

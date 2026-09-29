@@ -2,6 +2,9 @@ package com.family195home.notification.controller;
 
 import com.family195home.notification.client.AppServiceClient;
 import com.family195home.notification.client.AppServiceClientException;
+import com.family195home.notification.dto.BindingResult;
+import com.family195home.notification.dto.MonthlySummaryView;
+import com.family195home.notification.service.MonthlySummaryFormatter;
 import com.linecorp.bot.client.LineMessagingClient;
 import com.linecorp.bot.model.ReplyMessage;
 import com.linecorp.bot.model.event.Event;
@@ -12,6 +15,7 @@ import com.linecorp.bot.spring.boot.annotation.EventMapping;
 import com.linecorp.bot.spring.boot.annotation.LineMessageHandler;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.regex.Pattern;
 
 /**
@@ -22,6 +26,7 @@ import java.util.regex.Pattern;
 public class LineWebhookController {
 
     private static final Pattern BINDING_CODE_PATTERN = Pattern.compile("\\d{6}");
+    private static final Pattern YEAR_MONTH_PATTERN = Pattern.compile("\\d{4}-\\d{2}");
 
     private final AppServiceClient appServiceClient;
     private final LineMessagingClient lineMessagingClient;
@@ -35,15 +40,16 @@ public class LineWebhookController {
     public void handleTextMessage(MessageEvent<TextMessageContent> event) {
         String text = event.getMessage().getText().trim();
         String lineUserId = event.getSource().getUserId();
+        reply(event.getReplyToken(), determineReply(text, lineUserId));
+    }
 
-        String replyText;
+    /** 依訊息內容決定回覆文字：6 碼綁定碼 → 完成綁定；YYYY-MM → 月結查詢；其餘 → 格式提示（FR-014）。 */
+    public String determineReply(String text, String lineUserId) {
         if (BINDING_CODE_PATTERN.matcher(text).matches()) {
             // FR-023
-            replyText = handleBindingCode(text, lineUserId);
-        } else {
-            replyText = handleOtherMessage(text, lineUserId);
+            return handleBindingCode(text, lineUserId);
         }
-        reply(event.getReplyToken(), replyText);
+        return handleOtherMessage(text, lineUserId);
     }
 
     @EventMapping
@@ -66,9 +72,23 @@ public class LineWebhookController {
         }
     }
 
-    /** 由 US6（T061/T062）擴充：YYYY-MM 月份查詢與格式提示。 */
-    protected String handleOtherMessage(String text, String lineUserId) {
+    private String handleOtherMessage(String text, String lineUserId) {
+        if (YEAR_MONTH_PATTERN.matcher(text).matches()) {
+            // FR-014, FR-015
+            return handleMonthQuery(text, lineUserId);
+        }
+        // FR-014：不符合 YYYY-MM 格式的訊息一律回覆格式提示，不視為有效查詢
         return "請傳送平台產生的 6 碼綁定碼完成綁定，或以「YYYY-MM」格式（例如 2026-07）查詢指定月份支出匯總。";
+    }
+
+    private String handleMonthQuery(String month, String lineUserId) {
+        Optional<BindingResult> binding = appServiceClient.findByLineUserId(lineUserId);
+        if (binding.isEmpty()) {
+            // FR-015：未綁定帳號不得取得任何家庭支出資料
+            return "此帳號尚未綁定家庭成員身分，請先於平台登入後產生綁定碼並在此輸入完成綁定。";
+        }
+        MonthlySummaryView summary = appServiceClient.getMonthlySummary(binding.get().familyGroupId(), month);
+        return MonthlySummaryFormatter.format(summary);
     }
 
     private void reply(String replyToken, String text) {
