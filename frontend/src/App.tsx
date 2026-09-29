@@ -11,6 +11,7 @@ import PaymentAccountsPage from './pages/PaymentAccountsPage';
 import ExpenseFormPage from './pages/ExpenseFormPage';
 import ExpenseListPage from './pages/ExpenseListPage';
 import StatisticsPage from './pages/StatisticsPage';
+import LineBindingPage from './pages/LineBindingPage';
 
 export default function App() {
   return (
@@ -72,6 +73,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <StatisticsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/line-binding"
+            element={
+              <ProtectedRoute>
+                <LineBindingPage />
               </ProtectedRoute>
             }
           />

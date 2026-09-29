@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.family195home.app.family.infrastructure.persistence.LineBindingMapper">
+
+    <resultMap id="LineBindingResultMap" type="com.family195home.app.family.domain.LineBinding">
+        <id property="id" column="id"/>
+        <result property="familyMemberId" column="family_member_id"/>
+        <result property="lineUserId" column="line_user_id"/>
+        <result property="boundAt" column="bound_at"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.family195home.app.family.domain.LineBinding" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO line_bindings (family_member_id, line_user_id, bound_at)
+        VALUES (#{familyMemberId}, #{lineUserId}, #{boundAt})
+    </insert>
+
+    <select id="countByLineUserId" resultType="int">
+        SELECT COUNT(*) FROM line_bindings WHERE line_user_id = #{lineUserId}
+    </select>
+
+    <select id="selectByFamilyMemberId" resultMap="LineBindingResultMap">
+        SELECT id, family_member_id, line_user_id, bound_at FROM line_bindings WHERE family_member_id = #{familyMemberId}
+    </select>
+
+    <select id="selectByLineUserId" resultMap="LineBindingResultMap">
+        SELECT id, family_member_id, line_user_id, bound_at FROM line_bindings WHERE line_user_id = #{lineUserId}
+    </select>
+
+    <select id="selectAll" resultMap="LineBindingResultMap">
+        SELECT id, family_member_id, line_user_id, bound_at FROM line_bindings
+    </select>
+
+</mapper>

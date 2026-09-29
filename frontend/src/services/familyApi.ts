@@ -36,6 +36,7 @@ export interface MyFamilyResponse {
   status: string | null;
   role: string | null;
   inviteCode: string | null;
+  familyMemberId: number | null;
 }
 
 export function getMyFamily(): Promise<MyFamilyResponse> {
@@ -62,4 +63,13 @@ export function leaveGroup(familyGroupId: number, memberId: number): Promise<Lea
 
 export function kickMember(familyGroupId: number, memberId: number): Promise<{ memberId: number; status: string }> {
   return apiClient.post(`/families/${familyGroupId}/members/${memberId}/kick`).then((res) => res.data);
+}
+
+export interface GenerateCodeResponse {
+  code: string;
+  expiresAt: string;
+}
+
+export function generateLineBindingCode(memberId: number): Promise<GenerateCodeResponse> {
+  return apiClient.post(`/families/members/${memberId}/line-binding-codes`).then((res) => res.data);
 }

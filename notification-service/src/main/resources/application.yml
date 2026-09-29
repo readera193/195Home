@@ -29,11 +29,16 @@ app:
     base-url: ${APP_SERVICE_BASE_URL:http://app-service:8080}
   internal:
     token: ${INTERNAL_TOKEN:dev-only-internal-token-change-me}
-  line:
-    channel-token: ${LINE_CHANNEL_TOKEN:}
-    channel-secret: ${LINE_CHANNEL_SECRET:}
   notification:
     max-retries: 3
+
+# line-bot-sdk-java（line-bot-spring-boot）自動組態：預設 Webhook 路徑為 line.bot.handler.path
+line:
+  bot:
+    channel-token: ${LINE_CHANNEL_TOKEN:}
+    channel-secret: ${LINE_CHANNEL_SECRET:}
+    handler:
+      path: /api/line/webhook
 
 ---
 spring:

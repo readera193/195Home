@@ -31,4 +31,12 @@ public class StatisticsController {
         familyService.assertMemberAuthorized(familyGroupId, caller.userId(), FamilyService.RequiredRole.ANY_MEMBER);
         return ResponseEntity.ok(statisticsService.summarize(familyGroupId, month));
     }
+
+    // 僅供 notification-service 呼叫（X-Internal-Token）：家庭歸屬已由呼叫方依 LINE 綁定關係決定，
+    // 略過 assertMemberAuthorized（無平台使用者 JWT 可用，見 research.md 決策 7）
+    @GetMapping("/api/internal/statistics/monthly")
+    public ResponseEntity<MonthlySummaryResponse> internalMonthly(
+            @RequestParam Long familyGroupId, @RequestParam String month) {
+        return ResponseEntity.ok(statisticsService.summarize(familyGroupId, month));
+    }
 }

@@ -38,7 +38,8 @@ public class FamilyController {
         return familyService.getMyMembership(caller.userId())
                 .flatMap(member -> familyService.getGroup(member.getFamilyGroupId())
                         .map(group -> new MyFamilyResponse(
-                                group.getId(), group.getName(), group.getStatus().name(), member.getRole().name(), group.getInviteCode())))
+                                group.getId(), group.getName(), group.getStatus().name(), member.getRole().name(),
+                                group.getInviteCode(), member.getId())))
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.ok(MyFamilyResponse.none()));
     }

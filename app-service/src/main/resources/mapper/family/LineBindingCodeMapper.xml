@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.family195home.app.family.infrastructure.persistence.LineBindingCodeMapper">
+
+    <resultMap id="LineBindingCodeResultMap" type="com.family195home.app.family.domain.LineBindingCode">
+        <id property="id" column="id"/>
+        <result property="familyMemberId" column="family_member_id"/>
+        <result property="code" column="code"/>
+        <result property="expiresAt" column="expires_at"/>
+        <result property="used" column="used"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.family195home.app.family.domain.LineBindingCode" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO line_binding_codes (family_member_id, code, expires_at, used, created_at)
+        VALUES (#{familyMemberId}, #{code}, #{expiresAt}, #{used}, #{createdAt})
+    </insert>
+
+    <update id="markUsed">
+        UPDATE line_binding_codes SET used = 1 WHERE id = #{id}
+    </update>
+
+    <select id="selectByCode" resultMap="LineBindingCodeResultMap">
+        SELECT id, family_member_id, code, expires_at, used, created_at
+        FROM line_binding_codes WHERE code = #{code}
+    </select>
+
+</mapper>

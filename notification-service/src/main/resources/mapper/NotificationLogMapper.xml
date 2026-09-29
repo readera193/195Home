@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.family195home.notification.infrastructure.persistence.NotificationLogMapper">
+
+    <resultMap id="NotificationLogResultMap" type="com.family195home.notification.domain.NotificationLog">
+        <id property="id" column="id"/>
+        <result property="familyGroupId" column="family_group_id"/>
+        <result property="familyMemberId" column="family_member_id"/>
+        <result property="lineUserId" column="line_user_id"/>
+        <result property="yearMonth" column="year_month"/>
+        <result property="status" column="status"/>
+        <result property="attempts" column="attempts"/>
+        <result property="lastAttemptAt" column="last_attempt_at"/>
+        <result property="errorMessage" column="error_message"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.family195home.notification.domain.NotificationLog" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO notification_logs
+            (family_group_id, family_member_id, line_user_id, year_month, status, attempts, last_attempt_at, error_message)
+        VALUES
+            (#{familyGroupId}, #{familyMemberId}, #{lineUserId}, #{yearMonth}, #{status}, #{attempts}, #{lastAttemptAt}, #{errorMessage})
+    </insert>
+
+    <select id="selectByGroupAndMonth" resultMap="NotificationLogResultMap">
+        SELECT * FROM notification_logs WHERE family_group_id = #{familyGroupId} AND year_month = #{yearMonth}
+    </select>
+
+</mapper>
