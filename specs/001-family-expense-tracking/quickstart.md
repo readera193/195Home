@@ -7,16 +7,18 @@
 - Docker / Docker Compose
 - （可選）LINE Developers 帳號與一組 Messaging API channel（測試 User Story 5、6 時需要；若僅驗證 User Story 1–4，可略過）
 
-## 啟動系統
+## 啟動系統（本機開發）
 
 ```bash
 docker compose up -d --build
 ```
 
 啟動後：
-- 前端：`http://localhost:3000`
-- API 入口（gateway-service）：`http://localhost:8080`
-- 各服務健康檢查：`http://localhost:8080/api/<service>/actuator/health`
+- 網頁（前端靜態檔案由 app-service 一併 serve）與 API 入口：`http://localhost:8080`
+- app-service 健康檢查：`http://localhost:8080/actuator/health`
+- notification-service：於 docker-compose 網路內部運作（LINE Webhook 需另外設定對外可存取的網址，例如以 ngrok 轉發至 notification-service 的對外連接埠）
+
+> 系統已收斂為 2 個服務（app-service、notification-service），不再有獨立的 gateway 進程；前端、家庭/支出/統計 API 皆經由 app-service 單一入口存取。
 
 ## 驗證場景（對應 spec.md 各 User Story 的 Independent Test）
 
@@ -68,14 +70,21 @@ docker compose up -d --build
 ## 執行測試
 
 ```bash
-# 各後端服務（於各自服務目錄下）
+# app-service、notification-service（於各自服務目錄下）
 ./mvnw test
 
 # 前端
 cd frontend && npm test
 ```
 
-## 停止與清除
+## 部署到 Northflank（正式環境）
+
+1. 於 Northflank 建立專案，開通 1 個免費 MySQL database（建立 `appdb`、`notificationdb` 兩個 schema）
+2. 建立 2 個 Northflank service：`app-service`、`notification-service`，各自設定對應的 GHCR 映像檔來源
+3. 於 Northflank 設定各服務所需環境變數（資料庫連線字串、JWT 簽章密鑰、`X-INTERNAL_TOKEN`、LINE channel secret/token 等，見 [research.md](./research.md) 決策 5、7）
+4. GitHub Actions CD pipeline（`.github/workflows/cd.yml`）於 push 到主分支時建置映像檔、推送至 GHCR，並觸發 Northflank 兩個 service 重新部署最新映像檔
+
+## 停止與清除（本機開發）
 
 ```bash
 docker compose down -v
