@@ -44,7 +44,7 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 - [ ] T005 [P] 建立 app-service、notification-service 的 `application.yml` 骨架（含 DB 連線字串、JWT 簽章密鑰、`X-Internal-Token` 共用密鑰 placeholder，見 research.md 決策 5、7；正式環境改由 Northflank Secret Group 覆寫，本機開發由 docker-compose `environment` 區塊注入）
 - [ ] T006 建立 `docker-compose.yml` 骨架：MySQL 容器 + app-service + notification-service 兩項服務（含 `depends_on` 啟動順序）
 - [ ] T007 [P] 建立 `.github/workflows/ci.yml`：PR/push 時對 app-service、notification-service 執行 `./mvnw test`，對前端執行 `npm run build && npm test`（不通過測試不得合併，依 constitution 開發流程規範）
-- [ ] T008 [P] 為 app-service（`appdb`）、notification-service（`notificationdb`）各自建立初版 Flyway migration script `src/main/resources/db/migration/V1__create_initial_tables.sql`（MySQL DDL 語法），對應 data-model.md 定義的資料表
+- [ ] T008 [P] 為 app-service（`appdb`）、notification-service（`notificationdb`）各自建立初版 Flyway migration script `src/main/resources/db/migration/V1__create_initial_tables.sql`（MySQL DDL 語法），對應 data-model.md 定義的資料表；`expense_records` 表額外建立複合索引 `(family_group_id, payment_account_id, author_member_id, occurred_at)`，支援 FR-008/FR-009/FR-010 篩選與 SC-003（篩選後列表 2 秒內回應）
 
 **Checkpoint**: 兩個服務骨架與前端專案就緒，可開始 Foundational 開發
 
@@ -78,12 +78,12 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 - [ ] T016 [P] [US1] 建立 FamilyGroup 資料模型（POJO）、repository 介面與 MyBatis Mapper（`name` 全系統唯一、`status` ACTIVE/DISSOLVED、`inviteCode`）於 `app-service/src/main/java/com/family195home/app/family/domain/FamilyGroup.java`、`application/FamilyGroupRepository.java`、`infrastructure/persistence/FamilyGroupRepositoryImpl.java`、`infrastructure/persistence/FamilyGroupMapper.java`、`resources/mapper/family/FamilyGroupMapper.xml`
 - [ ] T017 [P] [US1] 建立 FamilyMember 資料模型（POJO）、repository 介面與 MyBatis Mapper（`status` ACTIVE/LEFT、`role` ADMIN/MEMBER、`joinedAt`/`leftAt`）於 `app-service/src/main/java/com/family195home/app/family/domain/FamilyMember.java`、`application/FamilyMemberRepository.java`、`infrastructure/persistence/FamilyMemberRepositoryImpl.java`、`infrastructure/persistence/FamilyMemberMapper.java`、`resources/mapper/family/FamilyMemberMapper.xml`
-- [ ] T018 [US1] 實作 FamilyService 建立群組邏輯：群組名稱唯一性檢查（重複回傳 `409 GROUP_NAME_TAKEN`，FR-001）、建立者自動成為 `ADMIN`；加入群組邏輯：邀請碼驗證（`404 INVALID_INVITE_CODE`）、群組已解散拒絕（`409 GROUP_DISSOLVED`）、單一在職群組限制（已屬於群組者拒絕，`409 ALREADY_IN_A_GROUP`，FR-026）於 `app-service/src/main/java/com/family195home/app/family/service/FamilyService.java`（依賴 T016、T017）
+- [ ] T018 [US1] 實作 FamilyService 建立群組邏輯：群組名稱唯一性檢查（重複回傳 `409 GROUP_NAME_TAKEN`，FR-001）、建立者自動成為 `ADMIN`；加入群組邏輯：邀請碼驗證（`404 INVALID_INVITE_CODE`）、群組已解散拒絕（`409 GROUP_DISSOLVED`）、單一在職群組限制（已屬於群組者拒絕，`409 ALREADY_IN_A_GROUP`，FR-026）；若使用者對該群組已存在一筆 `status=LEFT` 的 FamilyMember 紀錄，加入時重複使用該筆紀錄並將狀態恢復為 `ACTIVE`（`role` 維持原值或預設 `MEMBER`），保留原歷史支出紀錄歸屬，不建立新的 FamilyMember（FR-025）於 `app-service/src/main/java/com/family195home/app/family/service/FamilyService.java`（依賴 T016、T017）
 - [ ] T019 [US1] 實作離開群組邏輯：唯一在職成員離開 → 群組標記 `DISSOLVED`（FR-018）；`ADMIN` 離開且尚有其他在職成員 → 自動將 `ADMIN` 轉移給群組內 `joinedAt` 最早的其他在職成員（FR-029）於 `FamilyService.java`
 - [ ] T020 [US1] 實作移出成員（kick）邏輯：限該群組 `ADMIN` 呼叫，否則回傳 `403 NOT_GROUP_ADMIN`；被移出成員狀態變更為 `LEFT`（FR-028）於 `FamilyService.java`
 - [ ] T021 [US1] 實作 `FamilyService` 內部方法 `assertMemberAuthorized(familyGroupId, callerUserId, requiredRole)`：同進程 Java 方法呼叫（取代原本跨服務的 HTTP `authorize` 端點），供 expense、statistics 模組直接呼叫確認呼叫者當下角色與在職狀態（FR-019），未授權時拋出對應例外供上層轉換為 HTTP 錯誤碼
-- [ ] T022 [P] [US1] 實作 `POST /api/families`、`POST /api/families/join`、`GET /api/families/{id}/members?includeLeft=`（已離開成員標示保留於清單，FR-021）、`POST .../{memberId}/leave`、`POST .../{memberId}/kick` 端點於 `app-service/src/main/java/com/family195home/app/family/controller/FamilyController.java`（依賴 T018、T019、T020）
-- [ ] T023 [P] [US1] 單元測試：群組名稱唯一性、單一在職群組限制（FR-026）、唯一成員離開解散群組（FR-018）、管理者自動轉移（FR-029）、kick 權限判斷（FR-028）、`assertMemberAuthorized` 各角色情境於 `app-service/src/test/java/com/family195home/app/family/FamilyServiceTest.java`
+- [ ] T022 [P] [US1] 實作 `POST /api/families`、`POST /api/families/join`、`GET /api/families/{id}/members?includeLeft=`（已離開成員標示保留於清單，FR-021；呼叫 `assertMemberAuthorized` 確認呼叫者本身即為該 `{id}` 家庭群組成員，否則回傳 `403`，FR-017）、`POST .../{memberId}/leave`、`POST .../{memberId}/kick` 端點於 `app-service/src/main/java/com/family195home/app/family/controller/FamilyController.java`（依賴 T018、T019、T020、T021）
+- [ ] T023 [P] [US1] 單元測試：群組名稱唯一性、單一在職群組限制（FR-026）、唯一成員離開解散群組（FR-018）、管理者自動轉移（FR-029）、kick 權限判斷（FR-028）、已離開成員以邀請碼重新加入後狀態恢復為 `ACTIVE` 且沿用原 FamilyMember id（FR-025）、`assertMemberAuthorized` 各角色情境於 `app-service/src/test/java/com/family195home/app/family/FamilyServiceTest.java`
 - [ ] T024 [P] [US1] 前端建立家庭群組頁面（建立群組表單、顯示邀請碼/邀請連結、輸入邀請碼加入）於 `frontend/src/pages/FamilyGroupPage.tsx`
 - [ ] T025 [P] [US1] 前端成員列表頁面（顯示在職/已離開成員、管理者可移出成員、本人可離開群組）於 `frontend/src/pages/MembersPage.tsx`
 - [ ] T026 [US1] 前端封裝家庭群組相關 API 呼叫於 `frontend/src/services/familyApi.ts`（依賴 T014 的 apiClient）
@@ -102,8 +102,8 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 - [ ] T027 [P] [US2] 建立 PaymentAccount 資料模型（POJO）、repository 介面與 MyBatis Mapper（`status` ACTIVE/DISABLED）於 `app-service/src/main/java/com/family195home/app/expense/domain/PaymentAccount.java`、`application/PaymentAccountRepository.java`、`infrastructure/persistence/PaymentAccountRepositoryImpl.java`、`infrastructure/persistence/PaymentAccountMapper.java`、`resources/mapper/expense/PaymentAccountMapper.xml`
 - [ ] T028 [P] [US2] 建立 ExpenseRecord 資料模型（POJO）、repository 介面與 MyBatis Mapper（含 `amount`、`note`、`occurredAt`、`lockedByMemberId`、`lockedAt` 欄位）於 `app-service/src/main/java/com/family195home/app/expense/domain/ExpenseRecord.java`、`application/ExpenseRecordRepository.java`、`infrastructure/persistence/ExpenseRecordRepositoryImpl.java`、`infrastructure/persistence/ExpenseRecordMapper.java`、`resources/mapper/expense/ExpenseRecordMapper.xml`
-- [ ] T029 [US2] 實作 PaymentAccountService：建立支付帳戶（FR-003）、軟停用邏輯（`DISABLED` 後不可供新支出選用，且不允許真正刪除已使用過的帳戶，FR-022）於 `app-service/src/main/java/com/family195home/app/expense/service/PaymentAccountService.java`（依賴 T027）
-- [ ] T030 [P] [US2] 實作 `POST /api/accounts`、`GET /api/accounts?familyGroupId=&status=`、`POST /api/accounts/{id}/disable` 端點於 `app-service/src/main/java/com/family195home/app/expense/controller/PaymentAccountController.java`（依賴 T029）
+- [ ] T029 [US2] 實作 PaymentAccountService：建立支付帳戶（FR-003，群組已解散時拒絕建立並回傳 `409 GROUP_DISSOLVED`，FR-018）、軟停用邏輯（`DISABLED` 後不可供新支出選用，且不允許真正刪除已使用過的帳戶，FR-022）於 `app-service/src/main/java/com/family195home/app/expense/service/PaymentAccountService.java`（依賴 T027）
+- [ ] T030 [P] [US2] 實作 `POST /api/accounts`、`GET /api/accounts?familyGroupId=&status=`（呼叫 `assertMemberAuthorized` 確認呼叫者屬於 `familyGroupId`，否則回傳 `403`，FR-017）、`POST /api/accounts/{id}/disable` 端點於 `app-service/src/main/java/com/family195home/app/expense/controller/PaymentAccountController.java`（依賴 T021、T029）
 - [ ] T031 [US2] 實作 ExpenseService 新增邏輯：金額須為整數且可正可負可零（非整數回傳 `400 AMOUNT_MUST_BE_INTEGER`，FR-016）、備註與支付帳戶必填驗證（`400 NOTE_REQUIRED`/`400 PAYMENT_ACCOUNT_REQUIRED`）、未指定日期時預設伺服器當下時間（FR-005）、群組已解散拒絕新增（`409 GROUP_DISSOLVED`，FR-018）於 `app-service/src/main/java/com/family195home/app/expense/service/ExpenseService.java`（依賴 T028）
 - [ ] T032 [US2] 實作併發編輯鎖定邏輯：以條件式 UPDATE（`locked_by_member_id IS NULL OR locked_at < now-5min`）取得鎖、`POST /api/expenses/{id}/lock`（取得失敗回傳 `409 RECORD_LOCKED`）、`POST /api/expenses/{id}/unlock`（FR-027，見 research.md 決策 3）於 `ExpenseService.java`
 - [ ] T033 [US2] 實作編輯/刪除邏輯：直接呼叫 T021 建立的 `FamilyService.assertMemberAuthorized(...)` 方法（同進程呼叫，非 HTTP）確認操作者為本人或該群組 `ADMIN`（FR-019）、須已持有鎖方可操作（未持有回傳 `403 LOCK_NOT_HELD_BY_CALLER`）、`PUT /api/expenses/{id}`（成功後自動釋放鎖）、`DELETE /api/expenses/{id}` 於 `ExpenseService.java`（依賴 T021、T032）
@@ -126,7 +126,7 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 ### Implementation for User Story 3
 
-- [ ] T040 [US3] 實作 `GET /api/expenses?familyGroupId=&paymentAccountId=&authorMemberId=&month=` 列表與篩選邏輯（`paymentAccountId`、`authorMemberId` 可單獨或同時套用，FR-008/FR-009/FR-010；家庭範圍隔離，FR-017）於 `app-service/src/main/java/com/family195home/app/expense/controller/ExpenseController.java` 與 `ExpenseService.java`（依賴 T034）
+- [ ] T040 [US3] 實作 `GET /api/expenses?familyGroupId=&paymentAccountId=&authorMemberId=&month=` 列表與篩選邏輯（`paymentAccountId`、`authorMemberId` 可單獨或同時套用，FR-008/FR-009/FR-010；家庭範圍隔離：呼叫 T021 的 `assertMemberAuthorized` 確認呼叫者屬於 `familyGroupId`，否則回傳 `403`，FR-017）於 `app-service/src/main/java/com/family195home/app/expense/controller/ExpenseController.java` 與 `ExpenseService.java`（依賴 T021、T034）
 - [ ] T041 [P] [US3] 前端支出紀錄列表頁面（顯示家庭內所有成員紀錄、支付帳戶篩選下拉、成員篩選下拉，含已離開成員標示）於 `frontend/src/pages/ExpenseListPage.tsx`
 - [ ] T042 [US3] 前端 `expenseApi.ts` 擴充篩選查詢參數支援（依賴 T039、T040）
 
