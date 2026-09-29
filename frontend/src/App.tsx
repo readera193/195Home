@@ -7,6 +7,8 @@ import RegisterPage from './pages/RegisterPage';
 import HomePage from './pages/HomePage';
 import FamilyGroupPage from './pages/FamilyGroupPage';
 import MembersPage from './pages/MembersPage';
+import PaymentAccountsPage from './pages/PaymentAccountsPage';
+import ExpenseFormPage from './pages/ExpenseFormPage';
 
 export default function App() {
   return (
@@ -36,6 +38,22 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <MembersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/accounts"
+            element={
+              <ProtectedRoute>
+                <PaymentAccountsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/expenses/new"
+            element={
+              <ProtectedRoute>
+                <ExpenseFormPage />
               </ProtectedRoute>
             }
           />

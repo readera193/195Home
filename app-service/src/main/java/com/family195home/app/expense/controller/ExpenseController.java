@@ -1,0 +1,96 @@
+package com.family195home.app.expense.controller;
+
+import com.family195home.app.expense.application.PaymentAccountRepository;
+import com.family195home.app.expense.domain.ExpenseRecord;
+import com.family195home.app.expense.dto.CreateExpenseRequest;
+import com.family195home.app.expense.dto.ExpenseResponse;
+import com.family195home.app.expense.dto.LockResponse;
+import com.family195home.app.expense.dto.UpdateExpenseRequest;
+import com.family195home.app.expense.service.ExpenseService;
+import com.family195home.app.family.domain.FamilyMember;
+import com.family195home.app.family.service.FamilyService;
+import com.family195home.app.security.AuthenticatedUser;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
+
+@RestController
+@RequestMapping("/api/expenses")
+public class ExpenseController {
+
+    private final ExpenseService expenseService;
+    private final FamilyService familyService;
+    private final PaymentAccountRepository paymentAccountRepository;
+
+    public ExpenseController(ExpenseService expenseService, FamilyService familyService, PaymentAccountRepository paymentAccountRepository) {
+        this.expenseService = expenseService;
+        this.familyService = familyService;
+        this.paymentAccountRepository = paymentAccountRepository;
+    }
+
+    @PostMapping
+    public ResponseEntity<ExpenseResponse> create(
+            @AuthenticationPrincipal AuthenticatedUser caller, @Valid @RequestBody CreateExpenseRequest request) {
+        FamilyMember member = familyService.assertMemberAuthorized(
+                request.familyGroupId(), caller.userId(), FamilyService.RequiredRole.ANY_MEMBER);
+        LocalDateTime occurredAt = request.occurredAt() != null && !request.occurredAt().isBlank()
+                ? LocalDateTime.parse(request.occurredAt())
+                : null;
+        ExpenseRecord record = expenseService.create(
+                request.familyGroupId(), member.getId(), request.paymentAccountId(), request.amount(), request.note(), occurredAt);
+        return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(record));
+    }
+
+    @PutMapping("/{expenseId}")
+    public ResponseEntity<ExpenseResponse> update(
+            @AuthenticationPrincipal AuthenticatedUser caller,
+            @PathVariable Long expenseId,
+            @RequestParam Long familyGroupId,
+            @Valid @RequestBody UpdateExpenseRequest request) {
+        LocalDateTime occurredAt = request.occurredAt() != null && !request.occurredAt().isBlank()
+                ? LocalDateTime.parse(request.occurredAt())
+                : null;
+        ExpenseRecord record = expenseService.update(
+                familyGroupId, expenseId, caller.userId(), request.paymentAccountId(), request.amount(), request.note(), occurredAt);
+        return ResponseEntity.ok(toResponse(record));
+    }
+
+    @DeleteMapping("/{expenseId}")
+    public ResponseEntity<Void> delete(
+            @AuthenticationPrincipal AuthenticatedUser caller,
+            @PathVariable Long expenseId,
+            @RequestParam Long familyGroupId) {
+        expenseService.delete(familyGroupId, expenseId, caller.userId());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{expenseId}/lock")
+    public ResponseEntity<LockResponse> lock(
+            @AuthenticationPrincipal AuthenticatedUser caller,
+            @PathVariable Long expenseId,
+            @RequestParam Long familyGroupId) {
+        FamilyMember member = familyService.assertMemberAuthorized(familyGroupId, caller.userId(), FamilyService.RequiredRole.ANY_MEMBER);
+        ExpenseRecord record = expenseService.lock(expenseId, member.getId());
+        return ResponseEntity.ok(new LockResponse(record.getId(), record.getLockedByMemberId(), record.getLockedAt()));
+    }
+
+    @PostMapping("/{expenseId}/unlock")
+    public ResponseEntity<Void> unlock(@PathVariable Long expenseId) {
+        expenseService.unlock(expenseId);
+        return ResponseEntity.noContent().build();
+    }
+
+    private ExpenseResponse toResponse(ExpenseRecord record) {
+        String accountName = paymentAccountRepository.findById(record.getPaymentAccountId())
+                .map(a -> a.getName())
+                .orElse(null);
+        boolean locked = expenseService.isCurrentlyLocked(record);
+        return new ExpenseResponse(
+                record.getId(), record.getAmount(), record.getNote(), record.getOccurredAt(),
+                record.getPaymentAccountId(), accountName, record.getAuthorMemberId(), locked);
+    }
+}

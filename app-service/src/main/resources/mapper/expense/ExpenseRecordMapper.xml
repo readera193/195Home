@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.family195home.app.expense.infrastructure.persistence.ExpenseRecordMapper">
+
+    <resultMap id="ExpenseRecordResultMap" type="com.family195home.app.expense.domain.ExpenseRecord">
+        <id property="id" column="id"/>
+        <result property="familyGroupId" column="family_group_id"/>
+        <result property="paymentAccountId" column="payment_account_id"/>
+        <result property="authorMemberId" column="author_member_id"/>
+        <result property="amount" column="amount"/>
+        <result property="note" column="note"/>
+        <result property="occurredAt" column="occurred_at"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="lockedByMemberId" column="locked_by_member_id"/>
+        <result property="lockedAt" column="locked_at"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.family195home.app.expense.domain.ExpenseRecord" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO expense_records
+            (family_group_id, payment_account_id, author_member_id, amount, note, occurred_at, created_at, updated_at)
+        VALUES
+            (#{familyGroupId}, #{paymentAccountId}, #{authorMemberId}, #{amount}, #{note}, #{occurredAt}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <update id="update" parameterType="com.family195home.app.expense.domain.ExpenseRecord">
+        UPDATE expense_records
+        SET payment_account_id = #{paymentAccountId}, amount = #{amount}, note = #{note},
+            occurred_at = #{occurredAt}, updated_at = #{updatedAt}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM expense_records WHERE id = #{id}
+    </delete>
+
+    <select id="selectById" resultMap="ExpenseRecordResultMap">
+        SELECT * FROM expense_records WHERE id = #{id}
+    </select>
+
+    <select id="selectByFilter" resultMap="ExpenseRecordResultMap">
+        SELECT * FROM expense_records
+        WHERE family_group_id = #{familyGroupId}
+        <if test="paymentAccountId != null">
+            AND payment_account_id = #{paymentAccountId}
+        </if>
+        <if test="authorMemberId != null">
+            AND author_member_id = #{authorMemberId}
+        </if>
+        <if test="monthStart != null">
+            AND occurred_at &gt;= #{monthStart} AND occurred_at &lt; #{monthEndExclusive}
+        </if>
+        ORDER BY occurred_at DESC
+    </select>
+
+    <!-- 條件式 UPDATE 取得鎖（research.md 決策 3）：僅當目前未鎖定或鎖已逾時（lockExpiredBefore 之前）才會成功 -->
+    <update id="tryLock">
+        UPDATE expense_records
+        SET locked_by_member_id = #{memberId}, locked_at = #{now}
+        WHERE id = #{id}
+          AND (locked_by_member_id IS NULL OR locked_at &lt; #{lockExpiredBefore})
+    </update>
+
+    <update id="releaseLock">
+        UPDATE expense_records SET locked_by_member_id = NULL, locked_at = NULL WHERE id = #{id}
+    </update>
+
+</mapper>
