@@ -1,6 +1,6 @@
 # Phase 1 Data Model: 家庭共享支出平台
 
-依 constitution v3.0.0 原則 I（服務邊界與資料自主權），各實體依所屬**部署服務**分組；app-service 內再依**業務模組**（family、expense、statistics）細分，模組間不共用資料表，模組間如需彼此資料一律呼叫對方模組的 service 層方法（同進程 Java 方法呼叫，非 REST）。app-service 與 notification-service 之間唯一的跨服務資料存取透過 `contracts/app-service.md` 定義的內部 REST API。
+依 constitution 原則 I（服務邊界與資料自主權），各實體依所屬**部署服務**分組；app-service 內再依**業務模組**（family、expense、statistics）細分，模組間不共用資料表，模組間如需彼此資料一律呼叫對方模組的 service 層方法（同進程 Java 方法呼叫，非 REST）。app-service 與 notification-service 之間唯一的跨服務資料存取透過 `contracts/app-service.md` 定義的內部 REST API。
 
 ## app-service（資料庫：`appdb`）
 

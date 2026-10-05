@@ -16,7 +16,7 @@ import java.util.List;
 
 /**
  * 對 /api/**（排除 /api/users/register、/api/users/login、/api/internal/**、靜態資源）
- * 以簽章密鑰本地驗證 JWT。取代原本獨立 Gateway 進程的「本地驗證後轉發」（見 research.md 決策 7）。
+ * 以簽章密鑰本地驗證 JWT（見 research.md 決策 7）。
  * 驗證失敗（缺少/過期/簽章錯誤）不會在此丟出例外，而是保持未驗證狀態，
  * 交由 Spring Security 的 authorizeHttpRequests 規則統一回傳 401。
  */

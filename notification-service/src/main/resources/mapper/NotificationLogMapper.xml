@@ -16,13 +16,13 @@
 
     <insert id="insert" parameterType="com.family195home.notification.domain.NotificationLog" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO notification_logs
-            (family_group_id, family_member_id, line_user_id, year_month, status, attempts, last_attempt_at, error_message)
+            (family_group_id, family_member_id, line_user_id, `year_month`, status, attempts, last_attempt_at, error_message)
         VALUES
             (#{familyGroupId}, #{familyMemberId}, #{lineUserId}, #{yearMonth}, #{status}, #{attempts}, #{lastAttemptAt}, #{errorMessage})
     </insert>
 
     <select id="selectByGroupAndMonth" resultMap="NotificationLogResultMap">
-        SELECT * FROM notification_logs WHERE family_group_id = #{familyGroupId} AND year_month = #{yearMonth}
+        SELECT * FROM notification_logs WHERE family_group_id = #{familyGroupId} AND `year_month` = #{yearMonth}
     </select>
 
 </mapper>
