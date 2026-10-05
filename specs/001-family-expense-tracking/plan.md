@@ -1,6 +1,6 @@
 # Implementation Plan: 家庭共享支出平台 - 核心記帳與統計功能
 
-**Branch**: `001-family-expense-tracking` | **Date**: 2026-09-29（依 constitution v3.0.0 重新規劃） | **Spec**: [spec.md](./spec.md)
+**Branch**: `001-family-expense-tracking` | **Date**: 2026-09-29 | **Spec**: [spec.md](./spec.md)
 
 **Input**: Feature specification from `/specs/001-family-expense-tracking/spec.md`
 
@@ -8,13 +8,13 @@
 
 建立一個家庭共享支出記帳平台，讓使用者以 Email + 密碼建立帳號，建立/加入單一家庭群組，於群組內建立個人支付帳戶並記錄金額可正可負可零的整數支出紀錄（備註必填），家庭成員可共同檢視、依支付帳戶或成員篩選紀錄，並查看依支付帳戶彙總的月結淨額統計；系統另外透過 LINE Bot 於每月最後一天 23:00 主動推播當月支出匯總，並支援成員以「YYYY-MM」訊息主動查詢。
 
-技術方案依 constitution v3.0.0 採 Java 17 + Spring Boot，收斂為 **2 個部署服務**：**app-service**（單一 Spring Boot 應用，內部依業務領域切套件模組——family、expense、statistics，並直接 serve React 前端建置後的靜態檔案）與 **notification-service**（LINE Bot 整合、每月排程推播、關鍵字查詢，維持獨立部署）。資料庫統一使用單一 MySQL 執行個體，切分為 `appdb`（family/expense/statistics 模組共用，但各模組仍各自擁有獨立資料表與 Mapper，不共用表）、`notificationdb` 兩個 schema。服務間唯一的跨進程呼叫為 notification-service 呼叫 app-service 的內部 REST API；app-service 內部模組間一律以 Java service 層方法直接呼叫，不透過 HTTP。全系統以 docker-compose 一鍵啟動本機開發環境（2 個服務 + MySQL），正式環境部署至 Northflank（Sandbox 免費方案：2 個免費 service + 1 個免費 database），CI 透過 GitHub Actions 建置與測試，CD 建置映像檔推送至 GHCR 後觸發 Northflank 兩個 service 部署最新映像檔。
+技術方案依 constitution v3.0.0 採 Java 17 + Spring Boot，採 **2 個部署服務**：**app-service**（單一 Spring Boot 應用，內部依業務領域切套件模組——family、expense、statistics，並直接 serve React 前端建置後的靜態檔案）與 **notification-service**（LINE Bot 整合、每月排程推播、關鍵字查詢，維持獨立部署）。資料庫統一使用單一 MySQL 執行個體，切分為 `appdb`（family/expense/statistics 模組共用，但各模組仍各自擁有獨立資料表與 Mapper，不共用表）、`notificationdb` 兩個 schema。服務間唯一的跨進程呼叫為 notification-service 呼叫 app-service 的內部 REST API；app-service 內部模組間一律以 Java service 層方法直接呼叫，不透過 HTTP。全系統以 docker-compose 一鍵啟動本機開發環境（2 個服務 + MySQL），正式環境部署至 Northflank（Sandbox 免費方案：2 個免費 service + 1 個免費 database），CI 透過 GitHub Actions 建置與測試，CD 建置映像檔推送至 GHCR 後觸發 Northflank 兩個 service 部署最新映像檔。
 
 ## Technical Context
 
 **Language/Version**: Java 17（app-service、notification-service，Spring Boot 3.2+）；TypeScript 5.x + React 18（前端，建置後併入 app-service）
 
-**Primary Dependencies**: Spring Boot Web / Validation、MyBatis（`mybatis-spring-boot-starter`，資料庫存取層採 repository 介面 + RepositoryImpl adapter + MyBatis Mapper 分層）、Flyway（`flyway-mysql`，schema migration）、Spring Security + `jjwt`（BCrypt 密碼雜湊、JWT 簽發與本地驗證，於 app-service 內完成，不再有獨立 Gateway 進程）、Spring Boot Actuator（健康檢查）、MySQL Connector/J（`mysql-connector-j`）、line-bot-sdk-java（LINE Messaging API 官方 SDK，僅 notification-service 使用）；前端：React Router、Axios、TanStack Query (React Query)。**不再使用** Spring Cloud Gateway、Spring Cloud Config Server（見 constitution v3.0.0 技術範疇與邊界）。
+**Primary Dependencies**: Spring Boot Web / Validation、MyBatis（`mybatis-spring-boot-starter`，資料庫存取層採 repository 介面 + RepositoryImpl adapter + MyBatis Mapper 分層）、Flyway（`flyway-mysql`，schema migration）、Spring Security + `jjwt`（BCrypt 密碼雜湊、JWT 簽發與本地驗證，於 app-service 內完成，無獨立 Gateway 進程）、Spring Boot Actuator（健康檢查）、MySQL Connector/J（`mysql-connector-j`）、line-bot-sdk-java（LINE Messaging API 官方 SDK，僅 notification-service 使用）；前端：React Router、Axios、TanStack Query (React Query)。**不再使用** Spring Cloud Gateway、Spring Cloud Config Server（見 constitution v3.0.0 技術範疇與邊界）。
 
 **Storage**: MySQL（單一執行個體，Docker 容器：官方 `mysql` image，例如 `mysql:8.x`）；依服務資料自主權切分為 2 個 schema——`appdb`（app-service 專用，family/expense/statistics 模組各自擁有獨立資料表，不跨模組共用表）、`notificationdb`（notification-service 專用）；statistics 模組不建立獨立資料表，於 app-service 進程內即時呼叫 expense 模組的 service 方法彙總
 
@@ -36,19 +36,19 @@
 
 | 原則 | 檢查結果 | 說明 |
 |------|---------|------|
-| I. 服務邊界與資料自主權 | PASS | 收斂為 2 個部署服務（app-service、notification-service）；app-service 內部依業務領域（family、expense、statistics）維持套件模組與各自的 service/repository 分層，不跨模組直接操作彼此資料表；notification-service 需要 app-service 資料時一律透過其對外公開的內部 REST API（見 `contracts/app-service.md`），不繞過 API 直接存取資料庫 |
+| I. 服務邊界與資料自主權 | PASS | 2 個部署服務（app-service、notification-service）；app-service 內部依業務領域（family、expense、statistics）維持套件模組與各自的 service/repository 分層，不跨模組直接操作彼此資料表；notification-service 需要 app-service 資料時一律透過其對外公開的內部 REST API（見 `contracts/app-service.md`），不繞過 API 直接存取資料庫 |
 | II. Java 17 + Spring Boot 技術棧一致性 | PASS | 兩個服務統一使用 Java 17 + Spring Boot；未引入 .NET 或其他後端框架；未引入 Spring Cloud Gateway/Config Server 等僅在多服務拓樸下才有意義的治理元件；React + TypeScript 屬「已具備技術」允許範圍 |
 | III. 同步 REST 通訊，不用訊息佇列 | PASS | 唯一跨進程呼叫（notification-service → app-service）採同步 REST（WebClient/RestTemplate），未引入 Kafka/RabbitMQ；app-service 內部模組間呼叫為同進程 Java 方法呼叫，非網路通訊 |
 | IV. 核心商業邏輯測試優先 | PASS（規劃階段確認） | 已識別須測試之核心邏輯：家庭成員權限判斷、金額整數驗證、併發編輯鎖定、月結彙總計算、LINE 綁定唯一性、通知重試邏輯；實際測試將於 tasks/implement 階段落實 |
 | V. CI/CD 需含實際部署 | PASS | CD pipeline 建置映像檔推送 GHCR 後，觸發 Northflank 將 app-service、notification-service 兩者皆部署到可存取環境，非僅 image push（見 research.md 決策 1） |
-| VI. 可讀性與可解釋性優先於炫技 | PASS | 服務數量由 6 個收斂為 2 個，移除服務註冊中心、Spring Cloud Gateway/Config Server 等非必要基礎設施（見 research.md 決策 5、6、7）；以套件模組化取代進程拆分，服務邊界劃分理由與技術選型均於 research.md 說明 |
+| VI. 可讀性與可解釋性優先於炫技 | PASS | 服務數量僅 2 個，不引入服務註冊中心、Spring Cloud Gateway/Config Server 等非必要基礎設施（見 research.md 決策 5、6、7）；以套件模組化維持服務邊界，服務邊界劃分理由與技術選型均於 research.md 說明 |
 | VII. 容器化與一鍵啟動 | PASS | app-service、notification-service 各含 Dockerfile；單一 `docker-compose.yml` 於本機啟動 2 個服務 + MySQL |
 
 **技術範疇邊界檢查**：資料庫維持單一 MySQL 執行個體（appdb、notificationdb 兩個 schema，未引入 Redis/Mongo/MSSQL）；LINE Bot 整合封裝於 notification-service 單一服務內；前端建置產物直接由 app-service serve，未繞過既定分層直接存取資料庫或 notification-service；部署目標為 Northflank Sandbox 免費方案，服務數量（2 個）與資料庫數量（1 個）皆落在免費額度內。
 
 無違反項目，Complexity Tracking 表格無需填寫。
 
-**Phase 1 設計後複查**：完成 `research.md`、`data-model.md`、`contracts/`、`quickstart.md` 後重新檢視，設計內容（app-service 內 3 個業務模組的套件邊界、模組間直接方法呼叫取代 REST、notification-service 唯一保留的跨進程 REST 呼叫、DB 欄位鎖取代分散式鎖、統計即時運算不建快取層、Northflank 部署方案）與上述 Constitution Check 結論一致，無新增違反項目。
+**Phase 1 設計後複查**：完成 `research.md`、`data-model.md`、`contracts/`、`quickstart.md` 後重新檢視，設計內容（app-service 內 3 個業務模組的套件邊界、模組間直接方法呼叫、notification-service 唯一保留的跨進程 REST 呼叫、DB 欄位鎖、統計即時運算不建快取層、Northflank 部署方案）與上述 Constitution Check 結論一致，無新增違反項目。
 
 ## Project Structure
 
@@ -92,8 +92,8 @@ app-service/                       # 單一 Spring Boot 應用：family + expens
 │   │   ├── controller/
 │   │   ├── service/
 │   │   └── dto/
-│   ├── security/                  # JWT 簽發/本地驗證、`X-Internal-Token` 驗證（取代原 gateway）
-│   └── config/                    # Spring Boot 標準設定類別（取代原 config-service）
+│   ├── security/                  # JWT 簽發/本地驗證、`X-Internal-Token` 驗證
+│   └── config/                    # Spring Boot 標準設定類別
 ├── src/main/resources/
 │   ├── application.yml            # 含各環境 profile；正式環境改由 Northflank 環境變數/Secret 覆寫
 │   ├── mapper/                    # MyBatis XML Mapper（*.xml，依模組分子目錄 family/、expense/）
@@ -134,7 +134,7 @@ docker-compose.yml                 # 一鍵啟動：MySQL + app-service + notifi
 README.md
 ```
 
-**Structure Decision**: 採用 Option 2（Web application）並依 constitution v3.0.0 收斂為 2 個獨立可建置、可容器化的 Spring Boot 專案目錄：`app-service/`（取代原 gateway-service、config-service、family-service、expense-service、statistics-service 五個目錄，內部以套件模組 `family`/`expense`/`statistics` 維持業務邊界）與 `notification-service/`（維持原設計）；`frontend/` 維持標準 React + TypeScript 開發專案，其建置產物於 CI 階段複製進 `app-service/src/main/resources/static/` 一併打包，不再是獨立部署單位；移除 `config-repo/` 目錄，設定改用各服務自身的 `application.yml` + 環境變數。擁有獨立資料庫的兩個服務（app-service、notification-service）的資料存取層仍採 application（repository 介面/port）與 infrastructure/persistence（RepositoryImpl adapter + MyBatis Mapper 介面）分層，SQL 以 `src/main/resources/mapper/` 下的 MyBatis XML Mapper 撰寫；資料庫 schema 以 Flyway migration script（`src/main/resources/db/migration/V{n}__{description}.sql`）版本化管理，app-service 的 migration 對應單一 `appdb` schema（各模組資料表各自獨立，不共用）。
+**Structure Decision**: 採用 Option 2（Web application）並依 constitution 規劃為 2 個獨立可建置、可容器化的 Spring Boot 專案目錄：`app-service/`（內部以套件模組 `family`/`expense`/`statistics` 維持業務邊界）與 `notification-service/`；`frontend/` 維持標準 React + TypeScript 開發專案，其建置產物於 CI 階段複製進 `app-service/src/main/resources/static/` 一併打包，不是獨立部署單位；設定使用各服務自身的 `application.yml` + 環境變數。擁有獨立資料庫的兩個服務（app-service、notification-service）的資料存取層仍採 application（repository 介面/port）與 infrastructure/persistence（RepositoryImpl adapter + MyBatis Mapper 介面）分層，SQL 以 `src/main/resources/mapper/` 下的 MyBatis XML Mapper 撰寫；資料庫 schema 以 Flyway migration script（`src/main/resources/db/migration/V{n}__{description}.sql`）版本化管理，app-service 的 migration 對應單一 `appdb` schema（各模組資料表各自獨立，不共用）。
 
 ## Complexity Tracking
 

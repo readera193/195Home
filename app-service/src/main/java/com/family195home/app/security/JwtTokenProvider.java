@@ -15,8 +15,8 @@ import java.util.Date;
 import java.util.Optional;
 
 /**
- * JWT 簽發與本地驗證：app-service 內建 Spring Security filter 直接使用本類別，
- * 不再有獨立 Gateway 進程做「本地驗證後轉發」（見 research.md 決策 7）。
+ * JWT 簽發與本地驗證：app-service 內建 Spring Security filter 直接使用本類別
+ * （見 research.md 決策 7）。
  */
 @Component
 public class JwtTokenProvider {

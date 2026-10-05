@@ -18,7 +18,7 @@ docker compose up -d --build
 - app-service 健康檢查：`http://localhost:8080/actuator/health`
 - notification-service：於 docker-compose 網路內部運作（LINE Webhook 需另外設定對外可存取的網址，例如以 ngrok 轉發至 notification-service 的對外連接埠）
 
-> 系統已收斂為 2 個服務（app-service、notification-service），不再有獨立的 gateway 進程；前端、家庭/支出/統計 API 皆經由 app-service 單一入口存取。
+> 系統為 2 個服務（app-service、notification-service），無獨立的 gateway 進程；前端、家庭/支出/統計 API 皆經由 app-service 單一入口存取。
 
 ## 驗證場景（對應 spec.md 各 User Story 的 Independent Test）
 

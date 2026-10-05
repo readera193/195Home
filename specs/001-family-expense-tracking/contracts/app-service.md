@@ -131,7 +131,7 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 
 ## 內部 API（僅供 notification-service 呼叫，`X-Internal-Token` 驗證）
 
-以下端點皆發生於 LINE Webhook 或排程情境，**無平台使用者 JWT**（發話者是 LINE 帳號而非已登入的平台 Session），一律以 Header `X-Internal-Token`（共用密鑰，見 research.md 決策 7）驗證呼叫來源，取代一般的 `Authorization: Bearer <JWT>`：
+以下端點皆發生於 LINE Webhook 或排程情境，**無平台使用者 JWT**（發話者是 LINE 帳號而非已登入的平台 Session），一律以 Header `X-Internal-Token`（共用密鑰，見 research.md 決策 7）驗證呼叫來源（不使用 `Authorization: Bearer <JWT>`）：
 
 ### `POST /api/internal/line-bindings`
 - Header: `X-Internal-Token`

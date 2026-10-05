@@ -4,7 +4,7 @@
 
 ## 驗證模型
 
-本服務對 app-service 的所有呼叫皆發生於 LINE Webhook 或排程情境，**無平台使用者 JWT** 可用，一律以 Header `X-Internal-Token`（共用密鑰）驗證呼叫來源，取代一般的 `Authorization: Bearer <JWT>`（見 research.md 決策 7）。app-service 的呼叫目標位址（base URL）由環境變數設定：本機開發指向 docker-compose 服務名稱（例如 `http://app-service:8080`），Northflank 正式環境指向 app-service 對應 Northflank service 的內部網域。
+本服務對 app-service 的所有呼叫皆發生於 LINE Webhook 或排程情境，**無平台使用者 JWT** 可用，一律以 Header `X-Internal-Token`（共用密鑰）驗證呼叫來源（不使用 `Authorization: Bearer <JWT>`，見 research.md 決策 7）。app-service 的呼叫目標位址（base URL）由環境變數設定：本機開發指向 docker-compose 服務名稱（例如 `http://app-service:8080`），Northflank 正式環境指向 app-service 對應 Northflank service 的內部網域。
 
 ## LINE Webhook（外部：LINE 平台呼叫）
 

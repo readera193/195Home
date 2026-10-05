@@ -27,7 +27,7 @@
 資料庫：單一 MySQL 執行個體，appdb（app-service）+ notificationdb（notification-service）
 ```
 
-系統依 [constitution v3.0.0](.specify/memory/constitution.md) 收斂為 **2 個部署服務**：
+系統依 [constitution](.specify/memory/constitution.md) 採 **2 個部署服務**：
 
 - **app-service**：帳號註冊/登入、家庭群組、支付帳戶、支出紀錄、月結統計，並直接 serve 前端建置後的靜態檔案（同源部署，無需 CORS、無需獨立 Gateway）。內部依業務領域（family/expense/statistics）維持套件模組邊界。
 - **notification-service**：LINE Bot Webhook、每月最後一天 23:00 自動推播、LINE 關鍵字查詢。與 app-service 之間唯一透過內部 REST API（`X-Internal-Token` 驗證）溝通。
@@ -43,7 +43,7 @@
 | 身份驗證 | Spring Security + JWT（jjwt） | app-service 內建本地驗證，無需獨立 Gateway |
 | 服務間通訊 | 同步 REST（僅 notification→app-service 一條） | 家庭規模不需訊息佇列 |
 | 前端 | React 18 + TypeScript + Vite | 已具備技術，同源部署簡化設定 |
-| 部署 | Northflank Sandbox 免費方案 | 2 個免費 service + 1 個免費 database，恰好對應收斂後架構 |
+| 部署 | Northflank Sandbox 免費方案 | 2 個免費 service + 1 個免費 database，恰好對應 2 個部署服務的架構 |
 
 ### 為什麼不用 .NET？
 
@@ -55,7 +55,7 @@
 
 ### 為什麼只拆兩個服務，不是完整微服務？
 
-專案僅供家人自用、非高併發，且確定部署目標為 Northflank 免費 Sandbox 方案（2 個免費 service + 1 個免費 database）。最初規劃是 6 個獨立微服務（gateway、config server、family、expense、statistics、notification），但這遠超過免費額度，且在此規模下維持 6 個進程本身就是過度設計，違反 constitution 原則 VI（可讀性與可解釋性優先於炫技）。收斂為 2 個部署服務、以套件層級模組化取代進程層級拆分，仍可清楚展示服務邊界設計能力與「何時該拆、何時不該拆」的架構判斷，且完全落在免費方案額度內。
+專案僅供家人自用、非高併發，且確定部署目標為 Northflank 免費 Sandbox 方案（2 個免費 service + 1 個免費 database）。在此規模下拆成多個進程屬於過度設計，違反 constitution 原則 VI（可讀性與可解釋性優先於炫技）。因此採 2 個部署服務、以套件層級模組化（family/expense/statistics）維持服務邊界，可清楚展示服務邊界設計能力與「何時該拆、何時不該拆」的架構判斷，且完全落在免費方案額度內。
 
 ## 本機開發
 

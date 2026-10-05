@@ -13,7 +13,7 @@ import java.util.Map;
 
 /**
  * 依支付帳戶彙總月結淨額（FR-011）。同進程直接呼叫 {@link ExpenseService}
- * 取得資料，取代原本跨服務 WebClient 呼叫（見 research.md 決策 4）。
+ * 取得資料（見 research.md 決策 4）。
  */
 @Service
 public class StatisticsService {

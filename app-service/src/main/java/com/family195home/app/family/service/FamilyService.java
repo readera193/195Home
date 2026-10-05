@@ -17,9 +17,9 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * 家庭群組核心業務邏輯（US1）。{@link #assertMemberAuthorized} 是本次架構收斂後
+ * 家庭群組核心業務邏輯（US1）。{@link #assertMemberAuthorized} 是
  * 供 expense、statistics 模組直接呼叫（同進程方法呼叫）確認呼叫者角色與在職狀態的
- * 唯一入口，取代原本跨服務的 HTTP authorize 端點（見 research.md 決策 7）。
+ * 唯一入口（見 research.md 決策 7）。
  */
 @Service
 public class FamilyService {
@@ -153,7 +153,7 @@ public class FamilyService {
     }
 
     /**
-     * 同進程方法呼叫入口（取代原本跨服務 HTTP authorize 端點）：確認 callerUserId 是否為
+     * 同進程方法呼叫入口：確認 callerUserId 是否為
      * familyGroupId 的在職成員，並視需要要求 ADMIN 角色（FR-017、FR-019）。
      */
     public FamilyMember assertMemberAuthorized(Long familyGroupId, Long callerUserId, RequiredRole requiredRole) {

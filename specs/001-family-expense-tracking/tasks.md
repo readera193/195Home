@@ -7,7 +7,7 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 **Input**: Design documents from `/specs/001-family-expense-tracking/`
 
-**Prerequisites**: [plan.md](./plan.md)、[spec.md](./spec.md)、[research.md](./research.md)、[data-model.md](./data-model.md)、[contracts/](./contracts/)、[quickstart.md](./quickstart.md)、[.specify/memory/constitution.md](../../.specify/memory/constitution.md)（v3.0.0：架構收斂為 app-service + notification-service 2 個部署服務）
+**Prerequisites**: [plan.md](./plan.md)、[spec.md](./spec.md)、[research.md](./research.md)、[data-model.md](./data-model.md)、[contracts/](./contracts/)、[quickstart.md](./quickstart.md)、[.specify/memory/constitution.md](../../.specify/memory/constitution.md)（架構：app-service + notification-service 2 個部署服務）
 
 **Tests**: 依 constitution 原則 IV（核心商業邏輯測試優先），下方各 User Story 皆包含針對 plan.md Technical Context 明列之核心邏輯（家庭成員權限判斷、金額整數驗證、併發鎖定、月結彙總計算、LINE 綁定唯一性、通知重試邏輯）的單元測試任務；不涵蓋樣板程式碼（getter/setter、DTO 轉換）測試。
 
@@ -22,7 +22,7 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 ## Path Conventions（依 plan.md Project Structure）
 
 - 2 個部署服務：`app-service/`、`notification-service/`
-- `app-service/` 內依業務領域切套件模組：`family/`、`expense/`、`statistics/`，各自 `src/main/java/.../app/<module>/{controller,service,domain,dto}`；另有 `security/`（JWT 驗證、X-Internal-Token 驗證）、`config/`（Spring Boot 標準設定，取代原 config-service）
+- `app-service/` 內依業務領域切套件模組：`family/`、`expense/`、`statistics/`，各自 `src/main/java/.../app/<module>/{controller,service,domain,dto}`；另有 `security/`（JWT 驗證、X-Internal-Token 驗證）、`config/`（Spring Boot 標準設定）
 - 擁有獨立資料表的模組/服務（app-service 的 family、expense；notification-service）另含：
   `application/`（repository 介面/port）、`infrastructure/persistence/`（RepositoryImpl adapter +
   MyBatis Mapper 介面）、`src/main/resources/mapper/`（MyBatis XML Mapper，app-service 依模組分子目錄）、
@@ -59,7 +59,7 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 - [X] T009 [P] 建立 User 資料模型（POJO）、repository 介面與 MyBatis Mapper 於 `app-service/src/main/java/com/family195home/app/family/domain/User.java`、`application/UserRepository.java`、`infrastructure/persistence/UserRepositoryImpl.java`、`infrastructure/persistence/UserMapper.java`、`resources/mapper/family/UserMapper.xml`（對應 `appdb`）
 - [X] T010 [P] 實作 BCrypt 密碼雜湊設定與 JWT 簽發/驗證工具類別（HS256、Claim 含 `sub`/`email`/`iat`/`exp`，2 小時過期）於 `app-service/src/main/java/com/family195home/app/security/JwtTokenProvider.java`
 - [X] T011 實作 `POST /api/users/register`、`POST /api/users/login` API（含 Email 全系統唯一性檢查，重複則回傳 `409 EMAIL_ALREADY_REGISTERED`，FR-024）於 `app-service/src/main/java/com/family195home/app/family/controller/UserController.java` 與對應 service 層（依賴 T009、T010）
-- [X] T012 [P] 於 `app-service/src/main/java/com/family195home/app/security/JwtAuthFilter.java` 實作 Spring Security filter chain：對 `/api/**`（排除 `/api/users/register`、`/api/users/login`、`/api/internal/**`、靜態資源）以簽章密鑰本地驗證 JWT 與過期時間，失敗回傳 `401`（同進程完成驗證，不再有獨立 Gateway 進程，見 research.md 決策 7）
+- [X] T012 [P] 於 `app-service/src/main/java/com/family195home/app/security/JwtAuthFilter.java` 實作 Spring Security filter chain：對 `/api/**`（排除 `/api/users/register`、`/api/users/login`、`/api/internal/**`、靜態資源）以簽章密鑰本地驗證 JWT 與過期時間，失敗回傳 `401`（同進程完成驗證，無獨立 Gateway 進程，見 research.md 決策 7）
 - [X] T013 [P] 於 `app-service/src/main/java/com/family195home/app/security/InternalTokenFilter.java` 實作 `X-Internal-Token` 驗證 filter，套用於 `/api/internal/**`，僅允許持有共用密鑰的呼叫者存取（僅供 notification-service 呼叫，見 contracts/app-service.md）
 - [X] T014 [P] 前端建立登入/註冊頁面與 Axios 攔截器（自動帶入 `Authorization: Bearer <JWT>`、401 導回登入頁）於 `frontend/src/pages/LoginPage.tsx`、`frontend/src/pages/RegisterPage.tsx`、`frontend/src/services/apiClient.ts`
 - [X] T015 [P] 前端建立路由骨架與受保護路由（React Router，未登入導向登入頁）於 `frontend/src/App.tsx`
@@ -81,7 +81,7 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 - [X] T018 [US1] 實作 FamilyService 建立群組邏輯：群組名稱唯一性檢查（重複回傳 `409 GROUP_NAME_TAKEN`，FR-001）、建立者自動成為 `ADMIN`；加入群組邏輯：邀請碼驗證（`404 INVALID_INVITE_CODE`）、群組已解散拒絕（`409 GROUP_DISSOLVED`）、單一在職群組限制（已屬於群組者拒絕，`409 ALREADY_IN_A_GROUP`，FR-026）；若使用者對該群組已存在一筆 `status=LEFT` 的 FamilyMember 紀錄，加入時重複使用該筆紀錄並將狀態恢復為 `ACTIVE`（`role` 維持原值或預設 `MEMBER`），保留原歷史支出紀錄歸屬，不建立新的 FamilyMember（FR-025）於 `app-service/src/main/java/com/family195home/app/family/service/FamilyService.java`（依賴 T016、T017）
 - [X] T019 [US1] 實作離開群組邏輯：唯一在職成員離開 → 群組標記 `DISSOLVED`（FR-018）；`ADMIN` 離開且尚有其他在職成員 → 自動將 `ADMIN` 轉移給群組內 `joinedAt` 最早的其他在職成員（FR-029）於 `FamilyService.java`
 - [X] T020 [US1] 實作移出成員（kick）邏輯：限該群組 `ADMIN` 呼叫，否則回傳 `403 NOT_GROUP_ADMIN`；被移出成員狀態變更為 `LEFT`（FR-028）於 `FamilyService.java`
-- [X] T021 [US1] 實作 `FamilyService` 內部方法 `assertMemberAuthorized(familyGroupId, callerUserId, requiredRole)`：同進程 Java 方法呼叫（取代原本跨服務的 HTTP `authorize` 端點），供 expense、statistics 模組直接呼叫確認呼叫者當下角色與在職狀態（FR-019），未授權時拋出對應例外供上層轉換為 HTTP 錯誤碼
+- [X] T021 [US1] 實作 `FamilyService` 內部方法 `assertMemberAuthorized(familyGroupId, callerUserId, requiredRole)`：同進程 Java 方法呼叫，供 expense、statistics 模組直接呼叫確認呼叫者當下角色與在職狀態（FR-019），未授權時拋出對應例外供上層轉換為 HTTP 錯誤碼
 - [X] T022 [P] [US1] 實作 `POST /api/families`、`POST /api/families/join`、`GET /api/families/{id}/members?includeLeft=`（已離開成員標示保留於清單，FR-021；呼叫 `assertMemberAuthorized` 確認呼叫者本身即為該 `{id}` 家庭群組成員，否則回傳 `403`，FR-017）、`POST .../{memberId}/leave`、`POST .../{memberId}/kick` 端點於 `app-service/src/main/java/com/family195home/app/family/controller/FamilyController.java`（依賴 T018、T019、T020、T021）
 - [X] T023 [P] [US1] 單元測試：群組名稱唯一性、單一在職群組限制（FR-026）、唯一成員離開解散群組（FR-018）、管理者自動轉移（FR-029）、kick 權限判斷（FR-028）、已離開成員以邀請碼重新加入後狀態恢復為 `ACTIVE` 且沿用原 FamilyMember id（FR-025）、`assertMemberAuthorized` 各角色情境於 `app-service/src/test/java/com/family195home/app/family/FamilyServiceTest.java`
 - [X] T024 [P] [US1] 前端建立家庭群組頁面（建立群組表單、顯示邀請碼/邀請連結、輸入邀請碼加入）於 `frontend/src/pages/FamilyGroupPage.tsx`
@@ -142,7 +142,7 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 ### Implementation for User Story 4
 
-- [X] T043 [US4] 實作 StatisticsService：同進程直接呼叫 `ExpenseService` 取得指定家庭、指定月份的支出紀錄（Java 方法呼叫，取代原本跨服務 WebClient 呼叫，見 research.md 決策 4），依 `paymentAccountId` 加總 `amount` 為 `netAmount`，當月無資料時回傳空陣列與 `totalNetAmount: 0`（非錯誤或空白畫面，FR-011）於 `app-service/src/main/java/com/family195home/app/statistics/service/StatisticsService.java`（依賴 T040）
+- [X] T043 [US4] 實作 StatisticsService：同進程直接呼叫 `ExpenseService` 取得指定家庭、指定月份的支出紀錄（Java 方法呼叫，見 research.md 決策 4），依 `paymentAccountId` 加總 `amount` 為 `netAmount`，當月無資料時回傳空陣列與 `totalNetAmount: 0`（非錯誤或空白畫面，FR-011）於 `app-service/src/main/java/com/family195home/app/statistics/service/StatisticsService.java`（依賴 T040）
 - [X] T044 [P] [US4] 實作 `GET /api/statistics/monthly?familyGroupId=&month=` 公開端點（呼叫 T021 的 `assertMemberAuthorized` 確認呼叫者屬於該家庭群組，FR-017）於 `app-service/src/main/java/com/family195home/app/statistics/controller/StatisticsController.java`（依賴 T043、T021）
 - [X] T045 [P] [US4] 單元測試：各帳戶彙總淨額加總等於當月支出紀錄總和（SC-004）、無資料月份回傳 0 而非錯誤於 `app-service/src/test/java/com/family195home/app/statistics/StatisticsServiceTest.java`
 - [X] T046 [P] [US4] 前端統計頁面（月份選擇器、各支付帳戶淨額列表、總計）於 `frontend/src/pages/StatisticsPage.tsx`
@@ -202,7 +202,7 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 - [X] T065 [P] 前端建置產物整合：於 CI（`.github/workflows/ci.yml`）中 `frontend` build 完成後，將 `frontend/dist` 產物複製進 `app-service/src/main/resources/static/`，供 app-service 一併打包進映像檔（依 plan.md Project Structure）
 - [X] T066 [P] 完善 `docker-compose.yml`：加入 app-service、notification-service 健康檢查（Spring Boot Actuator）與 `depends_on` 條件式啟動順序、注入 `application.yml` 對應環境變數
 - [X] T067 [P] 建立 `.github/workflows/cd.yml`：build app-service、notification-service 映像檔 → 推送 GHCR → 觸發 Northflank 對應兩個 service 拉取並部署最新映像檔（見 research.md 決策 1、quickstart.md「部署到 Northflank」段落）
-- [X] T068 [P] 撰寫 `README.md`：系統架構圖、app-service（含 family/expense/statistics 模組）與 notification-service 職責說明、技術選型理由（含「為什麼不用 .NET」「為什麼不用訊息佇列」「為什麼只拆兩個服務，不是完整微服務」之具體回答，依 constitution v3.0.0 開發流程規範）
+- [X] T068 [P] 撰寫 `README.md`：系統架構圖、app-service（含 family/expense/statistics 模組）與 notification-service 職責說明、技術選型理由（含「為什麼不用 .NET」「為什麼不用訊息佇列」「為什麼只拆兩個服務，不是完整微服務」之具體回答，依 constitution 開發流程規範）
 - [X] T069 依 [quickstart.md](./quickstart.md) 逐項執行 US1-US6 驗證場景，確認端對端可正常運作
 - [X] T070 [P] 前端關鍵元件測試（Vitest + React Testing Library）：登入表單、支出新增表單驗證邏輯於 `frontend/tests/`
 - [X] T071 [P] app-service（family、expense 模組）、notification-service 補上 MyBatis Mapper slice 測試，驗證自訂 SQL 查詢語意（例如依 `familyGroupId`/`status` 篩選、分頁、排序），於各自 `src/test/java/.../infrastructure/persistence/`
