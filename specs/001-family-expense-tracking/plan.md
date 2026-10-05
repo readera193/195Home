@@ -8,13 +8,13 @@
 
 建立一個家庭共享支出記帳平台，讓使用者以 Email + 密碼建立帳號，建立/加入單一家庭群組，於群組內建立個人支付帳戶並記錄金額可正可負可零的整數支出紀錄（備註必填），家庭成員可共同檢視、依支付帳戶或成員篩選紀錄，並查看依支付帳戶彙總的月結淨額統計；系統另外透過 LINE Bot 於每月最後一天 23:00 主動推播當月支出匯總，並支援成員以「YYYY-MM」訊息主動查詢。
 
-技術方案依 constitution v3.0.0 採 Java 17 + Spring Boot，採 **2 個部署服務**：**app-service**（單一 Spring Boot 應用，內部依業務領域切套件模組——family、expense、statistics，並直接 serve React 前端建置後的靜態檔案）與 **notification-service**（LINE Bot 整合、每月排程推播、關鍵字查詢，維持獨立部署）。資料庫統一使用單一 MySQL 執行個體，切分為 `appdb`（family/expense/statistics 模組共用，但各模組仍各自擁有獨立資料表與 Mapper，不共用表）、`notificationdb` 兩個 schema。服務間唯一的跨進程呼叫為 notification-service 呼叫 app-service 的內部 REST API；app-service 內部模組間一律以 Java service 層方法直接呼叫，不透過 HTTP。全系統以 docker-compose 一鍵啟動本機開發環境（2 個服務 + MySQL），正式環境部署至 Northflank（Sandbox 免費方案：2 個免費 service + 1 個免費 database），CI 透過 GitHub Actions 建置與測試，CD 建置映像檔推送至 GHCR 後觸發 Northflank 兩個 service 部署最新映像檔。
+技術方案依 constitution 採 Java 17 + Spring Boot，分為 **2 個部署服務**：**app-service**（單一 Spring Boot 應用，內部依業務領域切套件模組——family、expense、statistics，並直接 serve React 前端建置後的靜態檔案）與 **notification-service**（LINE Bot 整合、每月排程推播、關鍵字查詢，維持獨立部署）。資料庫統一使用單一 MySQL 執行個體，切分為 `appdb`（family/expense/statistics 模組共用，但各模組仍各自擁有獨立資料表與 Mapper，不共用表）、`notificationdb` 兩個 schema。服務間唯一的跨進程呼叫為 notification-service 呼叫 app-service 的內部 REST API；app-service 內部模組間一律以 Java service 層方法直接呼叫，不透過 HTTP。全系統以 docker-compose 一鍵啟動本機開發環境（2 個服務 + MySQL），正式環境部署至 Northflank（Sandbox 免費方案：2 個免費 service + 1 個免費 database），CI 透過 GitHub Actions 建置與測試，CD 建置映像檔推送至 GHCR 後觸發 Northflank 兩個 service 部署最新映像檔。
 
 ## Technical Context
 
 **Language/Version**: Java 17（app-service、notification-service，Spring Boot 3.2+）；TypeScript 5.x + React 18（前端，建置後併入 app-service）
 
-**Primary Dependencies**: Spring Boot Web / Validation、MyBatis（`mybatis-spring-boot-starter`，資料庫存取層採 repository 介面 + RepositoryImpl adapter + MyBatis Mapper 分層）、Flyway（`flyway-mysql`，schema migration）、Spring Security + `jjwt`（BCrypt 密碼雜湊、JWT 簽發與本地驗證，於 app-service 內完成，無獨立 Gateway 進程）、Spring Boot Actuator（健康檢查）、MySQL Connector/J（`mysql-connector-j`）、line-bot-sdk-java（LINE Messaging API 官方 SDK，僅 notification-service 使用）；前端：React Router、Axios、TanStack Query (React Query)。**不再使用** Spring Cloud Gateway、Spring Cloud Config Server（見 constitution v3.0.0 技術範疇與邊界）。
+**Primary Dependencies**: Spring Boot Web / Validation、MyBatis（`mybatis-spring-boot-starter`，資料庫存取層採 repository 介面 + RepositoryImpl adapter + MyBatis Mapper 分層）、Flyway（`flyway-mysql`，schema migration）、Spring Security + `jjwt`（BCrypt 密碼雜湊、JWT 簽發與本地驗證，於 app-service 內完成，無獨立 Gateway 進程）、Spring Boot Actuator（健康檢查）、MySQL Connector/J（`mysql-connector-j`）、line-bot-sdk-java（LINE Messaging API 官方 SDK，僅 notification-service 使用）；前端：React Router、Axios、TanStack Query (React Query)。**不使用** Spring Cloud Gateway、Spring Cloud Config Server（見 constitution 技術範疇與邊界）。
 
 **Storage**: MySQL（單一執行個體，Docker 容器：官方 `mysql` image，例如 `mysql:8.x`）；依服務資料自主權切分為 2 個 schema——`appdb`（app-service 專用，family/expense/statistics 模組各自擁有獨立資料表，不跨模組共用表）、`notificationdb`（notification-service 專用）；statistics 模組不建立獨立資料表，於 app-service 進程內即時呼叫 expense 模組的 service 方法彙總
 
@@ -26,7 +26,7 @@
 
 **Performance Goals**: 家庭規模（非高併發）；篩選後列表 2 秒內回應（SC-003）；月結通知於觸發後 5 分鐘內送達所有已綁定成員（SC-005）；LINE 查詢 1 分鐘內回覆（SC-006）
 
-**Constraints**: 金額僅接受整數（可正可負可零，不支援小數點）；同一支出紀錄同時僅允許一人編輯（DB 層邏輯鎖，5 分鐘 TTL 避免永久鎖死）；單一幣別（新台幣）；一使用者僅能同時屬於一個家庭群組；LINE 綁定碼 10 分鐘內有效且單次使用；app-service、notification-service 的資源需求（vCPU/記憶體）MUST 落在 Northflank Sandbox 免費方案的 2 個 service 額度內，資料庫 MUST 使用該方案的 1 個免費 database（見 constitution v3.0.0 技術範疇與邊界）
+**Constraints**: 金額僅接受整數（可正可負可零，不支援小數點）；同一支出紀錄同時僅允許一人編輯（DB 層邏輯鎖，5 分鐘 TTL 避免永久鎖死）；單一幣別（新台幣）；一使用者僅能同時屬於一個家庭群組；LINE 綁定碼 10 分鐘內有效且單次使用；app-service、notification-service 的資源需求（vCPU/記憶體）MUST 落在 Northflank Sandbox 免費方案的 2 個 service 額度內，資料庫 MUST 使用該方案的 1 個免費 database（見 constitution 技術範疇與邊界）
 
 **Scale/Scope**: 6 個 User Story、29 項功能需求、5 個核心實體；單一家庭群組規模的資料量（每月數十至數百筆支出紀錄）
 
