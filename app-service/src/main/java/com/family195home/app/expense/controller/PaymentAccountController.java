@@ -4,8 +4,8 @@ import com.family195home.app.expense.domain.PaymentAccount;
 import com.family195home.app.expense.domain.PaymentAccountStatus;
 import com.family195home.app.expense.dto.CreateAccountRequest;
 import com.family195home.app.expense.dto.PaymentAccountResponse;
+import com.family195home.app.expense.dto.UpdateAccountRequest;
 import com.family195home.app.expense.service.PaymentAccountService;
-import com.family195home.app.family.domain.FamilyMember;
 import com.family195home.app.family.service.FamilyService;
 import com.family195home.app.security.AuthenticatedUser;
 import jakarta.validation.Valid;
@@ -31,10 +31,8 @@ public class PaymentAccountController {
     @PostMapping
     public ResponseEntity<PaymentAccountResponse> create(
             @AuthenticationPrincipal AuthenticatedUser caller, @Valid @RequestBody CreateAccountRequest request) {
-        // FR-017：呼叫者須為該家庭群組成員，familyMemberId 由呼叫者自身身分決定，不接受前端傳入
-        FamilyMember member = familyService.assertMemberAuthorized(
-                request.familyGroupId(), caller.userId(), FamilyService.RequiredRole.ANY_MEMBER);
-        PaymentAccount account = paymentAccountService.create(request.familyGroupId(), member.getId(), request.name());
+        // FR-003：限群組管理者；建立者身分由呼叫者自身決定，不接受前端傳入
+        PaymentAccount account = paymentAccountService.create(request.familyGroupId(), caller.userId(), request.name());
         return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(account));
     }
 
@@ -54,9 +52,24 @@ public class PaymentAccountController {
         return ResponseEntity.ok(accounts);
     }
 
+    @PutMapping("/{accountId}")
+    public ResponseEntity<PaymentAccountResponse> rename(
+            @AuthenticationPrincipal AuthenticatedUser caller,
+            @PathVariable Long accountId,
+            @Valid @RequestBody UpdateAccountRequest request) {
+        return ResponseEntity.ok(toResponse(paymentAccountService.rename(accountId, caller.userId(), request.name())));
+    }
+
+    @DeleteMapping("/{accountId}")
+    public ResponseEntity<Void> delete(@AuthenticationPrincipal AuthenticatedUser caller, @PathVariable Long accountId) {
+        paymentAccountService.delete(accountId, caller.userId());
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/{accountId}/disable")
-    public ResponseEntity<PaymentAccountResponse> disable(@PathVariable Long accountId) {
-        PaymentAccount account = paymentAccountService.disable(accountId);
+    public ResponseEntity<PaymentAccountResponse> disable(
+            @AuthenticationPrincipal AuthenticatedUser caller, @PathVariable Long accountId) {
+        PaymentAccount account = paymentAccountService.disable(accountId, caller.userId());
         return ResponseEntity.ok(toResponse(account));
     }
 

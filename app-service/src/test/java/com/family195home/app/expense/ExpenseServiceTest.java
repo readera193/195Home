@@ -12,6 +12,7 @@ import com.family195home.app.family.domain.MemberStatus;
 import com.family195home.app.family.service.FamilyService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -102,15 +103,45 @@ class ExpenseServiceTest {
     }
 
     @Test
-    void update_rejectsWhenCallerIsNeitherAuthorNorAdmin() {
-        // FR-019
+    void update_rejectsWhenCallerNotInGroup() {
+        // FR-017、FR-019：非群組在職成員不可操作
         ExpenseRecord record = expenseRecord(1L, 10L, 100L);
         when(expenseRecordRepository.findById(1L)).thenReturn(Optional.of(record));
-        FamilyMember otherMember = member(999L, 20L, MemberRole.MEMBER);
-        when(familyService.assertMemberAuthorized(10L, 5L, FamilyService.RequiredRole.ANY_MEMBER)).thenReturn(otherMember);
+        when(familyService.assertMemberAuthorized(10L, 5L, FamilyService.RequiredRole.ANY_MEMBER))
+                .thenThrow(new ApiException(HttpStatus.FORBIDDEN, "NOT_GROUP_MEMBER", "您不是該家庭群組成員"));
 
         assertThatThrownBy(() -> expenseService.update(10L, 1L, 5L, 100L, BigDecimal.TEN, "備註", null))
-                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("NOT_AUTHOR_OR_ADMIN"));
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("NOT_GROUP_MEMBER"));
+    }
+
+    @Test
+    void update_allowsRegularMemberEvenIfNotAuthor() {
+        // FR-019：一般成員可編輯其他成員新增的紀錄
+        ExpenseRecord record = expenseRecord(1L, 10L, 999L);
+        record.setLockedByMemberId(2L);
+        record.setLockedAt(LocalDateTime.now());
+        when(expenseRecordRepository.findById(1L)).thenReturn(Optional.of(record));
+        FamilyMember regular = member(2L, 5L, MemberRole.MEMBER);
+        when(familyService.assertMemberAuthorized(10L, 5L, FamilyService.RequiredRole.ANY_MEMBER)).thenReturn(regular);
+
+        ExpenseRecord result = expenseService.update(10L, 1L, 5L, 200L, new BigDecimal("30"), "他人紀錄", null);
+
+        assertThat(result.getAmount()).isEqualTo(30);
+    }
+
+    @Test
+    void delete_allowsRegularMemberEvenIfNotAuthor() {
+        // FR-019
+        ExpenseRecord record = expenseRecord(1L, 10L, 999L);
+        record.setLockedByMemberId(2L);
+        record.setLockedAt(LocalDateTime.now());
+        when(expenseRecordRepository.findById(1L)).thenReturn(Optional.of(record));
+        FamilyMember regular = member(2L, 5L, MemberRole.MEMBER);
+        when(familyService.assertMemberAuthorized(10L, 5L, FamilyService.RequiredRole.ANY_MEMBER)).thenReturn(regular);
+
+        expenseService.delete(10L, 1L, 5L);
+
+        verify(expenseRecordRepository).delete(1L);
     }
 
     @Test

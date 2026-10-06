@@ -33,6 +33,11 @@ public class ExpenseRecordRepositoryImpl implements ExpenseRecordRepository {
     }
 
     @Override
+    public boolean existsByPaymentAccountId(Long paymentAccountId) {
+        return mapper.countByPaymentAccountId(paymentAccountId) > 0;
+    }
+
+    @Override
     public void delete(Long id) {
         mapper.deleteById(id);
     }

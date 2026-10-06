@@ -30,6 +30,10 @@
         WHERE id = #{id}
     </update>
 
+    <select id="countByPaymentAccountId" resultType="int">
+        SELECT COUNT(*) FROM expense_records WHERE payment_account_id = #{paymentAccountId}
+    </select>
+
     <delete id="deleteById">
         DELETE FROM expense_records WHERE id = #{id}
     </delete>

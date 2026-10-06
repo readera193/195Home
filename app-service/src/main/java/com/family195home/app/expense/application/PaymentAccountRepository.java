@@ -12,6 +12,8 @@ public interface PaymentAccountRepository {
 
     void update(PaymentAccount account);
 
+    void delete(Long id);
+
     Optional<PaymentAccount> findById(Long id);
 
     /** status 為 null 時回傳所有狀態（對應 API 的 status=ALL）。 */
