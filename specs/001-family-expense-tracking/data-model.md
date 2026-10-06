@@ -26,7 +26,7 @@ schema 定義對應 `app-service/src/main/resources/db/migration/`（Flyway migr
 | id | BIGINT PK | |
 | name | VARCHAR(100) UNIQUE NOT NULL | 全系統唯一（FR-001） |
 | status | VARCHAR(20) NOT NULL | `ACTIVE` \| `DISSOLVED` |
-| inviteCode | VARCHAR(32) UNIQUE NOT NULL | 可重複使用、無時限（FR-002） |
+| inviteCode | VARCHAR(32) UNIQUE NOT NULL | 可重複使用、無時限（FR-002）；加入時須檢查申請者在該群組是否為 `REMOVED`（FR-030） |
 | createdAt | DATETIME(6) NOT NULL | |
 
 **狀態轉換**：`ACTIVE` → `DISSOLVED`（唯一在職成員離開時，FR-018）。`DISSOLVED` 群組 MUST NOT 允許新增支付帳戶或支出紀錄。
@@ -38,7 +38,7 @@ schema 定義對應 `app-service/src/main/resources/db/migration/`（Flyway migr
 | id | BIGINT PK | |
 | familyGroupId | BIGINT FK → FamilyGroup | |
 | userId | BIGINT FK → User | |
-| status | VARCHAR(20) NOT NULL | `ACTIVE` \| `LEFT` |
+| status | VARCHAR(20) NOT NULL | `ACTIVE` \| `LEFT`（自行離開）\| `REMOVED`（被管理者移出） |
 | role | VARCHAR(20) NOT NULL | `ADMIN` \| `MEMBER` |
 | joinedAt | DATETIME(6) NOT NULL | |
 | leftAt | DATETIME(6) NULL | |
@@ -50,8 +50,12 @@ schema 定義對應 `app-service/src/main/resources/db/migration/`（Flyway migr
 
 **狀態轉換**：
 - （不存在）→ `ACTIVE`：建立群組或以邀請碼加入（FR-001、FR-002）。
-- `ACTIVE` → `LEFT`：自行離開或被管理者移出（FR-021、FR-028）。
+- `ACTIVE` → `LEFT`：自行離開（FR-021）。
+- `ACTIVE` → `REMOVED`：被管理者移出（FR-028）；`leftAt` 同樣記錄移出時間。
 - `LEFT` → `ACTIVE`：以原群組邀請碼重新加入，`role` 維持原值或預設 `MEMBER`（FR-025）。
+- `REMOVED` → `ACTIVE`：**不允許**以邀請碼加入，邀請碼加入時 MUST 拒絕（FR-030）。
+- `REMOVED` → `LEFT`：管理者明確「恢復加入資格」後，該成員方可依上一條以邀請碼重新加入（FR-030）。
+- `LEFT` 與 `REMOVED` 皆視為「已離開」顯示於成員篩選清單（FR-021），且皆不佔用 FR-026 的在職名額，可建立或加入其他群組。
 - `role`：`ADMIN` 離開仍有其他在職成員的群組時，自動將 `ADMIN` 轉移給群組內 `joinedAt` 最早的其他在職成員（FR-029）。
 
 #### LineBindingCode（LINE 綁定碼）
