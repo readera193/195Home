@@ -18,7 +18,7 @@ export interface MemberView {
   familyMemberId: number;
   userId: number;
   email: string;
-  status: 'ACTIVE' | 'LEFT';
+  status: 'ACTIVE' | 'LEFT' | 'REMOVED';
   role: 'ADMIN' | 'MEMBER';
   joinedAt: string;
   leftAt: string | null;
@@ -63,6 +63,15 @@ export function leaveGroup(familyGroupId: number, memberId: number): Promise<Lea
 
 export function kickMember(familyGroupId: number, memberId: number): Promise<{ memberId: number; status: string }> {
   return apiClient.post(`/families/${familyGroupId}/members/${memberId}/kick`).then((res) => res.data);
+}
+
+export function restoreMemberEligibility(
+  familyGroupId: number,
+  memberId: number,
+): Promise<{ memberId: number; status: string }> {
+  return apiClient
+    .post(`/families/${familyGroupId}/members/${memberId}/restore-eligibility`)
+    .then((res) => res.data);
 }
 
 export interface GenerateCodeResponse {

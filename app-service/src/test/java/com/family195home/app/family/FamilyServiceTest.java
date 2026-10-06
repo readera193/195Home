@@ -149,7 +149,7 @@ class FamilyServiceTest {
     }
 
     @Test
-    void kick_byAdmin_marksTargetLeft() {
+    void kick_byAdmin_marksTargetRemoved() {
         FamilyMember admin = activeMember(1L, 10L, MemberRole.ADMIN);
         FamilyMember target = activeMember(2L, 10L, MemberRole.MEMBER);
         when(familyMemberRepository.findActiveByUserId(admin.getUserId())).thenReturn(Optional.of(admin));
@@ -158,7 +158,59 @@ class FamilyServiceTest {
 
         FamilyMember result = familyService.kick(10L, 2L, admin.getUserId());
 
+        assertThat(result.getStatus()).isEqualTo(MemberStatus.REMOVED);
+    }
+
+    @Test
+    void joinGroup_rejectsRemovedMember() {
+        // FR-030：被移出的成員不可用邀請碼重新加入
+        when(familyMemberRepository.findActiveByUserId(2L)).thenReturn(Optional.empty());
+        when(familyGroupRepository.findByInviteCode("CODE1"))
+                .thenReturn(Optional.of(groupOf(10L, "王家", FamilyGroupStatus.ACTIVE, "CODE1")));
+        FamilyMember removed = activeMember(5L, 10L, MemberRole.MEMBER);
+        removed.setStatus(MemberStatus.REMOVED);
+        when(familyMemberRepository.findByUserIdAndGroupId(2L, 10L)).thenReturn(Optional.of(removed));
+
+        assertThatThrownBy(() -> familyService.joinGroup(2L, "CODE1"))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("MEMBER_REMOVED"));
+        assertThat(removed.getStatus()).isEqualTo(MemberStatus.REMOVED);
+        verify(familyMemberRepository, never()).update(any());
+    }
+
+    @Test
+    void restoreEligibility_byAdmin_changesRemovedToLeft() {
+        // FR-030
+        FamilyMember admin = activeMember(1L, 10L, MemberRole.ADMIN);
+        FamilyMember removed = activeMember(2L, 10L, MemberRole.MEMBER);
+        removed.setStatus(MemberStatus.REMOVED);
+        when(familyMemberRepository.findActiveByUserId(admin.getUserId())).thenReturn(Optional.of(admin));
+        when(familyMemberRepository.findById(2L)).thenReturn(Optional.of(removed));
+
+        FamilyMember result = familyService.restoreEligibility(10L, 2L, admin.getUserId());
+
         assertThat(result.getStatus()).isEqualTo(MemberStatus.LEFT);
+        verify(familyMemberRepository).update(removed);
+    }
+
+    @Test
+    void restoreEligibility_rejectsNonRemovedMember() {
+        FamilyMember admin = activeMember(1L, 10L, MemberRole.ADMIN);
+        FamilyMember left = activeMember(2L, 10L, MemberRole.MEMBER);
+        left.setStatus(MemberStatus.LEFT);
+        when(familyMemberRepository.findActiveByUserId(admin.getUserId())).thenReturn(Optional.of(admin));
+        when(familyMemberRepository.findById(2L)).thenReturn(Optional.of(left));
+
+        assertThatThrownBy(() -> familyService.restoreEligibility(10L, 2L, admin.getUserId()))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("MEMBER_NOT_REMOVED"));
+    }
+
+    @Test
+    void restoreEligibility_rejectsNonAdmin() {
+        FamilyMember member = activeMember(3L, 10L, MemberRole.MEMBER);
+        when(familyMemberRepository.findActiveByUserId(member.getUserId())).thenReturn(Optional.of(member));
+
+        assertThatThrownBy(() -> familyService.restoreEligibility(10L, 2L, member.getUserId()))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("NOT_GROUP_ADMIN"));
     }
 
     @Test

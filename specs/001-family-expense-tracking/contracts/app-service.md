@@ -40,12 +40,12 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 - Header: `Authorization`
 - Request: `{ inviteCode: string }`
 - Response 200: `{ familyGroupId, name, role: "MEMBER" | "ADMIN", status: "ACTIVE" }`
-- Errors: `404 INVALID_INVITE_CODE`、`409 ALREADY_IN_A_GROUP`（FR-026）、`409 GROUP_DISSOLVED`
+- Errors: `404 INVALID_INVITE_CODE`、`409 ALREADY_IN_A_GROUP`（FR-026）、`409 GROUP_DISSOLVED`、`403 MEMBER_REMOVED`（被管理者移出者不可以邀請碼重新加入，FR-030）
 
 ### `GET /api/families/{familyGroupId}/members`
 - Header: `Authorization`
 - Query: `includeLeft=true|false`（預設 true，供篩選清單使用，FR-021）
-- Response 200: `[{ familyMemberId, userId, email, status, role, joinedAt, leftAt }]`
+- Response 200: `[{ familyMemberId, userId, email, status: "ACTIVE"|"LEFT"|"REMOVED", role, joinedAt, leftAt }]`
 
 ### `POST /api/families/{familyGroupId}/members/{memberId}/leave`
 - Header: `Authorization`（限本人）
@@ -54,8 +54,13 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 
 ### `POST /api/families/{familyGroupId}/members/{memberId}/kick`
 - Header: `Authorization`（限該群組 ADMIN）
-- Response 200: `{ status: "LEFT" }`
+- Response 200: `{ memberId, status: "REMOVED" }`（被移出者不可以邀請碼重新加入，FR-028、FR-030）
 - Errors: `403 NOT_GROUP_ADMIN`（FR-028）
+
+### `POST /api/families/{familyGroupId}/members/{memberId}/restore-eligibility`
+- Header: `Authorization`（限該群組 ADMIN）
+- Response 200: `{ memberId, status: "LEFT" }`（`REMOVED` → `LEFT`，之後該成員可依 FR-025 以邀請碼重新加入，FR-030）
+- Errors: `403 NOT_GROUP_ADMIN`、`404 MEMBER_NOT_FOUND`、`409 MEMBER_NOT_REMOVED`
 
 ### `POST /api/families/members/{memberId}/line-binding-codes`
 - Header: `Authorization`（限本人）
