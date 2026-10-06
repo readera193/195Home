@@ -113,12 +113,13 @@ public class ExpenseService {
         expenseRecordRepository.delete(expenseId);
     }
 
-    // FR-017、FR-019：呼叫者須為該群組在職成員，且紀錄須屬於該群組；不限制新增者本人
+    // FR-017、FR-019：呼叫者須為該群組在職成員，且紀錄須屬於該群組；不限制新增者本人。
+    // 紀錄屬於其他群組屬授權問題而非資源不存在，與 NOT_GROUP_MEMBER 一致回傳 403
     private ExpenseRecord requireRecordInGroup(Long familyGroupId, Long expenseId, Long callerUserId) {
         ExpenseRecord record = findRequired(expenseId);
         familyService.assertMemberAuthorized(familyGroupId, callerUserId, FamilyService.RequiredRole.ANY_MEMBER);
         if (!familyGroupId.equals(record.getFamilyGroupId())) {
-            throw new ApiException(HttpStatus.NOT_FOUND, "EXPENSE_NOT_FOUND", "找不到支出紀錄");
+            throw new ApiException(HttpStatus.FORBIDDEN, "EXPENSE_NOT_IN_GROUP", "此支出紀錄不屬於該家庭群組");
         }
         return record;
     }

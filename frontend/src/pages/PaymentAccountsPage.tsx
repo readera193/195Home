@@ -68,7 +68,7 @@ export default function PaymentAccountsPage() {
       {error && <p role="alert">{error}</p>}
       {isAdmin ? (
         <form onSubmit={handleCreate}>
-          <label htmlFor="accountName">帳戶名稱（例如現金、銀行帳戶、信用卡）</label>
+          <label htmlFor="accountName">（例如現金、銀行帳戶、信用卡）</label>
           <input id="accountName" value={name} onChange={(e) => setName(e.target.value)} required />
           <button type="submit">建立</button>
         </form>

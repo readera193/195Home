@@ -115,6 +115,21 @@ class ExpenseServiceTest {
     }
 
     @Test
+    void update_rejectsRecordFromAnotherGroup() {
+        // FR-017：紀錄屬於其他群組時回傳 403
+        ExpenseRecord record = expenseRecord(1L, 99L, 100L);
+        when(expenseRecordRepository.findById(1L)).thenReturn(Optional.of(record));
+        when(familyService.assertMemberAuthorized(10L, 5L, FamilyService.RequiredRole.ANY_MEMBER))
+                .thenReturn(member(2L, 5L, MemberRole.MEMBER));
+
+        assertThatThrownBy(() -> expenseService.update(10L, 1L, 5L, 100L, BigDecimal.TEN, "備註", null))
+                .isInstanceOfSatisfying(ApiException.class, e -> {
+                    assertThat(e.getCode()).isEqualTo("EXPENSE_NOT_IN_GROUP");
+                    assertThat(e.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+                });
+    }
+
+    @Test
     void update_allowsRegularMemberEvenIfNotAuthor() {
         // FR-019：一般成員可編輯其他成員新增的紀錄
         ExpenseRecord record = expenseRecord(1L, 10L, 999L);
