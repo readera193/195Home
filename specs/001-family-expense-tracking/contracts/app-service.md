@@ -115,12 +115,12 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 - Header: `Authorization`（須已持有鎖）
 - Request: `{ amount, note, occurredAt, paymentAccountId }`
 - Response 200: `{ expenseId, ... }`（成功後自動釋放鎖）
-- Errors: `403 LOCK_NOT_HELD_BY_CALLER`、`400 AMOUNT_MUST_BE_INTEGER` 等同新增驗證規則
+- Errors: `403 LOCK_NOT_HELD_BY_CALLER`、`403 NOT_GROUP_MEMBER`（非該群組在職成員，FR-017）、`403 EXPENSE_NOT_IN_GROUP`（紀錄不屬於該群組）、`400 AMOUNT_MUST_BE_INTEGER` 等同新增驗證規則
 
 ### `DELETE /api/expenses/{expenseId}`
 - Header: `Authorization`（須已持有鎖；群組任一在職成員皆可鎖定後刪除，FR-019）
 - Response 204
-- Errors: `403 LOCK_NOT_HELD_BY_CALLER`
+- Errors: `403 LOCK_NOT_HELD_BY_CALLER`、`403 NOT_GROUP_MEMBER`、`403 EXPENSE_NOT_IN_GROUP`
 
 ### `POST /api/expenses/{expenseId}/unlock`
 - Header: `Authorization`（取消編輯時釋放鎖）
