@@ -57,7 +57,7 @@ export default function ExpenseListPage() {
           {members?.map((member) => (
             <option key={member.familyMemberId} value={member.familyMemberId}>
               {member.email}
-              {member.status === 'LEFT' ? '（已離開）' : ''}
+              {member.status !== 'ACTIVE' ? '（已離開）' : ''}
             </option>
           ))}
         </select>

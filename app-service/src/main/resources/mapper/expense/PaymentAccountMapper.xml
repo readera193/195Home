@@ -20,6 +20,10 @@
         UPDATE payment_accounts SET name = #{name}, status = #{status} WHERE id = #{id}
     </update>
 
+    <delete id="deleteById">
+        DELETE FROM payment_accounts WHERE id = #{id}
+    </delete>
+
     <select id="selectById" resultMap="PaymentAccountResultMap">
         SELECT id, family_member_id, family_group_id, name, status, created_at
         FROM payment_accounts WHERE id = #{id}

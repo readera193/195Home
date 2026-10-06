@@ -49,7 +49,7 @@ public class FamilyService {
         return group;
     }
 
-    // FR-002, FR-025, FR-026
+    // FR-002, FR-025, FR-026, FR-030
     public FamilyMember joinGroup(Long userId, String inviteCode) {
         assertNotAlreadyInGroup(userId);
         FamilyGroup group = familyGroupRepository.findByInviteCode(inviteCode)
@@ -62,6 +62,10 @@ public class FamilyService {
         Optional<FamilyMember> existing = familyMemberRepository.findByUserIdAndGroupId(userId, group.getId());
         if (existing.isPresent()) {
             FamilyMember member = existing.get();
+            // FR-030：被管理者移出的成員不可用邀請碼重新加入，須由管理者恢復加入資格
+            if (member.getStatus() == MemberStatus.REMOVED) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "MEMBER_REMOVED", "您已被管理者移出此群組，無法再次加入");
+            }
             member.setStatus(MemberStatus.ACTIVE);
             member.setLeftAt(null);
             familyMemberRepository.update(member);
@@ -99,7 +103,7 @@ public class FamilyService {
         if (!member.getUserId().equals(callerUserId)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "NOT_SELF", "僅能操作自己的成員身分");
         }
-        return doLeave(member);
+        return doLeave(member, MemberStatus.LEFT);
     }
 
     // FR-028
@@ -109,7 +113,21 @@ public class FamilyService {
         if (target.getUserId().equals(callerUserId)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "CANNOT_KICK_SELF", "無法移出自己，請使用離開群組");
         }
-        doLeave(target);
+        doLeave(target, MemberStatus.REMOVED);
+        return target;
+    }
+
+    // FR-030：管理者恢復被移出成員的加入資格（REMOVED → LEFT），之後該成員方可依 FR-025 以邀請碼重新加入
+    public FamilyMember restoreEligibility(Long familyGroupId, Long memberId, Long callerUserId) {
+        assertMemberAuthorized(familyGroupId, callerUserId, RequiredRole.ADMIN);
+        FamilyMember target = familyMemberRepository.findById(memberId)
+                .filter(m -> m.getFamilyGroupId().equals(familyGroupId))
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND", "找不到成員"));
+        if (target.getStatus() != MemberStatus.REMOVED) {
+            throw new ApiException(HttpStatus.CONFLICT, "MEMBER_NOT_REMOVED", "此成員並非被移出狀態");
+        }
+        target.setStatus(MemberStatus.LEFT);
+        familyMemberRepository.update(target);
         return target;
     }
 
@@ -123,11 +141,11 @@ public class FamilyService {
         return member;
     }
 
-    private LeaveResult doLeave(FamilyMember member) {
+    private LeaveResult doLeave(FamilyMember member, MemberStatus newStatus) {
         Long familyGroupId = member.getFamilyGroupId();
         int activeCountBeforeLeaving = familyMemberRepository.countActiveByGroupId(familyGroupId);
 
-        member.setStatus(MemberStatus.LEFT);
+        member.setStatus(newStatus);
         member.setLeftAt(LocalDateTime.now());
         familyMemberRepository.update(member);
 
@@ -137,7 +155,7 @@ public class FamilyService {
                     .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "GROUP_NOT_FOUND", "找不到家庭群組"));
             group.setStatus(FamilyGroupStatus.DISSOLVED);
             familyGroupRepository.update(group);
-            return new LeaveResult(MemberStatus.LEFT, FamilyGroupStatus.DISSOLVED, null);
+            return new LeaveResult(newStatus, FamilyGroupStatus.DISSOLVED, null);
         }
 
         // FR-029：管理者離開仍有其他在職成員的群組時，自動轉移給 joinedAt 最早的其他在職成員
@@ -149,7 +167,7 @@ public class FamilyService {
             familyMemberRepository.update(newAdmin);
             newAdminMemberId = newAdmin.getId();
         }
-        return new LeaveResult(MemberStatus.LEFT, FamilyGroupStatus.ACTIVE, newAdminMemberId);
+        return new LeaveResult(newStatus, FamilyGroupStatus.ACTIVE, newAdminMemberId);
     }
 
     /**

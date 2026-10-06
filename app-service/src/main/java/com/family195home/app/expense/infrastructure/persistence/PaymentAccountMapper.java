@@ -13,6 +13,8 @@ public interface PaymentAccountMapper {
 
     void update(PaymentAccount account);
 
+    void deleteById(@Param("id") Long id);
+
     PaymentAccount selectById(@Param("id") Long id);
 
     List<PaymentAccount> selectByGroupId(@Param("familyGroupId") Long familyGroupId, @Param("status") String status);

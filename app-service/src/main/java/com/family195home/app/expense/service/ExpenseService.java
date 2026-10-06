@@ -90,9 +90,9 @@ public class ExpenseService {
         return record.isLocked(LocalDateTime.now(), lockTtlMinutes);
     }
 
-    // FR-019：本人或該群組 ADMIN 才可編輯/刪除；FR-027：須已持有鎖
+    // FR-019：群組任一在職成員皆可編輯/刪除任何紀錄；FR-027：須已持有鎖
     public ExpenseRecord update(Long familyGroupId, Long expenseId, Long callerUserId, Long paymentAccountId, BigDecimal amount, String note, LocalDateTime occurredAt) {
-        ExpenseRecord record = requireAuthorOrAdmin(familyGroupId, expenseId, callerUserId);
+        ExpenseRecord record = requireRecordInGroup(familyGroupId, expenseId, callerUserId);
         requireLockHeldByCaller(record, familyGroupId, callerUserId);
 
         record.setPaymentAccountId(paymentAccountId);
@@ -108,17 +108,18 @@ public class ExpenseService {
     }
 
     public void delete(Long familyGroupId, Long expenseId, Long callerUserId) {
-        ExpenseRecord record = requireAuthorOrAdmin(familyGroupId, expenseId, callerUserId);
+        ExpenseRecord record = requireRecordInGroup(familyGroupId, expenseId, callerUserId);
         requireLockHeldByCaller(record, familyGroupId, callerUserId);
         expenseRecordRepository.delete(expenseId);
     }
 
-    private ExpenseRecord requireAuthorOrAdmin(Long familyGroupId, Long expenseId, Long callerUserId) {
+    // FR-017、FR-019：呼叫者須為該群組在職成員，且紀錄須屬於該群組；不限制新增者本人。
+    // 紀錄屬於其他群組屬授權問題而非資源不存在，與 NOT_GROUP_MEMBER 一致回傳 403
+    private ExpenseRecord requireRecordInGroup(Long familyGroupId, Long expenseId, Long callerUserId) {
         ExpenseRecord record = findRequired(expenseId);
-        FamilyMember caller = familyService.assertMemberAuthorized(familyGroupId, callerUserId, FamilyService.RequiredRole.ANY_MEMBER);
-        boolean isAuthor = caller.getId().equals(record.getAuthorMemberId());
-        if (!isAuthor && !caller.isAdmin()) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "NOT_AUTHOR_OR_ADMIN", "僅本人或群組管理者可編輯/刪除此紀錄");
+        familyService.assertMemberAuthorized(familyGroupId, callerUserId, FamilyService.RequiredRole.ANY_MEMBER);
+        if (!familyGroupId.equals(record.getFamilyGroupId())) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "EXPENSE_NOT_IN_GROUP", "此支出紀錄不屬於該家庭群組");
         }
         return record;
     }

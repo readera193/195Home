@@ -33,6 +33,14 @@ export function disableAccount(accountId: number): Promise<PaymentAccountRespons
   return apiClient.post(`/accounts/${accountId}/disable`).then((res) => res.data);
 }
 
+export function renameAccount(accountId: number, name: string): Promise<PaymentAccountResponse> {
+  return apiClient.put(`/accounts/${accountId}`, { name }).then((res) => res.data);
+}
+
+export function deleteAccount(accountId: number): Promise<void> {
+  return apiClient.delete(`/accounts/${accountId}`).then(() => undefined);
+}
+
 export interface CreateExpenseInput {
   familyGroupId: number;
   paymentAccountId: number;

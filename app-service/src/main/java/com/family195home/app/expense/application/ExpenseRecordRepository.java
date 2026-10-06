@@ -28,4 +28,7 @@ public interface ExpenseRecordRepository {
     int tryLock(Long id, Long memberId, LocalDateTime now, long ttlMinutes);
 
     void releaseLock(Long id);
+
+    /** 該支付帳戶是否已被任何支出紀錄使用（FR-022）。 */
+    boolean existsByPaymentAccountId(Long paymentAccountId);
 }

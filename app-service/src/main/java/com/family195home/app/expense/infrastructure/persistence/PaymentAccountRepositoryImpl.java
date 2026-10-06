@@ -29,6 +29,11 @@ public class PaymentAccountRepositoryImpl implements PaymentAccountRepository {
     }
 
     @Override
+    public void delete(Long id) {
+        mapper.deleteById(id);
+    }
+
+    @Override
     public Optional<PaymentAccount> findById(Long id) {
         return Optional.ofNullable(mapper.selectById(id));
     }

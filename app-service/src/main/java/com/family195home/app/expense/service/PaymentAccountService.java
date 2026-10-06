@@ -1,10 +1,12 @@
 package com.family195home.app.expense.service;
 
 import com.family195home.app.common.ApiException;
+import com.family195home.app.expense.application.ExpenseRecordRepository;
 import com.family195home.app.expense.application.PaymentAccountRepository;
 import com.family195home.app.expense.domain.PaymentAccount;
 import com.family195home.app.expense.domain.PaymentAccountStatus;
 import com.family195home.app.family.domain.FamilyGroupStatus;
+import com.family195home.app.family.domain.FamilyMember;
 import com.family195home.app.family.service.FamilyService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -12,26 +14,35 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * 支付帳戶為群組層級，新增／改名／停用／刪除一律限該群組管理者（FR-003、FR-022）。
+ */
 @Service
 public class PaymentAccountService {
 
     private final PaymentAccountRepository paymentAccountRepository;
+    private final ExpenseRecordRepository expenseRecordRepository;
     private final FamilyService familyService;
 
-    public PaymentAccountService(PaymentAccountRepository paymentAccountRepository, FamilyService familyService) {
+    public PaymentAccountService(
+            PaymentAccountRepository paymentAccountRepository,
+            ExpenseRecordRepository expenseRecordRepository,
+            FamilyService familyService) {
         this.paymentAccountRepository = paymentAccountRepository;
+        this.expenseRecordRepository = expenseRecordRepository;
         this.familyService = familyService;
     }
 
-    // FR-003, FR-018（群組已解散拒絕新增支付帳戶）
-    public PaymentAccount create(Long familyGroupId, Long familyMemberId, String name) {
+    // FR-003（限 ADMIN）, FR-018（群組已解散拒絕新增支付帳戶）
+    public PaymentAccount create(Long familyGroupId, Long callerUserId, String name) {
+        FamilyMember admin = familyService.assertMemberAuthorized(familyGroupId, callerUserId, FamilyService.RequiredRole.ADMIN);
         var group = familyService.getGroup(familyGroupId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "GROUP_NOT_FOUND", "找不到家庭群組"));
         if (group.getStatus() == FamilyGroupStatus.DISSOLVED) {
             throw new ApiException(HttpStatus.CONFLICT, "GROUP_DISSOLVED", "此家庭群組已解散，無法新增支付帳戶");
         }
         PaymentAccount account = new PaymentAccount(
-                familyMemberId, familyGroupId, name, PaymentAccountStatus.ACTIVE, LocalDateTime.now());
+                admin.getId(), familyGroupId, name, PaymentAccountStatus.ACTIVE, LocalDateTime.now());
         paymentAccountRepository.save(account);
         return account;
     }
@@ -40,12 +51,35 @@ public class PaymentAccountService {
         return paymentAccountRepository.findByGroupId(familyGroupId, status);
     }
 
-    // FR-022：僅能軟停用，不允許真正刪除已被使用過的帳戶（本階段一律走軟停用，不提供刪除端點）
-    public PaymentAccount disable(Long accountId) {
-        PaymentAccount account = paymentAccountRepository.findById(accountId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "ACCOUNT_NOT_FOUND", "找不到支付帳戶"));
+    // FR-003（限 ADMIN）
+    public PaymentAccount rename(Long accountId, Long callerUserId, String name) {
+        PaymentAccount account = requireAccountAsAdmin(accountId, callerUserId);
+        account.setName(name);
+        paymentAccountRepository.update(account);
+        return account;
+    }
+
+    // FR-022（限 ADMIN）：軟停用，既有支出紀錄仍顯示原帳戶名稱
+    public PaymentAccount disable(Long accountId, Long callerUserId) {
+        PaymentAccount account = requireAccountAsAdmin(accountId, callerUserId);
         account.setStatus(PaymentAccountStatus.DISABLED);
         paymentAccountRepository.update(account);
+        return account;
+    }
+
+    // FR-022（限 ADMIN）：僅從未被支出紀錄使用的帳戶可真正刪除
+    public void delete(Long accountId, Long callerUserId) {
+        PaymentAccount account = requireAccountAsAdmin(accountId, callerUserId);
+        if (expenseRecordRepository.existsByPaymentAccountId(accountId)) {
+            throw new ApiException(HttpStatus.CONFLICT, "ACCOUNT_IN_USE", "此支付帳戶已有支出紀錄，無法刪除，請改用停用");
+        }
+        paymentAccountRepository.delete(account.getId());
+    }
+
+    private PaymentAccount requireAccountAsAdmin(Long accountId, Long callerUserId) {
+        PaymentAccount account = paymentAccountRepository.findById(accountId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "ACCOUNT_NOT_FOUND", "找不到支付帳戶"));
+        familyService.assertMemberAuthorized(account.getFamilyGroupId(), callerUserId, FamilyService.RequiredRole.ADMIN);
         return account;
     }
 }

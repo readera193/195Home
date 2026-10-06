@@ -32,4 +32,6 @@ public interface ExpenseRecordMapper {
             @Param("lockExpiredBefore") LocalDateTime lockExpiredBefore);
 
     void releaseLock(@Param("id") Long id);
+
+    int countByPaymentAccountId(@Param("paymentAccountId") Long paymentAccountId);
 }

@@ -92,6 +92,15 @@ public class FamilyController {
         return ResponseEntity.ok(new KickResponse(target.getId(), target.getStatus().name()));
     }
 
+    @PostMapping("/{familyGroupId}/members/{memberId}/restore-eligibility")
+    public ResponseEntity<KickResponse> restoreEligibility(
+            @AuthenticationPrincipal AuthenticatedUser caller,
+            @PathVariable Long familyGroupId,
+            @PathVariable Long memberId) {
+        FamilyMember target = familyService.restoreEligibility(familyGroupId, memberId, caller.userId());
+        return ResponseEntity.ok(new KickResponse(target.getId(), target.getStatus().name()));
+    }
+
     private MemberView toView(FamilyMember member) {
         String email = userRepository.findById(member.getUserId()).map(u -> u.getEmail()).orElse(null);
         return new MemberView(

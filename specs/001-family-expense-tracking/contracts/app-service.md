@@ -40,12 +40,12 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 - Header: `Authorization`
 - Request: `{ inviteCode: string }`
 - Response 200: `{ familyGroupId, name, role: "MEMBER" | "ADMIN", status: "ACTIVE" }`
-- Errors: `404 INVALID_INVITE_CODE`、`409 ALREADY_IN_A_GROUP`（FR-026）、`409 GROUP_DISSOLVED`
+- Errors: `404 INVALID_INVITE_CODE`、`409 ALREADY_IN_A_GROUP`（FR-026）、`409 GROUP_DISSOLVED`、`403 MEMBER_REMOVED`（被管理者移出者不可以邀請碼重新加入，FR-030）
 
 ### `GET /api/families/{familyGroupId}/members`
 - Header: `Authorization`
 - Query: `includeLeft=true|false`（預設 true，供篩選清單使用，FR-021）
-- Response 200: `[{ familyMemberId, userId, email, status, role, joinedAt, leftAt }]`
+- Response 200: `[{ familyMemberId, userId, email, status: "ACTIVE"|"LEFT"|"REMOVED", role, joinedAt, leftAt }]`
 
 ### `POST /api/families/{familyGroupId}/members/{memberId}/leave`
 - Header: `Authorization`（限本人）
@@ -54,8 +54,13 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 
 ### `POST /api/families/{familyGroupId}/members/{memberId}/kick`
 - Header: `Authorization`（限該群組 ADMIN）
-- Response 200: `{ status: "LEFT" }`
+- Response 200: `{ memberId, status: "REMOVED" }`（被移出者不可以邀請碼重新加入，FR-028、FR-030）
 - Errors: `403 NOT_GROUP_ADMIN`（FR-028）
+
+### `POST /api/families/{familyGroupId}/members/{memberId}/restore-eligibility`
+- Header: `Authorization`（限該群組 ADMIN）
+- Response 200: `{ memberId, status: "LEFT" }`（`REMOVED` → `LEFT`，之後該成員可依 FR-025 以邀請碼重新加入，FR-030）
+- Errors: `403 NOT_GROUP_ADMIN`、`404 MEMBER_NOT_FOUND`、`409 MEMBER_NOT_REMOVED`
 
 ### `POST /api/families/members/{memberId}/line-binding-codes`
 - Header: `Authorization`（限本人）
@@ -64,7 +69,7 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 ## 支付帳戶（公開 API）
 
 ### `POST /api/accounts`
-- Header: `Authorization`
+- Header: `Authorization`（限該群組 ADMIN，否則 `403 NOT_GROUP_ADMIN`，FR-003）
 - Request: `{ familyGroupId, name }`（`familyMemberId` 由 JWT 解出的呼叫者身分決定，不由前端傳入）
 - Response 201: `{ accountId, name, status: "ACTIVE" }`（FR-003）
 
@@ -72,8 +77,19 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 - Header: `Authorization`
 - Response 200: `[{ accountId, familyMemberId, name, status }]`
 
+### `PUT /api/accounts/{accountId}`
+- Header: `Authorization`（限該群組 ADMIN）
+- Request: `{ name }`
+- Response 200: `{ accountId, name, status }`
+- Errors: `403 NOT_GROUP_ADMIN`
+
+### `DELETE /api/accounts/{accountId}`
+- Header: `Authorization`（限該群組 ADMIN）
+- Response 204（僅限從未被支出紀錄使用的帳戶，FR-022）
+- Errors: `403 NOT_GROUP_ADMIN`、`409 ACCOUNT_IN_USE`（已被使用，請改用停用）
+
 ### `POST /api/accounts/{accountId}/disable`
-- Header: `Authorization`
+- Header: `Authorization`（限該群組 ADMIN，否則 `403 NOT_GROUP_ADMIN`）
 - Response 200: `{ accountId, status: "DISABLED" }`（FR-022，僅軟停用，不可真正刪除）
 
 ## 支出紀錄（公開 API）
@@ -91,7 +107,7 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 - 篩選條件可單獨或同時套用 `paymentAccountId`、`authorMemberId`（FR-008、FR-009、FR-010）
 
 ### `POST /api/expenses/{expenseId}/lock`
-- Header: `Authorization`（操作者需為本人或該群組 ADMIN，同進程呼叫 family 模組驗證，FR-019）
+- Header: `Authorization`（操作者需為該群組在職成員，不限新增者本人，同進程呼叫 family 模組驗證，FR-019）
 - Response 200: `{ expenseId, lockedByMemberId, lockedAt }`
 - Errors: `409 RECORD_LOCKED`（其他人持有中，5 分鐘內，FR-027）
 
@@ -99,12 +115,12 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 - Header: `Authorization`（須已持有鎖）
 - Request: `{ amount, note, occurredAt, paymentAccountId }`
 - Response 200: `{ expenseId, ... }`（成功後自動釋放鎖）
-- Errors: `403 LOCK_NOT_HELD_BY_CALLER`、`400 AMOUNT_MUST_BE_INTEGER` 等同新增驗證規則
+- Errors: `403 LOCK_NOT_HELD_BY_CALLER`、`403 NOT_GROUP_MEMBER`（非該群組在職成員，FR-017）、`403 EXPENSE_NOT_IN_GROUP`（紀錄不屬於該群組）、`400 AMOUNT_MUST_BE_INTEGER` 等同新增驗證規則
 
 ### `DELETE /api/expenses/{expenseId}`
-- Header: `Authorization`（須已持有鎖，或本人/ADMIN 直接鎖定後刪除）
+- Header: `Authorization`（須已持有鎖；群組任一在職成員皆可鎖定後刪除，FR-019）
 - Response 204
-- Errors: `403 LOCK_NOT_HELD_BY_CALLER`
+- Errors: `403 LOCK_NOT_HELD_BY_CALLER`、`403 NOT_GROUP_MEMBER`、`403 EXPENSE_NOT_IN_GROUP`
 
 ### `POST /api/expenses/{expenseId}/unlock`
 - Header: `Authorization`（取消編輯時釋放鎖）
