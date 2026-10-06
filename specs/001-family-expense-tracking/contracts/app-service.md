@@ -69,7 +69,7 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 ## 支付帳戶（公開 API）
 
 ### `POST /api/accounts`
-- Header: `Authorization`
+- Header: `Authorization`（限該群組 ADMIN，否則 `403 NOT_GROUP_ADMIN`，FR-003）
 - Request: `{ familyGroupId, name }`（`familyMemberId` 由 JWT 解出的呼叫者身分決定，不由前端傳入）
 - Response 201: `{ accountId, name, status: "ACTIVE" }`（FR-003）
 
@@ -77,8 +77,19 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 - Header: `Authorization`
 - Response 200: `[{ accountId, familyMemberId, name, status }]`
 
+### `PUT /api/accounts/{accountId}`
+- Header: `Authorization`（限該群組 ADMIN）
+- Request: `{ name }`
+- Response 200: `{ accountId, name, status }`
+- Errors: `403 NOT_GROUP_ADMIN`
+
+### `DELETE /api/accounts/{accountId}`
+- Header: `Authorization`（限該群組 ADMIN）
+- Response 204（僅限從未被支出紀錄使用的帳戶，FR-022）
+- Errors: `403 NOT_GROUP_ADMIN`、`409 ACCOUNT_IN_USE`（已被使用，請改用停用）
+
 ### `POST /api/accounts/{accountId}/disable`
-- Header: `Authorization`
+- Header: `Authorization`（限該群組 ADMIN，否則 `403 NOT_GROUP_ADMIN`）
 - Response 200: `{ accountId, status: "DISABLED" }`（FR-022，僅軟停用，不可真正刪除）
 
 ## 支出紀錄（公開 API）
@@ -96,7 +107,7 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 - 篩選條件可單獨或同時套用 `paymentAccountId`、`authorMemberId`（FR-008、FR-009、FR-010）
 
 ### `POST /api/expenses/{expenseId}/lock`
-- Header: `Authorization`（操作者需為本人或該群組 ADMIN，同進程呼叫 family 模組驗證，FR-019）
+- Header: `Authorization`（操作者需為該群組在職成員，不限新增者本人，同進程呼叫 family 模組驗證，FR-019）
 - Response 200: `{ expenseId, lockedByMemberId, lockedAt }`
 - Errors: `409 RECORD_LOCKED`（其他人持有中，5 分鐘內，FR-027）
 
@@ -107,7 +118,7 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 - Errors: `403 LOCK_NOT_HELD_BY_CALLER`、`400 AMOUNT_MUST_BE_INTEGER` 等同新增驗證規則
 
 ### `DELETE /api/expenses/{expenseId}`
-- Header: `Authorization`（須已持有鎖，或本人/ADMIN 直接鎖定後刪除）
+- Header: `Authorization`（須已持有鎖；群組任一在職成員皆可鎖定後刪除，FR-019）
 - Response 204
 - Errors: `403 LOCK_NOT_HELD_BY_CALLER`
 

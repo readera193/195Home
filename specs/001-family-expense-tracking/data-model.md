@@ -91,13 +91,13 @@ schema 定義對應 `app-service/src/main/resources/db/migration/`（Flyway migr
 | 欄位 | 型別 | 說明 |
 |------|------|------|
 | id | BIGINT PK | |
-| familyMemberId | BIGINT NOT NULL | 參照 family 模組的成員 id（模組間參照，非 FK） |
+| familyMemberId | BIGINT NOT NULL | 建立者（管理者）的成員 id（模組間參照，非 FK）；帳戶為群組層級，不限制僅建立者可使用 |
 | familyGroupId | BIGINT NOT NULL | 供家庭範圍查詢與資料隔離（FR-017） |
 | name | VARCHAR(100) NOT NULL | 例如「現金」「銀行帳戶」「信用卡」（FR-003） |
 | status | VARCHAR(20) NOT NULL | `ACTIVE` \| `DISABLED` |
 | createdAt | DATETIME(6) NOT NULL | |
 
-**驗證規則**：`DISABLED` 帳戶不可供新增支出紀錄選用，但既有支出紀錄仍完整顯示原帳戶名稱；已有支出紀錄關聯的帳戶 MUST NOT 真正刪除，僅能軟停用（FR-022）。
+**驗證規則**：建立、改名、停用、刪除 MUST 限該群組 `ADMIN`（FR-003、FR-022）；從未被支出紀錄使用的帳戶可真正刪除，已使用者僅能軟停用。`DISABLED` 帳戶不可供新增支出紀錄選用，但既有支出紀錄仍完整顯示原帳戶名稱；已有支出紀錄關聯的帳戶 MUST NOT 真正刪除，僅能軟停用（FR-022）。
 
 **狀態轉換**：`ACTIVE` → `DISABLED`（不可逆，僅軟停用）。
 
@@ -120,7 +120,7 @@ schema 定義對應 `app-service/src/main/resources/db/migration/`（Flyway migr
 **驗證規則**：
 - `amount` 必須為整數（不接受小數點）；可正可負可零（FR-016）。
 - `note`、`paymentAccountId` 為必填欄位，缺少則拒絕儲存（FR-016）。
-- 編輯/刪除權限：本人新增者 或 該群組 `ADMIN` 成員 才可操作（FR-019）；其餘成員禁止（expense 模組的 service 層直接呼叫 family 模組的 service 方法確認身分與角色，同進程呼叫，見 research.md 決策 7）。
+- 新增/編輯/刪除權限：該群組任一在職成員（`ADMIN` 或 `MEMBER`）皆可操作任何紀錄，不限新增者本人（FR-019）；非該群組在職成員禁止（expense 模組的 service 層直接呼叫 family 模組的 service 方法確認在職身分，同進程呼叫，見 research.md 決策 7）。
 - 編輯/刪除前須先成功取得 `lockedByMemberId` 鎖定，否則回傳「紀錄目前正被編輯中」錯誤（FR-027）。
 
 ---
