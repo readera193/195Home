@@ -4,9 +4,7 @@ import com.family195home.app.common.ApiException;
 import com.family195home.app.common.ErrorKind;
 import com.family195home.app.expense.application.ExpenseRecordRepository;
 import com.family195home.app.expense.domain.ExpenseRecord;
-import com.family195home.app.family.domain.FamilyGroupStatus;
-import com.family195home.app.family.domain.FamilyMember;
-import com.family195home.app.family.service.FamilyService;
+import com.family195home.app.family.application.FamilyAccess;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,7 +14,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * 支出紀錄核心邏輯（US2）。與 family 模組之間一律透過 {@link FamilyService} 的
+ * 支出紀錄核心邏輯（US2）。與 family 模組之間一律透過 {@link FamilyAccess} 的
  * public 方法同進程呼叫（見 research.md 決策 7），不透過 HTTP。
  */
 @Service
@@ -24,23 +22,25 @@ import java.util.List;
 public class ExpenseService {
 
     private final ExpenseRecordRepository expenseRecordRepository;
-    private final FamilyService familyService;
+    private final FamilyAccess familyAccess;
     private final long lockTtlMinutes;
 
     public ExpenseService(
             ExpenseRecordRepository expenseRecordRepository,
-            FamilyService familyService,
+            FamilyAccess familyAccess,
             @Value("${app.expense-lock.ttl-minutes}") long lockTtlMinutes) {
         this.expenseRecordRepository = expenseRecordRepository;
-        this.familyService = familyService;
+        this.familyAccess = familyAccess;
         this.lockTtlMinutes = lockTtlMinutes;
     }
 
     // FR-004, FR-005, FR-006, FR-016, FR-018
     public ExpenseRecord create(Long familyGroupId, Long authorMemberId, Long paymentAccountId, BigDecimal amount, String note, LocalDateTime occurredAt) {
-        var group = familyService.getGroup(familyGroupId)
-                .orElseThrow(() -> new ApiException(ErrorKind.NOT_FOUND, "GROUP_NOT_FOUND", "找不到家庭群組"));
-        if (group.getStatus() == FamilyGroupStatus.DISSOLVED) {
+        var groupState = familyAccess.groupState(familyGroupId);
+        if (groupState == FamilyAccess.GroupState.NOT_FOUND) {
+            throw new ApiException(ErrorKind.NOT_FOUND, "GROUP_NOT_FOUND", "找不到家庭群組");
+        }
+        if (groupState == FamilyAccess.GroupState.DISSOLVED) {
             throw new ApiException(ErrorKind.CONFLICT, "GROUP_DISSOLVED", "此家庭群組已解散，無法新增支出紀錄");
         }
         int intAmount = toIntegerAmount(amount);
@@ -119,7 +119,7 @@ public class ExpenseService {
     // 紀錄屬於其他群組屬授權問題而非資源不存在，與 NOT_GROUP_MEMBER 一致回傳 403
     private ExpenseRecord requireRecordInGroup(Long familyGroupId, Long expenseId, Long callerUserId) {
         ExpenseRecord record = findRequired(expenseId);
-        familyService.assertMemberAuthorized(familyGroupId, callerUserId, FamilyService.RequiredRole.ANY_MEMBER);
+        familyAccess.requireMember(familyGroupId, callerUserId);
         if (!familyGroupId.equals(record.getFamilyGroupId())) {
             throw new ApiException(ErrorKind.FORBIDDEN, "EXPENSE_NOT_IN_GROUP", "此支出紀錄不屬於該家庭群組");
         }
@@ -127,8 +127,8 @@ public class ExpenseService {
     }
 
     private void requireLockHeldByCaller(ExpenseRecord record, Long familyGroupId, Long callerUserId) {
-        FamilyMember caller = familyService.assertMemberAuthorized(familyGroupId, callerUserId, FamilyService.RequiredRole.ANY_MEMBER);
-        if (record.getLockedByMemberId() == null || !record.getLockedByMemberId().equals(caller.getId())) {
+        FamilyAccess.MemberRef caller = familyAccess.requireMember(familyGroupId, callerUserId);
+        if (record.getLockedByMemberId() == null || !record.getLockedByMemberId().equals(caller.memberId())) {
             throw new ApiException(ErrorKind.FORBIDDEN, "LOCK_NOT_HELD_BY_CALLER", "請先取得編輯鎖定後再操作");
         }
     }

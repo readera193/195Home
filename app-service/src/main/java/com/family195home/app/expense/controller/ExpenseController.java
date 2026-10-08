@@ -7,8 +7,7 @@ import com.family195home.app.expense.dto.ExpenseResponse;
 import com.family195home.app.expense.dto.LockResponse;
 import com.family195home.app.expense.dto.UpdateExpenseRequest;
 import com.family195home.app.expense.service.ExpenseService;
-import com.family195home.app.family.domain.FamilyMember;
-import com.family195home.app.family.service.FamilyService;
+import com.family195home.app.family.application.FamilyAccess;
 import com.family195home.app.security.AuthenticatedUser;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -24,25 +23,24 @@ import java.util.List;
 public class ExpenseController {
 
     private final ExpenseService expenseService;
-    private final FamilyService familyService;
+    private final FamilyAccess familyAccess;
     private final PaymentAccountRepository paymentAccountRepository;
 
-    public ExpenseController(ExpenseService expenseService, FamilyService familyService, PaymentAccountRepository paymentAccountRepository) {
+    public ExpenseController(ExpenseService expenseService, FamilyAccess familyAccess, PaymentAccountRepository paymentAccountRepository) {
         this.expenseService = expenseService;
-        this.familyService = familyService;
+        this.familyAccess = familyAccess;
         this.paymentAccountRepository = paymentAccountRepository;
     }
 
     @PostMapping
     public ResponseEntity<ExpenseResponse> create(
             @AuthenticationPrincipal AuthenticatedUser caller, @Valid @RequestBody CreateExpenseRequest request) {
-        FamilyMember member = familyService.assertMemberAuthorized(
-                request.familyGroupId(), caller.userId(), FamilyService.RequiredRole.ANY_MEMBER);
+        FamilyAccess.MemberRef member = familyAccess.requireMember(request.familyGroupId(), caller.userId());
         LocalDateTime occurredAt = request.occurredAt() != null && !request.occurredAt().isBlank()
                 ? LocalDateTime.parse(request.occurredAt())
                 : null;
         ExpenseRecord record = expenseService.create(
-                request.familyGroupId(), member.getId(), request.paymentAccountId(), request.amount(), request.note(), occurredAt);
+                request.familyGroupId(), member.memberId(), request.paymentAccountId(), request.amount(), request.note(), occurredAt);
         return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(record));
     }
 
@@ -54,7 +52,7 @@ public class ExpenseController {
             @RequestParam(required = false) Long authorMemberId,
             @RequestParam(required = false) String month) {
         // FR-017：家庭範圍隔離，呼叫者須為該家庭群組成員，否則回傳 403
-        familyService.assertMemberAuthorized(familyGroupId, caller.userId(), FamilyService.RequiredRole.ANY_MEMBER);
+        familyAccess.requireMember(familyGroupId, caller.userId());
         List<ExpenseResponse> responses = expenseService.list(familyGroupId, paymentAccountId, authorMemberId, month).stream()
                 .map(this::toResponse)
                 .toList();
@@ -89,8 +87,8 @@ public class ExpenseController {
             @AuthenticationPrincipal AuthenticatedUser caller,
             @PathVariable Long expenseId,
             @RequestParam Long familyGroupId) {
-        FamilyMember member = familyService.assertMemberAuthorized(familyGroupId, caller.userId(), FamilyService.RequiredRole.ANY_MEMBER);
-        ExpenseRecord record = expenseService.lock(expenseId, member.getId());
+        FamilyAccess.MemberRef member = familyAccess.requireMember(familyGroupId, caller.userId());
+        ExpenseRecord record = expenseService.lock(expenseId, member.memberId());
         return ResponseEntity.ok(new LockResponse(record.getId(), record.getLockedByMemberId(), record.getLockedAt()));
     }
 

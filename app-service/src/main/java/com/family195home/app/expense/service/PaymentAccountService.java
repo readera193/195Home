@@ -6,9 +6,7 @@ import com.family195home.app.expense.application.ExpenseRecordRepository;
 import com.family195home.app.expense.application.PaymentAccountRepository;
 import com.family195home.app.expense.domain.PaymentAccount;
 import com.family195home.app.expense.domain.PaymentAccountStatus;
-import com.family195home.app.family.domain.FamilyGroupStatus;
-import com.family195home.app.family.domain.FamilyMember;
-import com.family195home.app.family.service.FamilyService;
+import com.family195home.app.family.application.FamilyAccess;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,27 +22,29 @@ public class PaymentAccountService {
 
     private final PaymentAccountRepository paymentAccountRepository;
     private final ExpenseRecordRepository expenseRecordRepository;
-    private final FamilyService familyService;
+    private final FamilyAccess familyAccess;
 
     public PaymentAccountService(
             PaymentAccountRepository paymentAccountRepository,
             ExpenseRecordRepository expenseRecordRepository,
-            FamilyService familyService) {
+            FamilyAccess familyAccess) {
         this.paymentAccountRepository = paymentAccountRepository;
         this.expenseRecordRepository = expenseRecordRepository;
-        this.familyService = familyService;
+        this.familyAccess = familyAccess;
     }
 
     // FR-003（限 ADMIN）, FR-018（群組已解散拒絕新增支付帳戶）
     public PaymentAccount create(Long familyGroupId, Long callerUserId, String name) {
-        FamilyMember admin = familyService.assertMemberAuthorized(familyGroupId, callerUserId, FamilyService.RequiredRole.ADMIN);
-        var group = familyService.getGroup(familyGroupId)
-                .orElseThrow(() -> new ApiException(ErrorKind.NOT_FOUND, "GROUP_NOT_FOUND", "找不到家庭群組"));
-        if (group.getStatus() == FamilyGroupStatus.DISSOLVED) {
+        FamilyAccess.MemberRef admin = familyAccess.requireAdmin(familyGroupId, callerUserId);
+        var groupState = familyAccess.groupState(familyGroupId);
+        if (groupState == FamilyAccess.GroupState.NOT_FOUND) {
+            throw new ApiException(ErrorKind.NOT_FOUND, "GROUP_NOT_FOUND", "找不到家庭群組");
+        }
+        if (groupState == FamilyAccess.GroupState.DISSOLVED) {
             throw new ApiException(ErrorKind.CONFLICT, "GROUP_DISSOLVED", "此家庭群組已解散，無法新增支付帳戶");
         }
         PaymentAccount account = new PaymentAccount(
-                admin.getId(), familyGroupId, name, PaymentAccountStatus.ACTIVE, LocalDateTime.now());
+                admin.memberId(), familyGroupId, name, PaymentAccountStatus.ACTIVE, LocalDateTime.now());
         paymentAccountRepository.save(account);
         return account;
     }
@@ -81,7 +81,7 @@ public class PaymentAccountService {
     private PaymentAccount requireAccountAsAdmin(Long accountId, Long callerUserId) {
         PaymentAccount account = paymentAccountRepository.findById(accountId)
                 .orElseThrow(() -> new ApiException(ErrorKind.NOT_FOUND, "ACCOUNT_NOT_FOUND", "找不到支付帳戶"));
-        familyService.assertMemberAuthorized(account.getFamilyGroupId(), callerUserId, FamilyService.RequiredRole.ADMIN);
+        familyAccess.requireAdmin(account.getFamilyGroupId(), callerUserId);
         return account;
     }
 }

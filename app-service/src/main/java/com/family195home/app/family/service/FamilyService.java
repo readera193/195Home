@@ -2,6 +2,7 @@ package com.family195home.app.family.service;
 
 import com.family195home.app.common.ApiException;
 import com.family195home.app.common.ErrorKind;
+import com.family195home.app.family.application.FamilyAccess;
 import com.family195home.app.family.application.FamilyGroupRepository;
 import com.family195home.app.family.application.FamilyMemberRepository;
 import com.family195home.app.family.domain.FamilyGroup;
@@ -24,7 +25,7 @@ import java.util.Optional;
  */
 @Service
 @Transactional
-public class FamilyService {
+public class FamilyService implements FamilyAccess {
 
     private static final String INVITE_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static final int INVITE_CODE_LENGTH = 10;
@@ -200,6 +201,23 @@ public class FamilyService {
             sb.append(INVITE_CODE_ALPHABET.charAt(random.nextInt(INVITE_CODE_ALPHABET.length())));
         }
         return sb.toString();
+    }
+
+    @Override
+    public MemberRef requireMember(Long familyGroupId, Long callerUserId) {
+        return new MemberRef(assertMemberAuthorized(familyGroupId, callerUserId, RequiredRole.ANY_MEMBER).getId());
+    }
+
+    @Override
+    public MemberRef requireAdmin(Long familyGroupId, Long callerUserId) {
+        return new MemberRef(assertMemberAuthorized(familyGroupId, callerUserId, RequiredRole.ADMIN).getId());
+    }
+
+    @Override
+    public GroupState groupState(Long familyGroupId) {
+        return familyGroupRepository.findById(familyGroupId)
+                .map(g -> g.getStatus() == FamilyGroupStatus.DISSOLVED ? GroupState.DISSOLVED : GroupState.ACTIVE)
+                .orElse(GroupState.NOT_FOUND);
     }
 
     public enum RequiredRole {

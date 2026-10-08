@@ -5,12 +5,10 @@ import com.family195home.app.common.ErrorKind;
 import com.family195home.app.expense.application.ExpenseRecordRepository;
 import com.family195home.app.expense.domain.ExpenseRecord;
 import com.family195home.app.expense.service.ExpenseService;
-import com.family195home.app.family.domain.FamilyGroup;
-import com.family195home.app.family.domain.FamilyGroupStatus;
 import com.family195home.app.family.domain.FamilyMember;
 import com.family195home.app.family.domain.MemberRole;
 import com.family195home.app.family.domain.MemberStatus;
-import com.family195home.app.family.service.FamilyService;
+import com.family195home.app.family.application.FamilyAccess;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -26,15 +24,15 @@ import static org.mockito.Mockito.*;
 class ExpenseServiceTest {
 
     private ExpenseRecordRepository expenseRecordRepository;
-    private FamilyService familyService;
+    private FamilyAccess familyAccess;
     private ExpenseService expenseService;
 
     @BeforeEach
     void setUp() {
         expenseRecordRepository = mock(ExpenseRecordRepository.class);
-        familyService = mock(FamilyService.class);
-        expenseService = new ExpenseService(expenseRecordRepository, familyService, 5L);
-        when(familyService.getGroup(10L)).thenReturn(Optional.of(activeGroup()));
+        familyAccess = mock(FamilyAccess.class);
+        expenseService = new ExpenseService(expenseRecordRepository, familyAccess, 5L);
+        when(familyAccess.groupState(10L)).thenReturn(FamilyAccess.GroupState.ACTIVE);
     }
 
     @Test
@@ -64,7 +62,7 @@ class ExpenseServiceTest {
     @Test
     void create_rejectsWhenGroupDissolved() {
         // FR-018
-        when(familyService.getGroup(10L)).thenReturn(Optional.of(dissolvedGroup()));
+        when(familyAccess.groupState(10L)).thenReturn(FamilyAccess.GroupState.DISSOLVED);
 
         assertThatThrownBy(() -> expenseService.create(10L, 1L, 100L, BigDecimal.TEN, "備註", null))
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("GROUP_DISSOLVED"));
@@ -107,7 +105,7 @@ class ExpenseServiceTest {
         // FR-017、FR-019：非群組在職成員不可操作
         ExpenseRecord record = expenseRecord(1L, 10L, 100L);
         when(expenseRecordRepository.findById(1L)).thenReturn(Optional.of(record));
-        when(familyService.assertMemberAuthorized(10L, 5L, FamilyService.RequiredRole.ANY_MEMBER))
+        when(familyAccess.requireMember(10L, 5L))
                 .thenThrow(new ApiException(ErrorKind.FORBIDDEN, "NOT_GROUP_MEMBER", "您不是該家庭群組成員"));
 
         assertThatThrownBy(() -> expenseService.update(10L, 1L, 5L, 100L, BigDecimal.TEN, "備註", null))
@@ -119,8 +117,8 @@ class ExpenseServiceTest {
         // FR-017：紀錄屬於其他群組時回傳 403
         ExpenseRecord record = expenseRecord(1L, 99L, 100L);
         when(expenseRecordRepository.findById(1L)).thenReturn(Optional.of(record));
-        when(familyService.assertMemberAuthorized(10L, 5L, FamilyService.RequiredRole.ANY_MEMBER))
-                .thenReturn(member(2L, 5L, MemberRole.MEMBER));
+        when(familyAccess.requireMember(10L, 5L))
+                .thenReturn(new FamilyAccess.MemberRef(member(2L, 5L, MemberRole.MEMBER).getId()));
 
         assertThatThrownBy(() -> expenseService.update(10L, 1L, 5L, 100L, BigDecimal.TEN, "備註", null))
                 .isInstanceOfSatisfying(ApiException.class, e -> {
@@ -137,7 +135,7 @@ class ExpenseServiceTest {
         record.setLockedAt(LocalDateTime.now());
         when(expenseRecordRepository.findById(1L)).thenReturn(Optional.of(record));
         FamilyMember regular = member(2L, 5L, MemberRole.MEMBER);
-        when(familyService.assertMemberAuthorized(10L, 5L, FamilyService.RequiredRole.ANY_MEMBER)).thenReturn(regular);
+        when(familyAccess.requireMember(10L, 5L)).thenReturn(new FamilyAccess.MemberRef(regular.getId()));
 
         ExpenseRecord result = expenseService.update(10L, 1L, 5L, 200L, new BigDecimal("30"), "他人紀錄", null);
 
@@ -152,7 +150,7 @@ class ExpenseServiceTest {
         record.setLockedAt(LocalDateTime.now());
         when(expenseRecordRepository.findById(1L)).thenReturn(Optional.of(record));
         FamilyMember regular = member(2L, 5L, MemberRole.MEMBER);
-        when(familyService.assertMemberAuthorized(10L, 5L, FamilyService.RequiredRole.ANY_MEMBER)).thenReturn(regular);
+        when(familyAccess.requireMember(10L, 5L)).thenReturn(new FamilyAccess.MemberRef(regular.getId()));
 
         expenseService.delete(10L, 1L, 5L);
 
@@ -167,7 +165,7 @@ class ExpenseServiceTest {
         record.setLockedAt(LocalDateTime.now());
         when(expenseRecordRepository.findById(1L)).thenReturn(Optional.of(record));
         FamilyMember author = member(100L, record.getAuthorMemberId(), MemberRole.MEMBER);
-        when(familyService.assertMemberAuthorized(10L, 5L, FamilyService.RequiredRole.ANY_MEMBER)).thenReturn(author);
+        when(familyAccess.requireMember(10L, 5L)).thenReturn(new FamilyAccess.MemberRef(author.getId()));
 
         assertThatThrownBy(() -> expenseService.update(10L, 1L, 5L, 100L, BigDecimal.TEN, "備註", null))
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("LOCK_NOT_HELD_BY_CALLER"));
@@ -181,24 +179,12 @@ class ExpenseServiceTest {
         record.setLockedAt(LocalDateTime.now());
         when(expenseRecordRepository.findById(1L)).thenReturn(Optional.of(record));
         FamilyMember admin = member(1L, 5L, MemberRole.ADMIN);
-        when(familyService.assertMemberAuthorized(10L, 5L, FamilyService.RequiredRole.ANY_MEMBER)).thenReturn(admin);
+        when(familyAccess.requireMember(10L, 5L)).thenReturn(new FamilyAccess.MemberRef(admin.getId()));
 
         ExpenseRecord result = expenseService.update(10L, 1L, 5L, 200L, new BigDecimal("-500"), "更新後備註", null);
 
         assertThat(result.getAmount()).isEqualTo(-500);
         verify(expenseRecordRepository).releaseLock(1L);
-    }
-
-    private FamilyGroup activeGroup() {
-        FamilyGroup group = new FamilyGroup("王家", FamilyGroupStatus.ACTIVE, "CODE1", LocalDateTime.now());
-        group.setId(10L);
-        return group;
-    }
-
-    private FamilyGroup dissolvedGroup() {
-        FamilyGroup group = new FamilyGroup("王家", FamilyGroupStatus.DISSOLVED, "CODE1", LocalDateTime.now());
-        group.setId(10L);
-        return group;
     }
 
     private FamilyMember member(Long memberId, Long userId, MemberRole role) {

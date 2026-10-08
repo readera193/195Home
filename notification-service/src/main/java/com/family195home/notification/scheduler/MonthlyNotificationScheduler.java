@@ -1,5 +1,6 @@
 package com.family195home.notification.scheduler;
 
+import com.family195home.notification.application.LineMessageSender;
 import com.family195home.notification.application.NotificationLogRepository;
 import com.family195home.notification.client.AppServiceClient;
 import com.family195home.notification.domain.NotificationLog;
@@ -7,9 +8,6 @@ import com.family195home.notification.domain.NotificationStatus;
 import com.family195home.notification.dto.LineBindingView;
 import com.family195home.notification.dto.MonthlySummaryView;
 import com.family195home.notification.service.MonthlySummaryFormatter;
-import com.linecorp.bot.client.LineMessagingClient;
-import com.linecorp.bot.model.PushMessage;
-import com.linecorp.bot.model.message.TextMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,17 +28,17 @@ public class MonthlyNotificationScheduler {
     private static final Logger log = LoggerFactory.getLogger(MonthlyNotificationScheduler.class);
 
     private final AppServiceClient appServiceClient;
-    private final LineMessagingClient lineMessagingClient;
+    private final LineMessageSender lineMessageSender;
     private final NotificationLogRepository notificationLogRepository;
     private final int maxRetries;
 
     public MonthlyNotificationScheduler(
             AppServiceClient appServiceClient,
-            LineMessagingClient lineMessagingClient,
+            LineMessageSender lineMessageSender,
             NotificationLogRepository notificationLogRepository,
             @Value("${app.notification.max-retries}") int maxRetries) {
         this.appServiceClient = appServiceClient;
-        this.lineMessagingClient = lineMessagingClient;
+        this.lineMessageSender = lineMessageSender;
         this.notificationLogRepository = notificationLogRepository;
         this.maxRetries = maxRetries;
     }
@@ -64,7 +62,7 @@ public class MonthlyNotificationScheduler {
         while (attempts < maxRetries) {
             attempts++;
             try {
-                lineMessagingClient.pushMessage(new PushMessage(binding.lineUserId(), new TextMessage(text))).get();
+                lineMessageSender.pushText(binding.lineUserId(), text);
                 saveLog(binding, yearMonth, NotificationStatus.SUCCESS, attempts, null);
                 return;
             } catch (Exception e) {

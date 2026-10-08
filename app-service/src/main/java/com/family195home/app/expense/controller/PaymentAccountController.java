@@ -6,7 +6,7 @@ import com.family195home.app.expense.dto.CreateAccountRequest;
 import com.family195home.app.expense.dto.PaymentAccountResponse;
 import com.family195home.app.expense.dto.UpdateAccountRequest;
 import com.family195home.app.expense.service.PaymentAccountService;
-import com.family195home.app.family.service.FamilyService;
+import com.family195home.app.family.application.FamilyAccess;
 import com.family195home.app.security.AuthenticatedUser;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -21,11 +21,11 @@ import java.util.List;
 public class PaymentAccountController {
 
     private final PaymentAccountService paymentAccountService;
-    private final FamilyService familyService;
+    private final FamilyAccess familyAccess;
 
-    public PaymentAccountController(PaymentAccountService paymentAccountService, FamilyService familyService) {
+    public PaymentAccountController(PaymentAccountService paymentAccountService, FamilyAccess familyAccess) {
         this.paymentAccountService = paymentAccountService;
-        this.familyService = familyService;
+        this.familyAccess = familyAccess;
     }
 
     @PostMapping
@@ -42,7 +42,7 @@ public class PaymentAccountController {
             @RequestParam Long familyGroupId,
             @RequestParam(required = false) String status) {
         // FR-017：呼叫者須為該家庭群組成員，否則回傳 403
-        familyService.assertMemberAuthorized(familyGroupId, caller.userId(), FamilyService.RequiredRole.ANY_MEMBER);
+        familyAccess.requireMember(familyGroupId, caller.userId());
         PaymentAccountStatus statusFilter = (status == null || status.isBlank() || "ALL".equalsIgnoreCase(status))
                 ? null
                 : PaymentAccountStatus.valueOf(status.toUpperCase());

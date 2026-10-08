@@ -1,6 +1,6 @@
 package com.family195home.app.statistics.controller;
 
-import com.family195home.app.family.service.FamilyService;
+import com.family195home.app.family.application.FamilyAccess;
 import com.family195home.app.security.AuthenticatedUser;
 import com.family195home.app.statistics.dto.MonthlySummaryResponse;
 import com.family195home.app.statistics.service.StatisticsService;
@@ -15,11 +15,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class StatisticsController {
 
     private final StatisticsService statisticsService;
-    private final FamilyService familyService;
+    private final FamilyAccess familyAccess;
 
-    public StatisticsController(StatisticsService statisticsService, FamilyService familyService) {
+    public StatisticsController(StatisticsService statisticsService, FamilyAccess familyAccess) {
         this.statisticsService = statisticsService;
-        this.familyService = familyService;
+        this.familyAccess = familyAccess;
     }
 
     @GetMapping("/api/statistics/monthly")
@@ -28,7 +28,7 @@ public class StatisticsController {
             @RequestParam Long familyGroupId,
             @RequestParam String month) {
         // FR-017：確認呼叫者屬於該家庭群組，避免跨家庭資料外洩
-        familyService.assertMemberAuthorized(familyGroupId, caller.userId(), FamilyService.RequiredRole.ANY_MEMBER);
+        familyAccess.requireMember(familyGroupId, caller.userId());
         return ResponseEntity.ok(MonthlySummaryResponse.from(statisticsService.summarize(familyGroupId, month)));
     }
 
