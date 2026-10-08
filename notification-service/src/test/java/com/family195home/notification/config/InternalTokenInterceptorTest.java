@@ -1,7 +1,7 @@
 package com.family195home.notification.config;
 
 import com.family195home.notification.application.NotificationLogRepository;
-import com.family195home.notification.controller.NotificationLogController;
+import com.family195home.notification.presentation.NotificationLogController;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;

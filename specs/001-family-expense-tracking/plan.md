@@ -73,28 +73,24 @@ app-service/                       # 單一 Spring Boot 應用：family + expens
                                     # + 前端靜態檔案，對外唯一入口
 ├── src/main/java/.../app/
 │   ├── family/                    # 使用者帳號、家庭群組、成員、邀請碼、LINE 綁定關係
-│   │   ├── controller/
-│   │   ├── service/
-│   │   ├── application/           # repository 介面（port）
+│   │   ├── application/           # Service（用例）+ repository 介面（port）
 │   │   ├── domain/                # 純 POJO 資料模型
 │   │   ├── infrastructure/
 │   │   │   └── persistence/       # RepositoryImpl（adapter）+ MyBatis Mapper 介面
-│   │   └── dto/
-│   ├── expense/                   # 支付帳戶、支出紀錄（含併發編輯鎖定）
-│   │   ├── controller/
-│   │   ├── service/
+│   │   └── presentation/          # Controller
+│   │       └── dto/               # Request / Response
+│   ├── expense/                   # 支付帳戶、支出紀錄（含併發編輯鎖定）；結構同 family
+│   ├── statistics/                # 依支付帳戶彙總月結淨額（直接呼叫 expense 模組 application，無獨立資料表，故無 infrastructure）
 │   │   ├── application/
 │   │   ├── domain/
-│   │   ├── infrastructure/
-│   │   │   └── persistence/
-│   │   └── dto/
-│   ├── statistics/                # 依支付帳戶彙總月結淨額（直接呼叫 expense 模組 service，無獨立資料表）
-│   │   ├── controller/
-│   │   ├── service/
-│   │   └── dto/
-│   ├── common/                    # 跨模組共用：ApiException/ErrorKind、GlobalExceptionHandler（Problem Details）、PagedResult
-│   ├── security/                  # JWT 簽發/本地驗證、`X-Internal-Token` 驗證、401/403 的 Problem Details 輸出
-│   └── config/                    # Spring Boot 標準設定類別
+│   │   └── presentation/
+│   │       └── dto/
+│   ├── presentation/
+│   │   └── exception/             # GlobalExceptionHandler、ProblemDetails（Problem Details 輸出）
+│   ├── infrastructure/
+│   │   └── security/              # JWT 簽發/本地驗證、`X-Internal-Token` 驗證、401/403 的 Problem Details 輸出
+│   ├── shared/                    # 跨模組共用：ApiException/ErrorKind、PagedResult、AuthenticatedUser
+│   └── config/                    # Spring Boot 標準設定類別（SecurityConfig、PasswordEncoderConfig）
 ├── src/main/resources/
 │   ├── application.yml            # 共用設定，不含機密預設值
 │   ├── application-dev.yml        # 本機開發預設值（docker-compose 使用）
@@ -102,7 +98,7 @@ app-service/                       # 單一 Spring Boot 應用：family + expens
 │   ├── mapper/                    # MyBatis XML Mapper（*.xml，依模組分子目錄 family/、expense/）
 │   ├── db/migration/              # Flyway 版本化 migration script（V{n}__xxx.sql，對應 appdb）
 │   └── static/                    # 前端 `npm run build` 產物（Docker build 的 frontend-build stage 複製進此目錄後一併打包）
-├── src/test/java/.../app/{family,expense,statistics,common,security}/
+├── src/test/java/.../app/                    # 測試目錄鏡像 main 的套件結構
 ├── src/test/resources/application-test.yml   # 測試用假機密
 ├── http/app-service.http          # VS Code REST Client 手動測試腳本
 ├── mvnw / mvnw.cmd / .mvn/        # Maven Wrapper
@@ -110,16 +106,16 @@ app-service/                       # 單一 Spring Boot 應用：family + expens
 
 notification-service/              # LINE Bot 整合：Webhook、每月排程推播、關鍵字查詢、發送重試紀錄
 ├── src/main/java/.../notification/
-│   ├── config/                    # InternalTokenInterceptor（保護 /api/notifications/**）、WebConfig
-│   ├── controller/
-│   ├── service/
-│   ├── client/                    # 呼叫 app-service 內部 REST API 的 WebClient 元件
-│   ├── application/               # repository 介面（port）
+│   ├── application/               # Service（MonthlySummaryFormatter）+ repository 介面（port）+ 呼叫 app-service 回傳的 dto
 │   ├── domain/                    # 純 POJO 資料模型
 │   ├── infrastructure/
+│   │   ├── client/                # 呼叫 app-service 內部 REST API 的 WebClient 元件
+│   │   ├── line/                  # LINE 訊息發送 adapter
 │   │   └── persistence/           # RepositoryImpl（adapter）+ MyBatis Mapper 介面
-│   ├── dto/
-│   └── scheduler/
+│   ├── presentation/              # Controller（LINE Webhook、通知紀錄）
+│   │   ├── dto/
+│   │   └── scheduler/             # 每月推播排程
+│   └── config/                    # InternalTokenInterceptor（保護 /api/notifications/**）、WebConfig
 ├── src/main/resources/
 │   ├── application.yml            # 共用設定，不含機密預設值
 │   ├── application-dev.yml / application-prod.yml

@@ -1,8 +1,8 @@
 package com.family195home.app.config;
 
-import com.family195home.app.security.InternalTokenFilter;
-import com.family195home.app.security.JwtAuthFilter;
-import com.family195home.app.security.ProblemDetailAuthHandlers;
+import com.family195home.app.infrastructure.security.InternalTokenFilter;
+import com.family195home.app.infrastructure.security.JwtAuthFilter;
+import com.family195home.app.infrastructure.security.ProblemDetailAuthHandlers;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;

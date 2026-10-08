@@ -113,3 +113,19 @@ docker-compose.yml      # 本機一鍵啟動
 specs/                  # spec-kit 規格與設計文件
 TESTING.md              # 測試分類、執行方式、profile 與 Migration 規則
 ```
+
+### 後端套件結構
+
+兩個後端服務採相同的分層慣例：
+
+```text
+<module>/
+├── application/            # Service（用例）+ Repository 介面（port）
+├── domain/                 # 純 POJO 資料模型，不依賴框架
+├── infrastructure/         # persistence（Mapper + RepositoryImpl）、client、line、security 等外部 adapter
+└── presentation/           # Controller + dto（Request/Response）
+shared/                     # 跨模組共用（例外、分頁、身分）
+config/                     # Spring 設定類別
+```
+
+app-service 依業務領域（family / expense / statistics）分模組，模組內再依上述分層；statistics 無持久化，因此沒有 infrastructure。測試目錄鏡像 main 的套件結構。

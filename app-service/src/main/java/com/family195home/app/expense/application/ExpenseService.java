@@ -1,0 +1,175 @@
+package com.family195home.app.expense.application;
+
+import com.family195home.app.shared.ApiException;
+import com.family195home.app.shared.ErrorKind;
+import com.family195home.app.shared.PagedResult;
+import com.family195home.app.expense.application.ExpenseRecordRepository;
+import com.family195home.app.expense.domain.ExpenseRecord;
+import com.family195home.app.family.application.FamilyAccess;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+
+/**
+ * 支出紀錄核心邏輯（US2）。與 family 模組之間一律透過 {@link FamilyAccess} 的
+ * public 方法同進程呼叫（見 research.md 決策 7），不透過 HTTP。
+ */
+@Service
+public class ExpenseService {
+
+    public static final int DEFAULT_PAGE_SIZE = 20;
+    public static final int MAX_PAGE_SIZE = 100;
+
+    private final ExpenseRecordRepository expenseRecordRepository;
+    private final FamilyAccess familyAccess;
+    private final long lockTtlMinutes;
+
+    public ExpenseService(
+            ExpenseRecordRepository expenseRecordRepository,
+            FamilyAccess familyAccess,
+            @Value("${app.expense-lock.ttl-minutes}") long lockTtlMinutes) {
+        this.expenseRecordRepository = expenseRecordRepository;
+        this.familyAccess = familyAccess;
+        this.lockTtlMinutes = lockTtlMinutes;
+    }
+
+    // FR-004, FR-005, FR-006, FR-016, FR-018
+    public ExpenseRecord create(Long familyGroupId, Long authorMemberId, Long paymentAccountId, BigDecimal amount, String note, LocalDateTime occurredAt) {
+        var groupState = familyAccess.groupState(familyGroupId);
+        if (groupState == FamilyAccess.GroupState.NOT_FOUND) {
+            throw new ApiException(ErrorKind.NOT_FOUND, "GROUP_NOT_FOUND", "找不到家庭群組");
+        }
+        if (groupState == FamilyAccess.GroupState.DISSOLVED) {
+            throw new ApiException(ErrorKind.CONFLICT, "GROUP_DISSOLVED", "此家庭群組已解散，無法新增支出紀錄");
+        }
+        int intAmount = toIntegerAmount(amount);
+        if (note == null || note.isBlank()) {
+            throw new ApiException(ErrorKind.BAD_REQUEST, "NOTE_REQUIRED", "備註為必填欄位");
+        }
+        if (paymentAccountId == null) {
+            throw new ApiException(ErrorKind.BAD_REQUEST, "PAYMENT_ACCOUNT_REQUIRED", "支付帳戶為必填欄位");
+        }
+
+        ExpenseRecord record = new ExpenseRecord();
+        record.setFamilyGroupId(familyGroupId);
+        record.setPaymentAccountId(paymentAccountId);
+        record.setAuthorMemberId(authorMemberId);
+        record.setAmount(intAmount);
+        record.setNote(note);
+        record.setOccurredAt(occurredAt != null ? occurredAt : LocalDateTime.now()); // FR-005/FR-006
+        LocalDateTime now = LocalDateTime.now();
+        record.setCreatedAt(now);
+        record.setUpdatedAt(now);
+        expenseRecordRepository.save(record);
+        return record;
+    }
+
+    // FR-007~FR-010、SC-003：分頁列表；page 從 0 起算，size 上限 MAX_PAGE_SIZE
+    @Transactional(readOnly = true)
+    public PagedResult<ExpenseRecord> listPage(
+            Long familyGroupId, Long paymentAccountId, Long authorMemberId, String month, int page, int size) {
+        if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
+            throw new ApiException(ErrorKind.BAD_REQUEST, "INVALID_PAGE_PARAMS",
+                    "page 須 >= 0，size 須介於 1 到 " + MAX_PAGE_SIZE);
+        }
+        long total = expenseRecordRepository.countByFilter(familyGroupId, paymentAccountId, authorMemberId, month);
+        List<ExpenseRecord> items = expenseRecordRepository.findPageByFilter(
+                familyGroupId, paymentAccountId, authorMemberId, month, page * size, size);
+        return PagedResult.of(items, page, size, total);
+    }
+
+    /** 不分頁的完整查詢，供 statistics 模組彙總整月資料使用。 */
+    @Transactional(readOnly = true)
+    public List<ExpenseRecord> list(Long familyGroupId, Long paymentAccountId, Long authorMemberId, String month) {
+        return expenseRecordRepository.findByFilter(familyGroupId, paymentAccountId, authorMemberId, month);
+    }
+
+    @Transactional(readOnly = true)
+    public ExpenseRecord findRequired(Long id) {
+        return expenseRecordRepository.findById(id)
+                .orElseThrow(() -> new ApiException(ErrorKind.NOT_FOUND, "EXPENSE_NOT_FOUND", "找不到支出紀錄"));
+    }
+
+    // FR-027：條件式 UPDATE 取得鎖，5 分鐘 TTL（見 research.md 決策 3）
+    public ExpenseRecord lock(Long expenseId, Long callerMemberId) {
+        LocalDateTime now = LocalDateTime.now();
+        int updated = expenseRecordRepository.tryLock(expenseId, callerMemberId, now, lockTtlMinutes);
+        if (updated == 0) {
+            throw new ApiException(ErrorKind.CONFLICT, "RECORD_LOCKED", "此紀錄目前正被編輯中，請稍後再試");
+        }
+        return findRequired(expenseId);
+    }
+
+    // 取消編輯時釋放鎖：呼叫者須為該群組在職成員；鎖仍有效且由他人持有時拒絕（FR-017、FR-027）。
+    // 紀錄未被鎖定或鎖已逾時則視為已釋放，不報錯（冪等）
+    @Transactional
+    public void unlock(Long expenseId, Long callerUserId) {
+        ExpenseRecord record = findRequired(expenseId);
+        FamilyAccess.MemberRef caller = familyAccess.requireMember(record.getFamilyGroupId(), callerUserId);
+        if (record.getLockedByMemberId() == null) {
+            return;
+        }
+        if (!record.getLockedByMemberId().equals(caller.memberId()) && isCurrentlyLocked(record)) {
+            throw new ApiException(ErrorKind.FORBIDDEN, "LOCK_NOT_HELD_BY_CALLER", "此紀錄正由其他成員編輯中，無法解除鎖定");
+        }
+        expenseRecordRepository.releaseLock(expenseId);
+    }
+
+    public boolean isCurrentlyLocked(ExpenseRecord record) {
+        return record.isLocked(LocalDateTime.now(), lockTtlMinutes);
+    }
+
+    // FR-019：群組任一在職成員皆可編輯/刪除任何紀錄；FR-027：須已持有鎖
+    @Transactional
+    public ExpenseRecord update(Long familyGroupId, Long expenseId, Long callerUserId, Long paymentAccountId, BigDecimal amount, String note, LocalDateTime occurredAt) {
+        ExpenseRecord record = requireRecordInGroup(familyGroupId, expenseId, callerUserId);
+        requireLockHeldByCaller(record, familyGroupId, callerUserId);
+
+        record.setPaymentAccountId(paymentAccountId);
+        record.setAmount(toIntegerAmount(amount));
+        record.setNote(note);
+        if (occurredAt != null) {
+            record.setOccurredAt(occurredAt);
+        }
+        record.setUpdatedAt(LocalDateTime.now());
+        expenseRecordRepository.update(record);
+        expenseRecordRepository.releaseLock(record.getId());
+        return record;
+    }
+
+    public void delete(Long familyGroupId, Long expenseId, Long callerUserId) {
+        ExpenseRecord record = requireRecordInGroup(familyGroupId, expenseId, callerUserId);
+        requireLockHeldByCaller(record, familyGroupId, callerUserId);
+        expenseRecordRepository.delete(expenseId);
+    }
+
+    // FR-017、FR-019：呼叫者須為該群組在職成員，且紀錄須屬於該群組；不限制新增者本人。
+    // 紀錄屬於其他群組屬授權問題而非資源不存在，與 NOT_GROUP_MEMBER 一致回傳 403
+    private ExpenseRecord requireRecordInGroup(Long familyGroupId, Long expenseId, Long callerUserId) {
+        ExpenseRecord record = findRequired(expenseId);
+        familyAccess.requireMember(familyGroupId, callerUserId);
+        if (!familyGroupId.equals(record.getFamilyGroupId())) {
+            throw new ApiException(ErrorKind.FORBIDDEN, "EXPENSE_NOT_IN_GROUP", "此支出紀錄不屬於該家庭群組");
+        }
+        return record;
+    }
+
+    private void requireLockHeldByCaller(ExpenseRecord record, Long familyGroupId, Long callerUserId) {
+        FamilyAccess.MemberRef caller = familyAccess.requireMember(familyGroupId, callerUserId);
+        if (record.getLockedByMemberId() == null || !record.getLockedByMemberId().equals(caller.memberId())) {
+            throw new ApiException(ErrorKind.FORBIDDEN, "LOCK_NOT_HELD_BY_CALLER", "請先取得編輯鎖定後再操作");
+        }
+    }
+
+    // FR-016：金額必須為整數（不接受小數點），可正可負可零
+    private int toIntegerAmount(BigDecimal amount) {
+        if (amount.stripTrailingZeros().scale() > 0) {
+            throw new ApiException(ErrorKind.BAD_REQUEST, "AMOUNT_MUST_BE_INTEGER", "金額必須為整數，不支援小數點");
+        }
+        return amount.intValueExact();
+    }
+}
