@@ -29,7 +29,7 @@ public class StatisticsController {
             @RequestParam String month) {
         // FR-017：確認呼叫者屬於該家庭群組，避免跨家庭資料外洩
         familyService.assertMemberAuthorized(familyGroupId, caller.userId(), FamilyService.RequiredRole.ANY_MEMBER);
-        return ResponseEntity.ok(statisticsService.summarize(familyGroupId, month));
+        return ResponseEntity.ok(MonthlySummaryResponse.from(statisticsService.summarize(familyGroupId, month)));
     }
 
     // 僅供 notification-service 呼叫（X-Internal-Token）：家庭歸屬已由呼叫方依 LINE 綁定關係決定，
@@ -37,6 +37,6 @@ public class StatisticsController {
     @GetMapping("/api/internal/statistics/monthly")
     public ResponseEntity<MonthlySummaryResponse> internalMonthly(
             @RequestParam Long familyGroupId, @RequestParam String month) {
-        return ResponseEntity.ok(statisticsService.summarize(familyGroupId, month));
+        return ResponseEntity.ok(MonthlySummaryResponse.from(statisticsService.summarize(familyGroupId, month)));
     }
 }

@@ -4,7 +4,7 @@ import com.family195home.app.expense.application.PaymentAccountRepository;
 import com.family195home.app.expense.domain.ExpenseRecord;
 import com.family195home.app.expense.domain.PaymentAccount;
 import com.family195home.app.expense.service.ExpenseService;
-import com.family195home.app.statistics.dto.MonthlySummaryResponse;
+import com.family195home.app.statistics.domain.MonthlySummary;
 import com.family195home.app.statistics.service.StatisticsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,7 +41,7 @@ class StatisticsServiceTest {
         when(paymentAccountRepository.findById(1L)).thenReturn(Optional.of(account(1L, "現金")));
         when(paymentAccountRepository.findById(2L)).thenReturn(Optional.of(account(2L, "銀行帳戶")));
 
-        MonthlySummaryResponse result = statisticsService.summarize(10L, "2026-09");
+        MonthlySummary result = statisticsService.summarize(10L, "2026-09");
 
         long recordSum = -350 - 200 + 30000 - 1500;
         assertThat(result.accounts().stream().mapToLong(a -> a.netAmount()).sum()).isEqualTo(recordSum);
@@ -53,7 +53,7 @@ class StatisticsServiceTest {
         // FR-011：當月無資料時回傳空陣列與 totalNetAmount: 0，而非錯誤或空白畫面
         when(expenseService.list(10L, null, null, "2099-01")).thenReturn(List.of());
 
-        MonthlySummaryResponse result = statisticsService.summarize(10L, "2099-01");
+        MonthlySummary result = statisticsService.summarize(10L, "2099-01");
 
         assertThat(result.accounts()).isEmpty();
         assertThat(result.totalNetAmount()).isZero();

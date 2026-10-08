@@ -11,7 +11,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ErrorResponse> handleApiException(ApiException ex) {
-        return ResponseEntity.status(ex.getStatus()).body(new ErrorResponse(ex.getCode(), ex.getMessage()));
+        return ResponseEntity.status(toStatus(ex.getKind())).body(new ErrorResponse(ex.getCode(), ex.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -21,5 +21,17 @@ public class GlobalExceptionHandler {
                 .map(fieldError -> fieldError.getField() + ": " + fieldError.getDefaultMessage())
                 .orElse("Validation failed");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse("VALIDATION_ERROR", message));
+    }
+
+    private static HttpStatus toStatus(ErrorKind kind) {
+        return switch (kind) {
+            case BAD_REQUEST -> HttpStatus.BAD_REQUEST;
+            case UNAUTHORIZED -> HttpStatus.UNAUTHORIZED;
+            case FORBIDDEN -> HttpStatus.FORBIDDEN;
+            case NOT_FOUND -> HttpStatus.NOT_FOUND;
+            case CONFLICT -> HttpStatus.CONFLICT;
+            case GONE -> HttpStatus.GONE;
+            case INTERNAL -> HttpStatus.INTERNAL_SERVER_ERROR;
+        };
     }
 }

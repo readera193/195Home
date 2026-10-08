@@ -3,8 +3,8 @@ package com.family195home.app.statistics.service;
 import com.family195home.app.expense.application.PaymentAccountRepository;
 import com.family195home.app.expense.domain.ExpenseRecord;
 import com.family195home.app.expense.service.ExpenseService;
-import com.family195home.app.statistics.dto.AccountSummaryView;
-import com.family195home.app.statistics.dto.MonthlySummaryResponse;
+import com.family195home.app.statistics.domain.AccountSummary;
+import com.family195home.app.statistics.domain.MonthlySummary;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
@@ -26,7 +26,7 @@ public class StatisticsService {
         this.paymentAccountRepository = paymentAccountRepository;
     }
 
-    public MonthlySummaryResponse summarize(Long familyGroupId, String month) {
+    public MonthlySummary summarize(Long familyGroupId, String month) {
         List<ExpenseRecord> records = expenseService.list(familyGroupId, null, null, month);
 
         Map<Long, Long> netByAccount = new LinkedHashMap<>();
@@ -34,13 +34,13 @@ public class StatisticsService {
             netByAccount.merge(record.getPaymentAccountId(), record.getAmount().longValue(), Long::sum);
         }
 
-        List<AccountSummaryView> accounts = netByAccount.entrySet().stream()
-                .map(entry -> new AccountSummaryView(entry.getKey(), accountName(entry.getKey()), entry.getValue()))
+        List<AccountSummary> accounts = netByAccount.entrySet().stream()
+                .map(entry -> new AccountSummary(entry.getKey(), accountName(entry.getKey()), entry.getValue()))
                 .toList();
-        long total = accounts.stream().mapToLong(AccountSummaryView::netAmount).sum();
+        long total = accounts.stream().mapToLong(AccountSummary::netAmount).sum();
 
         // FR-011：當月無資料時回傳空陣列與 totalNetAmount: 0，而非錯誤或空白畫面
-        return new MonthlySummaryResponse(familyGroupId, month, accounts, total);
+        return new MonthlySummary(familyGroupId, month, accounts, total);
     }
 
     private String accountName(Long paymentAccountId) {

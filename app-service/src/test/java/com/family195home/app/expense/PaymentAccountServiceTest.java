@@ -1,6 +1,7 @@
 package com.family195home.app.expense;
 
 import com.family195home.app.common.ApiException;
+import com.family195home.app.common.ErrorKind;
 import com.family195home.app.expense.application.ExpenseRecordRepository;
 import com.family195home.app.expense.application.PaymentAccountRepository;
 import com.family195home.app.expense.domain.PaymentAccount;
@@ -14,7 +15,6 @@ import com.family195home.app.family.domain.MemberStatus;
 import com.family195home.app.family.service.FamilyService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpStatus;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -43,7 +43,7 @@ class PaymentAccountServiceTest {
     void create_rejectsRegularMember() {
         // FR-003：一般成員不可建立支付帳戶
         when(familyService.assertMemberAuthorized(10L, 5L, FamilyService.RequiredRole.ADMIN))
-                .thenThrow(new ApiException(HttpStatus.FORBIDDEN, "NOT_GROUP_ADMIN", "僅群組管理者可執行此操作"));
+                .thenThrow(new ApiException(ErrorKind.FORBIDDEN, "NOT_GROUP_ADMIN", "僅群組管理者可執行此操作"));
 
         assertThatThrownBy(() -> service.create(10L, 5L, "現金"))
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("NOT_GROUP_ADMIN"));
@@ -92,7 +92,7 @@ class PaymentAccountServiceTest {
     void rename_rejectsRegularMember() {
         stubAccount(3L, 10L);
         when(familyService.assertMemberAuthorized(10L, 5L, FamilyService.RequiredRole.ADMIN))
-                .thenThrow(new ApiException(HttpStatus.FORBIDDEN, "NOT_GROUP_ADMIN", "僅群組管理者可執行此操作"));
+                .thenThrow(new ApiException(ErrorKind.FORBIDDEN, "NOT_GROUP_ADMIN", "僅群組管理者可執行此操作"));
 
         assertThatThrownBy(() -> service.rename(3L, 5L, "銀行帳戶"))
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("NOT_GROUP_ADMIN"));
@@ -115,7 +115,7 @@ class PaymentAccountServiceTest {
     void disable_rejectsRegularMember() {
         stubAccount(3L, 10L);
         when(familyService.assertMemberAuthorized(10L, 5L, FamilyService.RequiredRole.ADMIN))
-                .thenThrow(new ApiException(HttpStatus.FORBIDDEN, "NOT_GROUP_ADMIN", "僅群組管理者可執行此操作"));
+                .thenThrow(new ApiException(ErrorKind.FORBIDDEN, "NOT_GROUP_ADMIN", "僅群組管理者可執行此操作"));
 
         assertThatThrownBy(() -> service.disable(3L, 5L))
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("NOT_GROUP_ADMIN"));

@@ -1,6 +1,7 @@
 package com.family195home.app.expense;
 
 import com.family195home.app.common.ApiException;
+import com.family195home.app.common.ErrorKind;
 import com.family195home.app.expense.application.ExpenseRecordRepository;
 import com.family195home.app.expense.domain.ExpenseRecord;
 import com.family195home.app.expense.service.ExpenseService;
@@ -12,7 +13,6 @@ import com.family195home.app.family.domain.MemberStatus;
 import com.family195home.app.family.service.FamilyService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -108,7 +108,7 @@ class ExpenseServiceTest {
         ExpenseRecord record = expenseRecord(1L, 10L, 100L);
         when(expenseRecordRepository.findById(1L)).thenReturn(Optional.of(record));
         when(familyService.assertMemberAuthorized(10L, 5L, FamilyService.RequiredRole.ANY_MEMBER))
-                .thenThrow(new ApiException(HttpStatus.FORBIDDEN, "NOT_GROUP_MEMBER", "您不是該家庭群組成員"));
+                .thenThrow(new ApiException(ErrorKind.FORBIDDEN, "NOT_GROUP_MEMBER", "您不是該家庭群組成員"));
 
         assertThatThrownBy(() -> expenseService.update(10L, 1L, 5L, 100L, BigDecimal.TEN, "備註", null))
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("NOT_GROUP_MEMBER"));
@@ -125,7 +125,7 @@ class ExpenseServiceTest {
         assertThatThrownBy(() -> expenseService.update(10L, 1L, 5L, 100L, BigDecimal.TEN, "備註", null))
                 .isInstanceOfSatisfying(ApiException.class, e -> {
                     assertThat(e.getCode()).isEqualTo("EXPENSE_NOT_IN_GROUP");
-                    assertThat(e.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+                    assertThat(e.getKind()).isEqualTo(ErrorKind.FORBIDDEN);
                 });
     }
 

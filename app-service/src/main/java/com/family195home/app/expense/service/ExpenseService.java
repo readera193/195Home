@@ -1,14 +1,15 @@
 package com.family195home.app.expense.service;
 
 import com.family195home.app.common.ApiException;
+import com.family195home.app.common.ErrorKind;
 import com.family195home.app.expense.application.ExpenseRecordRepository;
 import com.family195home.app.expense.domain.ExpenseRecord;
 import com.family195home.app.family.domain.FamilyGroupStatus;
 import com.family195home.app.family.domain.FamilyMember;
 import com.family195home.app.family.service.FamilyService;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -19,6 +20,7 @@ import java.util.List;
  * public 方法同進程呼叫（見 research.md 決策 7），不透過 HTTP。
  */
 @Service
+@Transactional
 public class ExpenseService {
 
     private final ExpenseRecordRepository expenseRecordRepository;
@@ -37,16 +39,16 @@ public class ExpenseService {
     // FR-004, FR-005, FR-006, FR-016, FR-018
     public ExpenseRecord create(Long familyGroupId, Long authorMemberId, Long paymentAccountId, BigDecimal amount, String note, LocalDateTime occurredAt) {
         var group = familyService.getGroup(familyGroupId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "GROUP_NOT_FOUND", "找不到家庭群組"));
+                .orElseThrow(() -> new ApiException(ErrorKind.NOT_FOUND, "GROUP_NOT_FOUND", "找不到家庭群組"));
         if (group.getStatus() == FamilyGroupStatus.DISSOLVED) {
-            throw new ApiException(HttpStatus.CONFLICT, "GROUP_DISSOLVED", "此家庭群組已解散，無法新增支出紀錄");
+            throw new ApiException(ErrorKind.CONFLICT, "GROUP_DISSOLVED", "此家庭群組已解散，無法新增支出紀錄");
         }
         int intAmount = toIntegerAmount(amount);
         if (note == null || note.isBlank()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "NOTE_REQUIRED", "備註為必填欄位");
+            throw new ApiException(ErrorKind.BAD_REQUEST, "NOTE_REQUIRED", "備註為必填欄位");
         }
         if (paymentAccountId == null) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "PAYMENT_ACCOUNT_REQUIRED", "支付帳戶為必填欄位");
+            throw new ApiException(ErrorKind.BAD_REQUEST, "PAYMENT_ACCOUNT_REQUIRED", "支付帳戶為必填欄位");
         }
 
         ExpenseRecord record = new ExpenseRecord();
@@ -69,7 +71,7 @@ public class ExpenseService {
 
     public ExpenseRecord findRequired(Long id) {
         return expenseRecordRepository.findById(id)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "EXPENSE_NOT_FOUND", "找不到支出紀錄"));
+                .orElseThrow(() -> new ApiException(ErrorKind.NOT_FOUND, "EXPENSE_NOT_FOUND", "找不到支出紀錄"));
     }
 
     // FR-027：條件式 UPDATE 取得鎖，5 分鐘 TTL（見 research.md 決策 3）
@@ -77,7 +79,7 @@ public class ExpenseService {
         LocalDateTime now = LocalDateTime.now();
         int updated = expenseRecordRepository.tryLock(expenseId, callerMemberId, now, lockTtlMinutes);
         if (updated == 0) {
-            throw new ApiException(HttpStatus.CONFLICT, "RECORD_LOCKED", "此紀錄目前正被編輯中，請稍後再試");
+            throw new ApiException(ErrorKind.CONFLICT, "RECORD_LOCKED", "此紀錄目前正被編輯中，請稍後再試");
         }
         return findRequired(expenseId);
     }
@@ -119,7 +121,7 @@ public class ExpenseService {
         ExpenseRecord record = findRequired(expenseId);
         familyService.assertMemberAuthorized(familyGroupId, callerUserId, FamilyService.RequiredRole.ANY_MEMBER);
         if (!familyGroupId.equals(record.getFamilyGroupId())) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "EXPENSE_NOT_IN_GROUP", "此支出紀錄不屬於該家庭群組");
+            throw new ApiException(ErrorKind.FORBIDDEN, "EXPENSE_NOT_IN_GROUP", "此支出紀錄不屬於該家庭群組");
         }
         return record;
     }
@@ -127,14 +129,14 @@ public class ExpenseService {
     private void requireLockHeldByCaller(ExpenseRecord record, Long familyGroupId, Long callerUserId) {
         FamilyMember caller = familyService.assertMemberAuthorized(familyGroupId, callerUserId, FamilyService.RequiredRole.ANY_MEMBER);
         if (record.getLockedByMemberId() == null || !record.getLockedByMemberId().equals(caller.getId())) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "LOCK_NOT_HELD_BY_CALLER", "請先取得編輯鎖定後再操作");
+            throw new ApiException(ErrorKind.FORBIDDEN, "LOCK_NOT_HELD_BY_CALLER", "請先取得編輯鎖定後再操作");
         }
     }
 
     // FR-016：金額必須為整數（不接受小數點），可正可負可零
     private int toIntegerAmount(BigDecimal amount) {
         if (amount.stripTrailingZeros().scale() > 0) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "AMOUNT_MUST_BE_INTEGER", "金額必須為整數，不支援小數點");
+            throw new ApiException(ErrorKind.BAD_REQUEST, "AMOUNT_MUST_BE_INTEGER", "金額必須為整數，不支援小數點");
         }
         return amount.intValueExact();
     }

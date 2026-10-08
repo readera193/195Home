@@ -1,6 +1,7 @@
 package com.family195home.app.family.service;
 
 import com.family195home.app.common.ApiException;
+import com.family195home.app.common.ErrorKind;
 import com.family195home.app.family.application.FamilyGroupRepository;
 import com.family195home.app.family.application.FamilyMemberRepository;
 import com.family195home.app.family.domain.FamilyGroup;
@@ -8,8 +9,8 @@ import com.family195home.app.family.domain.FamilyGroupStatus;
 import com.family195home.app.family.domain.FamilyMember;
 import com.family195home.app.family.domain.MemberRole;
 import com.family195home.app.family.domain.MemberStatus;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
@@ -22,6 +23,7 @@ import java.util.Optional;
  * 唯一入口（見 research.md 決策 7）。
  */
 @Service
+@Transactional
 public class FamilyService {
 
     private static final String INVITE_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -40,7 +42,7 @@ public class FamilyService {
     public FamilyGroup createGroup(Long userId, String name) {
         assertNotAlreadyInGroup(userId);
         if (familyGroupRepository.existsByName(name)) {
-            throw new ApiException(HttpStatus.CONFLICT, "GROUP_NAME_TAKEN", "此家庭群組名稱已被使用");
+            throw new ApiException(ErrorKind.CONFLICT, "GROUP_NAME_TAKEN", "此家庭群組名稱已被使用");
         }
         FamilyGroup group = new FamilyGroup(name, FamilyGroupStatus.ACTIVE, generateUniqueInviteCode(), LocalDateTime.now());
         familyGroupRepository.save(group);
@@ -53,9 +55,9 @@ public class FamilyService {
     public FamilyMember joinGroup(Long userId, String inviteCode) {
         assertNotAlreadyInGroup(userId);
         FamilyGroup group = familyGroupRepository.findByInviteCode(inviteCode)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "INVALID_INVITE_CODE", "邀請碼無效"));
+                .orElseThrow(() -> new ApiException(ErrorKind.NOT_FOUND, "INVALID_INVITE_CODE", "邀請碼無效"));
         if (group.getStatus() == FamilyGroupStatus.DISSOLVED) {
-            throw new ApiException(HttpStatus.CONFLICT, "GROUP_DISSOLVED", "此家庭群組已解散");
+            throw new ApiException(ErrorKind.CONFLICT, "GROUP_DISSOLVED", "此家庭群組已解散");
         }
 
         // FR-025：已離開成員以原邀請碼重新加入，恢復為 ACTIVE 並沿用原 FamilyMember，保留歷史紀錄歸屬
@@ -64,7 +66,7 @@ public class FamilyService {
             FamilyMember member = existing.get();
             // FR-030：被管理者移出的成員不可用邀請碼重新加入，須由管理者恢復加入資格
             if (member.getStatus() == MemberStatus.REMOVED) {
-                throw new ApiException(HttpStatus.FORBIDDEN, "MEMBER_REMOVED", "您已被管理者移出此群組，無法再次加入");
+                throw new ApiException(ErrorKind.FORBIDDEN, "MEMBER_REMOVED", "您已被管理者移出此群組，無法再次加入");
             }
             member.setStatus(MemberStatus.ACTIVE);
             member.setLeftAt(null);
@@ -79,7 +81,7 @@ public class FamilyService {
 
     private void assertNotAlreadyInGroup(Long userId) {
         if (familyMemberRepository.findActiveByUserId(userId).isPresent()) {
-            throw new ApiException(HttpStatus.CONFLICT, "ALREADY_IN_A_GROUP", "您已屬於一個家庭群組，請先離開才能建立或加入新群組");
+            throw new ApiException(ErrorKind.CONFLICT, "ALREADY_IN_A_GROUP", "您已屬於一個家庭群組，請先離開才能建立或加入新群組");
         }
     }
 
@@ -101,7 +103,7 @@ public class FamilyService {
     public LeaveResult leave(Long familyGroupId, Long memberId, Long callerUserId) {
         FamilyMember member = requireActiveMemberInGroup(familyGroupId, memberId);
         if (!member.getUserId().equals(callerUserId)) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "NOT_SELF", "僅能操作自己的成員身分");
+            throw new ApiException(ErrorKind.FORBIDDEN, "NOT_SELF", "僅能操作自己的成員身分");
         }
         return doLeave(member, MemberStatus.LEFT);
     }
@@ -111,7 +113,7 @@ public class FamilyService {
         assertMemberAuthorized(familyGroupId, callerUserId, RequiredRole.ADMIN);
         FamilyMember target = requireActiveMemberInGroup(familyGroupId, memberId);
         if (target.getUserId().equals(callerUserId)) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "CANNOT_KICK_SELF", "無法移出自己，請使用離開群組");
+            throw new ApiException(ErrorKind.BAD_REQUEST, "CANNOT_KICK_SELF", "無法移出自己，請使用離開群組");
         }
         doLeave(target, MemberStatus.REMOVED);
         return target;
@@ -122,9 +124,9 @@ public class FamilyService {
         assertMemberAuthorized(familyGroupId, callerUserId, RequiredRole.ADMIN);
         FamilyMember target = familyMemberRepository.findById(memberId)
                 .filter(m -> m.getFamilyGroupId().equals(familyGroupId))
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND", "找不到成員"));
+                .orElseThrow(() -> new ApiException(ErrorKind.NOT_FOUND, "MEMBER_NOT_FOUND", "找不到成員"));
         if (target.getStatus() != MemberStatus.REMOVED) {
-            throw new ApiException(HttpStatus.CONFLICT, "MEMBER_NOT_REMOVED", "此成員並非被移出狀態");
+            throw new ApiException(ErrorKind.CONFLICT, "MEMBER_NOT_REMOVED", "此成員並非被移出狀態");
         }
         target.setStatus(MemberStatus.LEFT);
         familyMemberRepository.update(target);
@@ -134,9 +136,9 @@ public class FamilyService {
     private FamilyMember requireActiveMemberInGroup(Long familyGroupId, Long memberId) {
         FamilyMember member = familyMemberRepository.findById(memberId)
                 .filter(m -> m.getFamilyGroupId().equals(familyGroupId))
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND", "找不到成員"));
+                .orElseThrow(() -> new ApiException(ErrorKind.NOT_FOUND, "MEMBER_NOT_FOUND", "找不到成員"));
         if (!member.isActive()) {
-            throw new ApiException(HttpStatus.CONFLICT, "MEMBER_NOT_ACTIVE", "此成員目前不是在職狀態");
+            throw new ApiException(ErrorKind.CONFLICT, "MEMBER_NOT_ACTIVE", "此成員目前不是在職狀態");
         }
         return member;
     }
@@ -152,7 +154,7 @@ public class FamilyService {
         // FR-018：唯一在職成員離開時，群組自動解散
         if (activeCountBeforeLeaving <= 1) {
             FamilyGroup group = familyGroupRepository.findById(familyGroupId)
-                    .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "GROUP_NOT_FOUND", "找不到家庭群組"));
+                    .orElseThrow(() -> new ApiException(ErrorKind.NOT_FOUND, "GROUP_NOT_FOUND", "找不到家庭群組"));
             group.setStatus(FamilyGroupStatus.DISSOLVED);
             familyGroupRepository.update(group);
             return new LeaveResult(newStatus, FamilyGroupStatus.DISSOLVED, null);
@@ -162,7 +164,7 @@ public class FamilyService {
         Long newAdminMemberId = null;
         if (member.isAdmin()) {
             FamilyMember newAdmin = familyMemberRepository.findEarliestOtherActiveMember(familyGroupId, member.getId())
-                    .orElseThrow(() -> new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "NO_ELIGIBLE_ADMIN", "找不到可接任的管理者"));
+                    .orElseThrow(() -> new ApiException(ErrorKind.INTERNAL, "NO_ELIGIBLE_ADMIN", "找不到可接任的管理者"));
             newAdmin.setRole(MemberRole.ADMIN);
             familyMemberRepository.update(newAdmin);
             newAdminMemberId = newAdmin.getId();
@@ -177,9 +179,9 @@ public class FamilyService {
     public FamilyMember assertMemberAuthorized(Long familyGroupId, Long callerUserId, RequiredRole requiredRole) {
         FamilyMember member = familyMemberRepository.findActiveByUserId(callerUserId)
                 .filter(m -> m.getFamilyGroupId().equals(familyGroupId))
-                .orElseThrow(() -> new ApiException(HttpStatus.FORBIDDEN, "NOT_GROUP_MEMBER", "您不是該家庭群組成員"));
+                .orElseThrow(() -> new ApiException(ErrorKind.FORBIDDEN, "NOT_GROUP_MEMBER", "您不是該家庭群組成員"));
         if (requiredRole == RequiredRole.ADMIN && !member.isAdmin()) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "NOT_GROUP_ADMIN", "僅群組管理者可執行此操作");
+            throw new ApiException(ErrorKind.FORBIDDEN, "NOT_GROUP_ADMIN", "僅群組管理者可執行此操作");
         }
         return member;
     }

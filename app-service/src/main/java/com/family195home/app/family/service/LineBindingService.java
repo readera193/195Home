@@ -1,6 +1,7 @@
 package com.family195home.app.family.service;
 
 import com.family195home.app.common.ApiException;
+import com.family195home.app.common.ErrorKind;
 import com.family195home.app.family.application.FamilyMemberRepository;
 import com.family195home.app.family.application.LineBindingCodeRepository;
 import com.family195home.app.family.application.LineBindingRepository;
@@ -8,8 +9,8 @@ import com.family195home.app.family.domain.FamilyMember;
 import com.family195home.app.family.domain.LineBinding;
 import com.family195home.app.family.domain.LineBindingCode;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
@@ -21,6 +22,7 @@ import java.util.Optional;
  * notification-service 透過 contracts/app-service.md 的內部 API 呼叫本服務的邏輯。
  */
 @Service
+@Transactional
 public class LineBindingService {
 
     private static final String NUMERIC_ALPHABET = "0123456789";
@@ -43,6 +45,16 @@ public class LineBindingService {
         this.ttlMinutes = ttlMinutes;
     }
 
+    // FR-023：限本人產生自己的綁定碼
+    public LineBindingCode generateCodeForCaller(Long familyMemberId, Long callerUserId) {
+        FamilyMember member = familyMemberRepository.findById(familyMemberId)
+                .orElseThrow(() -> new ApiException(ErrorKind.NOT_FOUND, "MEMBER_NOT_FOUND", "找不到成員"));
+        if (!member.getUserId().equals(callerUserId)) {
+            throw new ApiException(ErrorKind.FORBIDDEN, "NOT_SELF", "僅能為自己產生綁定碼");
+        }
+        return generateCode(familyMemberId);
+    }
+
     // FR-023：成員登入後產生一組專屬綁定碼，10 分鐘內有效
     public LineBindingCode generateCode(Long familyMemberId) {
         LocalDateTime now = LocalDateTime.now();
@@ -55,10 +67,10 @@ public class LineBindingService {
     public BindingResult consume(String code, String lineUserId) {
         LineBindingCode bindingCode = codeRepository.findByCode(code)
                 .filter(c -> c.isValidAt(LocalDateTime.now()))
-                .orElseThrow(() -> new ApiException(HttpStatus.GONE, "CODE_EXPIRED_OR_USED", "綁定碼已過期或已使用，請重新登入平台產生新碼"));
+                .orElseThrow(() -> new ApiException(ErrorKind.GONE, "CODE_EXPIRED_OR_USED", "綁定碼已過期或已使用，請重新登入平台產生新碼"));
 
         if (bindingRepository.existsByLineUserId(lineUserId)) {
-            throw new ApiException(HttpStatus.CONFLICT, "LINE_ACCOUNT_ALREADY_BOUND", "此 LINE 帳號已綁定其他家庭成員身分");
+            throw new ApiException(ErrorKind.CONFLICT, "LINE_ACCOUNT_ALREADY_BOUND", "此 LINE 帳號已綁定其他家庭成員身分");
         }
 
         codeRepository.markUsed(bindingCode.getId());
@@ -76,13 +88,18 @@ public class LineBindingService {
     }
 
     // 供每月排程通知取得所有家庭的所有 LINE 綁定
-    public List<LineBinding> findAllBindings() {
-        return bindingRepository.findAll();
+    public List<BoundMember> findAllBoundMembers() {
+        return bindingRepository.findAll().stream()
+                .map(binding -> new BoundMember(
+                        binding.getFamilyMemberId(),
+                        familyMemberRepository.findById(binding.getFamilyMemberId()).map(FamilyMember::getFamilyGroupId).orElse(null),
+                        binding.getLineUserId()))
+                .toList();
     }
 
     private FamilyMember requireMember(Long familyMemberId) {
         return familyMemberRepository.findById(familyMemberId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND", "找不到成員"));
+                .orElseThrow(() -> new ApiException(ErrorKind.NOT_FOUND, "MEMBER_NOT_FOUND", "找不到成員"));
     }
 
     private String randomNumericCode() {
@@ -94,5 +111,8 @@ public class LineBindingService {
     }
 
     public record BindingResult(Long familyMemberId, Long familyGroupId) {
+    }
+
+    public record BoundMember(Long familyMemberId, Long familyGroupId, String lineUserId) {
     }
 }
