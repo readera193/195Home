@@ -24,7 +24,6 @@ import java.util.Optional;
  * 唯一入口（見 research.md 決策 7）。
  */
 @Service
-@Transactional
 public class FamilyService implements FamilyAccess {
 
     private static final String INVITE_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -40,6 +39,7 @@ public class FamilyService implements FamilyAccess {
     }
 
     // FR-001, FR-026
+    @Transactional
     public FamilyGroup createGroup(Long userId, String name) {
         assertNotAlreadyInGroup(userId);
         if (familyGroupRepository.existsByName(name)) {
@@ -53,6 +53,7 @@ public class FamilyService implements FamilyAccess {
     }
 
     // FR-002, FR-025, FR-026, FR-030
+    @Transactional
     public FamilyMember joinGroup(Long userId, String inviteCode) {
         assertNotAlreadyInGroup(userId);
         FamilyGroup group = familyGroupRepository.findByInviteCode(inviteCode)
@@ -87,20 +88,24 @@ public class FamilyService implements FamilyAccess {
     }
 
     /** 取得目前使用者所屬家庭群組與成員資訊（若未加入任何群組則回傳 empty）。 */
+    @Transactional(readOnly = true)
     public Optional<FamilyMember> getMyMembership(Long userId) {
         return familyMemberRepository.findActiveByUserId(userId);
     }
 
+    @Transactional(readOnly = true)
     public Optional<FamilyGroup> getGroup(Long familyGroupId) {
         return familyGroupRepository.findById(familyGroupId);
     }
 
     // FR-007, FR-021
+    @Transactional(readOnly = true)
     public List<FamilyMember> getMembers(Long familyGroupId, boolean includeLeft) {
         return familyMemberRepository.findByGroupId(familyGroupId, includeLeft);
     }
 
     // FR-018, FR-029
+    @Transactional
     public LeaveResult leave(Long familyGroupId, Long memberId, Long callerUserId) {
         FamilyMember member = requireActiveMemberInGroup(familyGroupId, memberId);
         if (!member.getUserId().equals(callerUserId)) {
@@ -110,6 +115,7 @@ public class FamilyService implements FamilyAccess {
     }
 
     // FR-028
+    @Transactional
     public FamilyMember kick(Long familyGroupId, Long memberId, Long callerUserId) {
         assertMemberAuthorized(familyGroupId, callerUserId, RequiredRole.ADMIN);
         FamilyMember target = requireActiveMemberInGroup(familyGroupId, memberId);
@@ -177,6 +183,7 @@ public class FamilyService implements FamilyAccess {
      * 同進程方法呼叫入口：確認 callerUserId 是否為
      * familyGroupId 的在職成員，並視需要要求 ADMIN 角色（FR-017、FR-019）。
      */
+    @Transactional(readOnly = true)
     public FamilyMember assertMemberAuthorized(Long familyGroupId, Long callerUserId, RequiredRole requiredRole) {
         FamilyMember member = familyMemberRepository.findActiveByUserId(callerUserId)
                 .filter(m -> m.getFamilyGroupId().equals(familyGroupId))
@@ -204,16 +211,19 @@ public class FamilyService implements FamilyAccess {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public MemberRef requireMember(Long familyGroupId, Long callerUserId) {
         return new MemberRef(assertMemberAuthorized(familyGroupId, callerUserId, RequiredRole.ANY_MEMBER).getId());
     }
 
     @Override
+    @Transactional(readOnly = true)
     public MemberRef requireAdmin(Long familyGroupId, Long callerUserId) {
         return new MemberRef(assertMemberAuthorized(familyGroupId, callerUserId, RequiredRole.ADMIN).getId());
     }
 
     @Override
+    @Transactional(readOnly = true)
     public GroupState groupState(Long familyGroupId) {
         return familyGroupRepository.findById(familyGroupId)
                 .map(g -> g.getStatus() == FamilyGroupStatus.DISSOLVED ? GroupState.DISSOLVED : GroupState.ACTIVE)

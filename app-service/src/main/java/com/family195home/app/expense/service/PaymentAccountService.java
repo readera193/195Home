@@ -17,7 +17,6 @@ import java.util.List;
  * 支付帳戶為群組層級，新增／改名／停用／刪除一律限該群組管理者（FR-003、FR-022）。
  */
 @Service
-@Transactional
 public class PaymentAccountService {
 
     private final PaymentAccountRepository paymentAccountRepository;
@@ -49,6 +48,7 @@ public class PaymentAccountService {
         return account;
     }
 
+    @Transactional(readOnly = true)
     public List<PaymentAccount> list(Long familyGroupId, PaymentAccountStatus status) {
         return paymentAccountRepository.findByGroupId(familyGroupId, status);
     }

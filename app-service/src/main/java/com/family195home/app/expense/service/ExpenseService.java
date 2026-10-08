@@ -18,7 +18,6 @@ import java.util.List;
  * public 方法同進程呼叫（見 research.md 決策 7），不透過 HTTP。
  */
 @Service
-@Transactional
 public class ExpenseService {
 
     private final ExpenseRecordRepository expenseRecordRepository;
@@ -65,10 +64,12 @@ public class ExpenseService {
         return record;
     }
 
+    @Transactional(readOnly = true)
     public List<ExpenseRecord> list(Long familyGroupId, Long paymentAccountId, Long authorMemberId, String month) {
         return expenseRecordRepository.findByFilter(familyGroupId, paymentAccountId, authorMemberId, month);
     }
 
+    @Transactional(readOnly = true)
     public ExpenseRecord findRequired(Long id) {
         return expenseRecordRepository.findById(id)
                 .orElseThrow(() -> new ApiException(ErrorKind.NOT_FOUND, "EXPENSE_NOT_FOUND", "找不到支出紀錄"));
@@ -93,6 +94,7 @@ public class ExpenseService {
     }
 
     // FR-019：群組任一在職成員皆可編輯/刪除任何紀錄；FR-027：須已持有鎖
+    @Transactional
     public ExpenseRecord update(Long familyGroupId, Long expenseId, Long callerUserId, Long paymentAccountId, BigDecimal amount, String note, LocalDateTime occurredAt) {
         ExpenseRecord record = requireRecordInGroup(familyGroupId, expenseId, callerUserId);
         requireLockHeldByCaller(record, familyGroupId, callerUserId);

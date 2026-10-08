@@ -22,7 +22,6 @@ import java.util.Optional;
  * notification-service 透過 contracts/app-service.md 的內部 API 呼叫本服務的邏輯。
  */
 @Service
-@Transactional
 public class LineBindingService {
 
     private static final String NUMERIC_ALPHABET = "0123456789";
@@ -64,6 +63,7 @@ public class LineBindingService {
     }
 
     // FR-020, FR-023：驗證碼有效性與單次使用；LINE 帳號重複綁定拒絕
+    @Transactional
     public BindingResult consume(String code, String lineUserId) {
         LineBindingCode bindingCode = codeRepository.findByCode(code)
                 .filter(c -> c.isValidAt(LocalDateTime.now()))
@@ -82,12 +82,14 @@ public class LineBindingService {
     }
 
     // FR-015：供 LINE 關鍵字查詢確認發話帳號是否已綁定
+    @Transactional(readOnly = true)
     public Optional<BindingResult> findByLineUserId(String lineUserId) {
         return bindingRepository.findByLineUserId(lineUserId)
                 .map(binding -> new BindingResult(binding.getFamilyMemberId(), requireMember(binding.getFamilyMemberId()).getFamilyGroupId()));
     }
 
     // 供每月排程通知取得所有家庭的所有 LINE 綁定
+    @Transactional(readOnly = true)
     public List<BoundMember> findAllBoundMembers() {
         return bindingRepository.findAll().stream()
                 .map(binding -> new BoundMember(
