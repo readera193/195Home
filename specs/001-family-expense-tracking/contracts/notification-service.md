@@ -6,6 +6,12 @@
 
 本服務對 app-service 的所有呼叫皆發生於 LINE Webhook 或排程情境，**無平台使用者 JWT** 可用，一律以 Header `X-Internal-Token`（共用密鑰）驗證呼叫來源（不使用 `Authorization: Bearer <JWT>`，見 research.md 決策 7）。app-service 的呼叫目標位址（base URL）由環境變數設定：本機開發指向 docker-compose 服務名稱（例如 `http://app-service:8080`），Northflank 正式環境指向 app-service 對應 Northflank service 的內部網域。
 
+## 與 app-service 的錯誤契約
+
+app-service 的錯誤回應為 RFC 9457 Problem Details（見 `contracts/app-service.md` 共通約定）。`AppServiceClient` 只讀取 `code` 與 `detail` 兩個欄位（其餘欄位忽略），轉成 `AppServiceClientException(statusCode, errorCode, message)` 供上層依 `errorCode` 決定 LINE 回覆內容（目前使用 `CODE_EXPIRED_OR_USED`、`LINE_ACCOUNT_ALREADY_BOUND`；「未綁定」則依 404 狀態判斷）；回應本體不是 Problem Details（例如閘道 502 的 HTML）時，`errorCode` 為 `UNKNOWN`。
+
+本服務自身的 HTTP 錯誤（缺少 query 參數、路徑不存在等）同樣以 Problem Details 回應（`spring.mvc.problemdetails.enabled=true`），與 app-service 格式一致。
+
 ## LINE Webhook（外部：LINE 平台呼叫）
 
 ### `POST /api/line/webhook`

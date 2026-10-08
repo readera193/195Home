@@ -7,6 +7,64 @@
 
 app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense 模組確認呼叫者角色、statistics 模組取得支出資料）皆為同進程 Java service 方法呼叫，**不透過 HTTP，因此不出現在本合約中**——本合約僅描述跨部署服務邊界（前端 ↔ app-service、notification-service ↔ app-service）的介面。
 
+## 共通約定
+
+### 錯誤回應格式（Problem Details）
+
+所有公開 API 與內部 API 的錯誤（含 Spring Security 在 filter 層攔下的 401 / 403）一律以 [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) Problem Details 回應，`Content-Type: application/problem+json`：
+
+```json
+{
+  "type": "about:blank",
+  "title": "Conflict",
+  "status": 409,
+  "detail": "您已屬於一個家庭群組",
+  "instance": "/api/families",
+  "code": "ALREADY_IN_A_GROUP"
+}
+```
+
+| 欄位 | 說明 |
+|------|------|
+| `status` / `title` | HTTP 狀態碼與其標準說明 |
+| `detail` | 給使用者看的錯誤訊息（前端直接顯示） |
+| `code` | **穩定的機器可讀錯誤代碼**，即本合約各端點 `Errors` 所列的代碼；前端與 notification-service 以 `code` 判斷分支，不可依賴 `detail` 文字 |
+| `instance` | 發生錯誤的請求路徑 |
+| `errors`（僅 `VALIDATION_ERROR`） | 欄位驗證失敗清單：`[{ "field": "email", "message": "..." }]` |
+
+實作策略：業務錯誤一律以 `ApiException(kind, code, message)` 丟出，由 `GlobalExceptionHandler` 統一轉成 Problem Details（`ErrorKind` 對應 HTTP 狀態碼）；**不使用 Result 型別**。Spring MVC 自身的例外（缺少參數、JSON 格式錯誤、路徑不存在等）同樣轉為 Problem Details，`code` 為其 HTTP 狀態名稱（如 `BAD_REQUEST`、`NOT_FOUND`）。
+
+通用錯誤代碼（任何端點都可能出現）：
+
+| HTTP | code | 說明 |
+|------|------|------|
+| 400 | `VALIDATION_ERROR` | 請求本體欄位驗證失敗（`@Valid`），`errors[]` 列出各欄位 |
+| 400 | `INVALID_DATE_FORMAT` | 日期時間（`occurredAt`）或月份（`month`）格式錯誤 |
+| 401 | `UNAUTHORIZED` | 未帶 token、token 無效或已過期；內部 API 的 `X-Internal-Token` 缺少或錯誤亦同 |
+| 403 | `FORBIDDEN` | 已登入但沒有權限（Spring Security 層級） |
+| 500 | `INTERNAL_ERROR` | 未預期的伺服器錯誤；`detail` 為固定文字，不洩漏內部細節 |
+
+業務層通用錯誤代碼：
+
+| HTTP | code | 說明 |
+|------|------|------|
+| 403 | `NOT_GROUP_MEMBER` | 呼叫者不是該家庭群組的在職成員（FR-017） |
+| 403 | `NOT_GROUP_ADMIN` | 該操作限群組管理者 |
+| 403 | `NOT_SELF` | 該操作限成員本人（離開群組、產生 LINE 綁定碼） |
+| 404 | `GROUP_NOT_FOUND` / `ACCOUNT_NOT_FOUND` / `EXPENSE_NOT_FOUND` / `MEMBER_NOT_FOUND` | 資源不存在 |
+| 409 | `MEMBER_NOT_ACTIVE` | 目標成員目前不是在職狀態（離開／移出時） |
+| 500 | `NO_ELIGIBLE_ADMIN` | 管理者離開時找不到可接任者（資料異常，正常流程不會發生） |
+
+### 分頁
+
+列表型端點若支援分頁（目前僅 `GET /api/expenses`），使用 query `page`（從 0 起算，預設 0）與 `size`（預設 20，上限 100），回應為：
+
+```json
+{ "items": [ ... ], "page": 0, "size": 20, "totalElements": 45, "totalPages": 3 }
+```
+
+`page < 0`、`size < 1` 或 `size > 100` → `400 INVALID_PAGE_PARAMS`。排序固定為 `occurredAt` 由新到舊，`occurredAt` 相同時以 `id` 由大到小，確保翻頁結果穩定。
+
 ## 帳號與登入（公開 API）
 
 ### `POST /api/users/register`
@@ -50,12 +108,13 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 ### `POST /api/families/{familyGroupId}/members/{memberId}/leave`
 - Header: `Authorization`（限本人）
 - Response 200: `{ status: "LEFT", groupStatus: "ACTIVE" | "DISSOLVED", newAdminMemberId?: number }`
+- Errors: `403 NOT_SELF`、`409 MEMBER_NOT_ACTIVE`
 - 邏輯：若為唯一在職成員 → 群組 `DISSOLVED`（FR-018）；若為 ADMIN 且尚有其他在職成員 → 自動轉移 ADMIN（FR-029）
 
 ### `POST /api/families/{familyGroupId}/members/{memberId}/kick`
 - Header: `Authorization`（限該群組 ADMIN）
 - Response 200: `{ memberId, status: "REMOVED" }`（被移出者不可以邀請碼重新加入，FR-028、FR-030）
-- Errors: `403 NOT_GROUP_ADMIN`（FR-028）
+- Errors: `403 NOT_GROUP_ADMIN`（FR-028）、`400 CANNOT_KICK_SELF`、`409 MEMBER_NOT_ACTIVE`
 
 ### `POST /api/families/{familyGroupId}/members/{memberId}/restore-eligibility`
 - Header: `Authorization`（限該群組 ADMIN）
@@ -101,24 +160,26 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 - Errors: `400 AMOUNT_MUST_BE_INTEGER`、`400 NOTE_REQUIRED`、`400 PAYMENT_ACCOUNT_REQUIRED`、`409 GROUP_DISSOLVED`（FR-016、FR-018）
 - 邏輯：`occurredAt` 未提供時使用伺服器當下時間（FR-005）
 
-### `GET /api/expenses?familyGroupId=&paymentAccountId=&authorMemberId=&month=YYYY-MM`
-- Header: `Authorization`
-- Response 200: `[{ expenseId, amount, note, occurredAt, paymentAccountId, paymentAccountName, authorMemberId, locked: boolean }]`
-- 篩選條件可單獨或同時套用 `paymentAccountId`、`authorMemberId`（FR-008、FR-009、FR-010）
+### `GET /api/expenses?familyGroupId=&paymentAccountId=&authorMemberId=&month=YYYY-MM&page=&size=`
+- Header: `Authorization`（呼叫者須為該群組在職成員，否則 `403 NOT_GROUP_MEMBER`，FR-017）
+- Response 200（分頁，見「共通約定 → 分頁」）: `{ items: [{ expenseId, amount, note, occurredAt, paymentAccountId, paymentAccountName, authorMemberId, locked: boolean }], page, size, totalElements, totalPages }`
+- 篩選條件可單獨或同時套用 `paymentAccountId`、`authorMemberId`（FR-008、FR-009、FR-010）；`month` 省略時不限月份
+- Errors: `400 INVALID_PAGE_PARAMS`、`400 INVALID_DATE_FORMAT`（`month` 格式錯誤）
+- 說明：statistics 模組彙總整月資料時走同進程的不分頁查詢，不受 `size` 上限影響（SC-004）
 
-### `POST /api/expenses/{expenseId}/lock`
-- Header: `Authorization`（操作者需為該群組在職成員，不限新增者本人，同進程呼叫 family 模組驗證，FR-019）
+### `POST /api/expenses/{expenseId}/lock?familyGroupId=`
+- Header: `Authorization`；Query `familyGroupId`（必填，用於驗證操作者屬於該群組）（操作者需為該群組在職成員，不限新增者本人，同進程呼叫 family 模組驗證，FR-019）
 - Response 200: `{ expenseId, lockedByMemberId, lockedAt }`
 - Errors: `409 RECORD_LOCKED`（其他人持有中，5 分鐘內，FR-027）
 
-### `PUT /api/expenses/{expenseId}`
-- Header: `Authorization`（須已持有鎖）
+### `PUT /api/expenses/{expenseId}?familyGroupId=`
+- Header: `Authorization`（須已持有鎖）；Query `familyGroupId`（必填，用於驗證操作者與紀錄皆屬於該群組）
 - Request: `{ amount, note, occurredAt, paymentAccountId }`
 - Response 200: `{ expenseId, ... }`（成功後自動釋放鎖）
 - Errors: `403 LOCK_NOT_HELD_BY_CALLER`、`403 NOT_GROUP_MEMBER`（非該群組在職成員，FR-017）、`403 EXPENSE_NOT_IN_GROUP`（紀錄不屬於該群組）、`400 AMOUNT_MUST_BE_INTEGER` 等同新增驗證規則
 
-### `DELETE /api/expenses/{expenseId}`
-- Header: `Authorization`（須已持有鎖；群組任一在職成員皆可鎖定後刪除，FR-019）
+### `DELETE /api/expenses/{expenseId}?familyGroupId=`
+- Header: `Authorization`；Query `familyGroupId`（必填）（須已持有鎖；群組任一在職成員皆可鎖定後刪除，FR-019）
 - Response 204
 - Errors: `403 LOCK_NOT_HELD_BY_CALLER`、`403 NOT_GROUP_MEMBER`、`403 EXPENSE_NOT_IN_GROUP`
 

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getMyFamily } from '../services/familyApi';
 import { createExpense, listAccounts } from '../services/expenseApi';
+import { getErrorMessage } from '../utils/apiError';
 
 export default function ExpenseFormPage() {
   const navigate = useNavigate();
@@ -51,8 +52,8 @@ export default function ExpenseFormPage() {
         occurredAt: occurredAt || undefined,
       });
       navigate('/expenses');
-    } catch (err: any) {
-      setError(err.response?.data?.message ?? '新增支出失敗');
+    } catch (err) {
+      setError(getErrorMessage(err, '新增支出失敗'));
     } finally {
       setSubmitting(false);
     }

@@ -1,5 +1,6 @@
 package com.family195home.app.expense.controller;
 
+import com.family195home.app.common.PagedResult;
 import com.family195home.app.expense.application.PaymentAccountRepository;
 import com.family195home.app.expense.domain.ExpenseRecord;
 import com.family195home.app.expense.dto.CreateExpenseRequest;
@@ -16,7 +17,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/expenses")
@@ -45,17 +45,19 @@ public class ExpenseController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ExpenseResponse>> list(
+    public ResponseEntity<PagedResult<ExpenseResponse>> list(
             @AuthenticationPrincipal AuthenticatedUser caller,
             @RequestParam Long familyGroupId,
             @RequestParam(required = false) Long paymentAccountId,
             @RequestParam(required = false) Long authorMemberId,
-            @RequestParam(required = false) String month) {
+            @RequestParam(required = false) String month,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "" + ExpenseService.DEFAULT_PAGE_SIZE) int size) {
         // FR-017：家庭範圍隔離，呼叫者須為該家庭群組成員，否則回傳 403
         familyAccess.requireMember(familyGroupId, caller.userId());
-        List<ExpenseResponse> responses = expenseService.list(familyGroupId, paymentAccountId, authorMemberId, month).stream()
-                .map(this::toResponse)
-                .toList();
+        PagedResult<ExpenseResponse> responses = expenseService
+                .listPage(familyGroupId, paymentAccountId, authorMemberId, month, page, size)
+                .map(this::toResponse);
         return ResponseEntity.ok(responses);
     }
 

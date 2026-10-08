@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { register } from '../services/userApi';
+import { getErrorMessage } from '../utils/apiError';
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
@@ -18,8 +19,8 @@ export default function RegisterPage() {
       await register({ email, password });
       setSuccess(true);
       setTimeout(() => navigate('/login'), 1000);
-    } catch (err: any) {
-      setError(err.response?.data?.message ?? '註冊失敗');
+    } catch (err) {
+      setError(getErrorMessage(err, '註冊失敗'));
     } finally {
       setSubmitting(false);
     }

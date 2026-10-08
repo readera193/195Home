@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { getMembers, getMyFamily } from '../services/familyApi';
 import { listAccounts, listExpenses } from '../services/expenseApi';
+
+const PAGE_SIZE = 20;
 
 export default function ExpenseListPage() {
   const { data: myFamily } = useQuery({ queryKey: ['myFamily'], queryFn: getMyFamily });
@@ -20,17 +22,23 @@ export default function ExpenseListPage() {
 
   const [paymentAccountId, setPaymentAccountId] = useState('');
   const [authorMemberId, setAuthorMemberId] = useState('');
+  const [page, setPage] = useState(0);
 
-  const { data: expenses, isLoading } = useQuery({
-    queryKey: ['expenses', familyGroupId, paymentAccountId, authorMemberId],
+  const { data: expensePage, isLoading } = useQuery({
+    queryKey: ['expenses', familyGroupId, paymentAccountId, authorMemberId, page],
     queryFn: () =>
       listExpenses({
         familyGroupId: familyGroupId!,
         paymentAccountId: paymentAccountId ? Number(paymentAccountId) : undefined,
         authorMemberId: authorMemberId ? Number(authorMemberId) : undefined,
+        page,
+        size: PAGE_SIZE,
       }),
     enabled: !!familyGroupId,
+    placeholderData: keepPreviousData,
   });
+  const expenses = expensePage?.items;
+  const totalPages = expensePage?.totalPages ?? 0;
 
   if (!familyGroupId) {
     return <p>您尚未加入任何家庭群組</p>;
@@ -42,7 +50,10 @@ export default function ExpenseListPage() {
 
       <div>
         <label htmlFor="filterAccount">支付帳戶篩選</label>
-        <select id="filterAccount" value={paymentAccountId} onChange={(e) => setPaymentAccountId(e.target.value)}>
+        <select id="filterAccount" value={paymentAccountId} onChange={(e) => {
+            setPaymentAccountId(e.target.value);
+            setPage(0);
+          }}>
           <option value="">全部</option>
           {accounts?.map((account) => (
             <option key={account.accountId} value={account.accountId}>
@@ -52,7 +63,10 @@ export default function ExpenseListPage() {
         </select>
 
         <label htmlFor="filterMember">成員篩選</label>
-        <select id="filterMember" value={authorMemberId} onChange={(e) => setAuthorMemberId(e.target.value)}>
+        <select id="filterMember" value={authorMemberId} onChange={(e) => {
+            setAuthorMemberId(e.target.value);
+            setPage(0);
+          }}>
           <option value="">全部</option>
           {members?.map((member) => (
             <option key={member.familyMemberId} value={member.familyMemberId}>
@@ -86,6 +100,20 @@ export default function ExpenseListPage() {
             ))}
           </tbody>
         </table>
+      )}
+
+      {totalPages > 1 && (
+        <nav aria-label="分頁">
+          <button type="button" onClick={() => setPage((p) => p - 1)} disabled={page === 0}>
+            上一頁
+          </button>
+          <span>
+            第 {page + 1} / {totalPages} 頁（共 {expensePage?.totalElements} 筆）
+          </span>
+          <button type="button" onClick={() => setPage((p) => p + 1)} disabled={page + 1 >= totalPages}>
+            下一頁
+          </button>
+        </nav>
       )}
     </div>
   );

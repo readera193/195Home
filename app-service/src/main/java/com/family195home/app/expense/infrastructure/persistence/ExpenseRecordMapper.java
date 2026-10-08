@@ -25,6 +25,22 @@ public interface ExpenseRecordMapper {
             @Param("monthStart") LocalDateTime monthStart,
             @Param("monthEndExclusive") LocalDateTime monthEndExclusive);
 
+    List<ExpenseRecord> selectPageByFilter(
+            @Param("familyGroupId") Long familyGroupId,
+            @Param("paymentAccountId") Long paymentAccountId,
+            @Param("authorMemberId") Long authorMemberId,
+            @Param("monthStart") LocalDateTime monthStart,
+            @Param("monthEndExclusive") LocalDateTime monthEndExclusive,
+            @Param("offset") int offset,
+            @Param("limit") int limit);
+
+    long countByFilter(
+            @Param("familyGroupId") Long familyGroupId,
+            @Param("paymentAccountId") Long paymentAccountId,
+            @Param("authorMemberId") Long authorMemberId,
+            @Param("monthStart") LocalDateTime monthStart,
+            @Param("monthEndExclusive") LocalDateTime monthEndExclusive);
+
     int tryLock(
             @Param("id") Long id,
             @Param("memberId") Long memberId,

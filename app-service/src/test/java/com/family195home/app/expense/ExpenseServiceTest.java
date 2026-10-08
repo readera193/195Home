@@ -2,6 +2,7 @@ package com.family195home.app.expense;
 
 import com.family195home.app.common.ApiException;
 import com.family195home.app.common.ErrorKind;
+import com.family195home.app.common.PagedResult;
 import com.family195home.app.expense.application.ExpenseRecordRepository;
 import com.family195home.app.expense.domain.ExpenseRecord;
 import com.family195home.app.expense.service.ExpenseService;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -202,5 +204,35 @@ class ExpenseServiceTest {
         record.setNote("原始備註");
         record.setOccurredAt(LocalDateTime.now());
         return record;
+    }
+
+    @Test
+    void listPage_passesOffsetAndComputesTotalPages() {
+        // FR-007、SC-003：第 2 頁（page=1）、每頁 20 筆 → offset 20
+        ExpenseRecord record = new ExpenseRecord();
+        when(expenseRecordRepository.countByFilter(10L, null, null, "2026-09")).thenReturn(45L);
+        when(expenseRecordRepository.findPageByFilter(10L, null, null, "2026-09", 20, 20)).thenReturn(List.of(record));
+
+        PagedResult<ExpenseRecord> result = expenseService.listPage(10L, null, null, "2026-09", 1, 20);
+
+        assertThat(result.items()).containsExactly(record);
+        assertThat(result.page()).isEqualTo(1);
+        assertThat(result.size()).isEqualTo(20);
+        assertThat(result.totalElements()).isEqualTo(45L);
+        assertThat(result.totalPages()).isEqualTo(3);
+    }
+
+    @Test
+    void listPage_rejectsInvalidPageParams() {
+        assertThatThrownBy(() -> expenseService.listPage(10L, null, null, null, -1, 20))
+                .isInstanceOfSatisfying(ApiException.class, e -> {
+                    assertThat(e.getKind()).isEqualTo(ErrorKind.BAD_REQUEST);
+                    assertThat(e.getCode()).isEqualTo("INVALID_PAGE_PARAMS");
+                });
+        assertThatThrownBy(() -> expenseService.listPage(10L, null, null, null, 0, 0))
+                .isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> expenseService.listPage(10L, null, null, null, 0, ExpenseService.MAX_PAGE_SIZE + 1))
+                .isInstanceOf(ApiException.class);
+        verifyNoInteractions(ignoreStubs(expenseRecordRepository));
     }
 }

@@ -1,0 +1,100 @@
+### app-service API 手動測試（VS Code「REST Client」擴充：humao.rest-client）
+### 先以 `docker compose up -d --build` 或 `mvn spring-boot:run -Dspring-boot.run.profiles=dev` 啟動，
+### 再由上而下依序執行；每個請求上方的「Send Request」即可送出。
+### 所有錯誤皆為 RFC 9457 Problem Details（application/problem+json）：status / title / detail / code。
+
+@baseUrl = http://localhost:8080
+@email = demo@example.com
+@password = Passw0rd!
+
+### 1. 註冊
+POST {{baseUrl}}/api/users/register
+Content-Type: application/json
+
+{ "email": "{{email}}", "password": "{{password}}" }
+
+### 2. 登入（取得 JWT，後續請求自動帶入）
+# @name login
+POST {{baseUrl}}/api/users/login
+Content-Type: application/json
+
+{ "email": "{{email}}", "password": "{{password}}" }
+
+###
+@token = {{login.response.body.token}}
+
+### 3. 錯誤格式範例：密碼錯誤 → 401，body 含 code=INVALID_CREDENTIALS
+POST {{baseUrl}}/api/users/login
+Content-Type: application/json
+
+{ "email": "{{email}}", "password": "wrong-password" }
+
+### 4. 錯誤格式範例：未帶 token → 401，code=UNAUTHORIZED
+GET {{baseUrl}}/api/families/me
+
+### 5. 建立家庭群組
+POST {{baseUrl}}/api/families
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "name": "王家" }
+
+### 6. 查詢目前所屬家庭群組（記下 familyGroupId、familyMemberId）
+GET {{baseUrl}}/api/families/me
+Authorization: Bearer {{token}}
+
+###
+@familyGroupId = 1
+@familyMemberId = 1
+
+### 7. 成員列表
+GET {{baseUrl}}/api/families/{{familyGroupId}}/members?includeLeft=true
+Authorization: Bearer {{token}}
+
+### 8. 新增支付帳戶（限管理者）
+POST {{baseUrl}}/api/accounts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "familyGroupId": {{familyGroupId}}, "name": "現金" }
+
+### 9. 支付帳戶列表
+GET {{baseUrl}}/api/accounts?familyGroupId={{familyGroupId}}&status=ALL
+Authorization: Bearer {{token}}
+
+###
+@paymentAccountId = 1
+
+### 10. 新增支出（金額可正可負可零；小數 → 400 AMOUNT_MUST_BE_INTEGER）
+POST {{baseUrl}}/api/expenses
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "familyGroupId": {{familyGroupId}}, "paymentAccountId": {{paymentAccountId}}, "amount": -350, "note": "午餐" }
+
+### 11. 錯誤格式範例：欄位驗證失敗 → 400，code=VALIDATION_ERROR，errors[] 列出各欄位
+POST {{baseUrl}}/api/expenses
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "familyGroupId": {{familyGroupId}}, "paymentAccountId": {{paymentAccountId}}, "amount": 100.5, "note": "" }
+
+### 12. 支出列表（分頁：page 從 0 起算，size 預設 20、上限 100）
+GET {{baseUrl}}/api/expenses?familyGroupId={{familyGroupId}}&page=0&size=20
+Authorization: Bearer {{token}}
+
+### 13. 支出列表 + 篩選 + 月份
+GET {{baseUrl}}/api/expenses?familyGroupId={{familyGroupId}}&paymentAccountId={{paymentAccountId}}&month=2026-09&page=0&size=10
+Authorization: Bearer {{token}}
+
+### 14. 月結統計
+GET {{baseUrl}}/api/statistics/monthly?familyGroupId={{familyGroupId}}&month=2026-09
+Authorization: Bearer {{token}}
+
+### 15. 產生 LINE 綁定碼
+POST {{baseUrl}}/api/families/members/{{familyMemberId}}/line-binding-codes
+Authorization: Bearer {{token}}
+
+### 16. 內部 API（僅 notification-service 使用；dev profile 的預設共用密鑰）
+GET {{baseUrl}}/api/internal/line-bindings
+X-Internal-Token: dev-only-internal-token-change-me

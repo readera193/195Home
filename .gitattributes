@@ -1,0 +1,5 @@
+# 統一換行字元：shell 腳本固定 LF（否則 Windows checkout 後 mvnw 無法在 Docker / CI 執行）
+* text=auto
+*.sh text eol=lf
+mvnw text eol=lf
+*.cmd text eol=crlf

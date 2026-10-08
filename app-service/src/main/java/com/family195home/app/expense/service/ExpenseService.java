@@ -2,6 +2,7 @@ package com.family195home.app.expense.service;
 
 import com.family195home.app.common.ApiException;
 import com.family195home.app.common.ErrorKind;
+import com.family195home.app.common.PagedResult;
 import com.family195home.app.expense.application.ExpenseRecordRepository;
 import com.family195home.app.expense.domain.ExpenseRecord;
 import com.family195home.app.family.application.FamilyAccess;
@@ -19,6 +20,9 @@ import java.util.List;
  */
 @Service
 public class ExpenseService {
+
+    public static final int DEFAULT_PAGE_SIZE = 20;
+    public static final int MAX_PAGE_SIZE = 100;
 
     private final ExpenseRecordRepository expenseRecordRepository;
     private final FamilyAccess familyAccess;
@@ -64,6 +68,21 @@ public class ExpenseService {
         return record;
     }
 
+    // FR-007~FR-010、SC-003：分頁列表；page 從 0 起算，size 上限 MAX_PAGE_SIZE
+    @Transactional(readOnly = true)
+    public PagedResult<ExpenseRecord> listPage(
+            Long familyGroupId, Long paymentAccountId, Long authorMemberId, String month, int page, int size) {
+        if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
+            throw new ApiException(ErrorKind.BAD_REQUEST, "INVALID_PAGE_PARAMS",
+                    "page 須 >= 0，size 須介於 1 到 " + MAX_PAGE_SIZE);
+        }
+        long total = expenseRecordRepository.countByFilter(familyGroupId, paymentAccountId, authorMemberId, month);
+        List<ExpenseRecord> items = expenseRecordRepository.findPageByFilter(
+                familyGroupId, paymentAccountId, authorMemberId, month, page * size, size);
+        return PagedResult.of(items, page, size, total);
+    }
+
+    /** 不分頁的完整查詢，供 statistics 模組彙總整月資料使用。 */
     @Transactional(readOnly = true)
     public List<ExpenseRecord> list(Long familyGroupId, Long paymentAccountId, Long authorMemberId, String month) {
         return expenseRecordRepository.findByFilter(familyGroupId, paymentAccountId, authorMemberId, month);

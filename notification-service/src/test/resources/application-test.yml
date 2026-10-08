@@ -1,0 +1,17 @@
+# 測試專用：固定的假值；資料庫連線由整合測試以 @DynamicPropertySource 指向 Testcontainers
+spring:
+  datasource:
+    username: test
+    password: test
+    url: jdbc:mysql://localhost:3306/notificationdb
+
+app:
+  app-service:
+    base-url: http://localhost:8080
+  internal:
+    token: test-only-internal-token
+
+line:
+  bot:
+    channel-token: test-only-token
+    channel-secret: test-only-secret

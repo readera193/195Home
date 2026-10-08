@@ -14,11 +14,11 @@
 
 **Language/Version**: Java 17（app-service、notification-service，Spring Boot 3.2+）；TypeScript 5.x + React 18（前端，建置後併入 app-service）
 
-**Primary Dependencies**: Spring Boot Web / Validation、MyBatis（`mybatis-spring-boot-starter`，資料庫存取層採 repository 介面 + RepositoryImpl adapter + MyBatis Mapper 分層）、Flyway（`flyway-mysql`，schema migration）、Spring Security + `jjwt`（BCrypt 密碼雜湊、JWT 簽發與本地驗證，於 app-service 內完成，無獨立 Gateway 進程）、Spring Boot Actuator（健康檢查）、MySQL Connector/J（`mysql-connector-j`）、line-bot-sdk-java（LINE Messaging API 官方 SDK，僅 notification-service 使用）；前端：React Router、Axios、TanStack Query (React Query)。**不再使用** Spring Cloud Gateway、Spring Cloud Config Server（見 constitution v3.0.0 技術範疇與邊界）。
+**Primary Dependencies**: Spring Boot Web / Validation、MyBatis（`mybatis-spring-boot-starter`，資料庫存取層採 repository 介面 + RepositoryImpl adapter + MyBatis Mapper 分層）、Flyway（`flyway-mysql`，schema migration）、Spring Security + `jjwt`（BCrypt 密碼雜湊、JWT 簽發與本地驗證，於 app-service 內完成，無獨立 Gateway 進程）、Spring Boot Actuator（健康檢查）、MySQL Connector/J（`mysql-connector-j`）、line-bot-sdk-java（LINE Messaging API 官方 SDK，僅 notification-service 使用）；前端：React Router、Axios、TanStack Query (React Query)、ESLint 9（typescript-eslint）。錯誤回應格式採 Spring 6 內建的 RFC 9457 Problem Details（`ProblemDetail`），業務錯誤以 Exception 丟出，不引入 `Result<T>`（見 research.md 決策 13）。後端兩個服務皆附 Maven Wrapper（`mvnw`）。**不再使用** Spring Cloud Gateway、Spring Cloud Config Server（見 constitution v3.0.0 技術範疇與邊界）。
 
 **Storage**: MySQL（單一執行個體，Docker 容器：官方 `mysql` image，例如 `mysql:8.x`）；依服務資料自主權切分為 2 個 schema——`appdb`（app-service 專用，family/expense/statistics 模組各自擁有獨立資料表，不跨模組共用表）、`notificationdb`（notification-service 專用）；statistics 模組不建立獨立資料表，於 app-service 進程內即時呼叫 expense 模組的 service 方法彙總
 
-**Testing**: JUnit 5 + Mockito + Spring Boot Test（app-service、notification-service 核心商業邏輯單元/整合測試：權限判斷、金額驗證、併發鎖定、月結彙總、LINE 綁定唯一性、排程重試邏輯）；Vitest + React Testing Library（前端關鍵元件測試）
+**Testing**: JUnit 5 + Mockito + Spring Boot Test（app-service、notification-service 核心商業邏輯單元/整合測試：權限判斷、金額驗證、併發鎖定、月結彙總、LINE 綁定唯一性、排程重試邏輯、分頁參數）；MockMvc 驗證錯誤回應格式（Problem Details）與 Security 401；Testcontainers + MySQL 驗證 Flyway migration 與 Mapper SQL（需要 Docker）；Vitest + React Testing Library（前端關鍵元件測試）；ESLint（前端靜態檢查，納入 CI）。測試分類與執行方式見根目錄 `TESTING.md`
 
 **Target Platform**: Docker 容器化服務。本機開發：單一 `docker-compose.yml` 一鍵啟動 app-service、notification-service、MySQL。正式環境：Northflank（Sandbox 免費方案），app-service、notification-service 各自對應 1 個 Northflank service，MySQL 使用 Northflank 提供的 1 個免費 database；GitHub Actions 建置映像檔並推送至 GitHub Container Registry (GHCR)，再觸發 Northflank 對應 service 重新部署最新映像檔
 
@@ -92,15 +92,21 @@ app-service/                       # 單一 Spring Boot 應用：family + expens
 │   │   ├── controller/
 │   │   ├── service/
 │   │   └── dto/
-│   ├── security/                  # JWT 簽發/本地驗證、`X-Internal-Token` 驗證
+│   ├── common/                    # 跨模組共用：ApiException/ErrorKind、GlobalExceptionHandler（Problem Details）、PagedResult
+│   ├── security/                  # JWT 簽發/本地驗證、`X-Internal-Token` 驗證、401/403 的 Problem Details 輸出
 │   └── config/                    # Spring Boot 標準設定類別
 ├── src/main/resources/
-│   ├── application.yml            # 含各環境 profile；正式環境改由 Northflank 環境變數/Secret 覆寫
+│   ├── application.yml            # 共用設定，不含機密預設值
+│   ├── application-dev.yml        # 本機開發預設值（docker-compose 使用）
+│   ├── application-prod.yml       # 正式環境：機密一律由 Northflank 環境變數/Secret 提供，缺少即啟動失敗
 │   ├── mapper/                    # MyBatis XML Mapper（*.xml，依模組分子目錄 family/、expense/）
 │   ├── db/migration/              # Flyway 版本化 migration script（V{n}__xxx.sql，對應 appdb）
-│   └── static/                    # 前端 `npm run build` 產物（由 CI 複製進此目錄後一併打包進映像檔）
-├── src/test/java/.../app/{family,expense,statistics}/
-└── Dockerfile
+│   └── static/                    # 前端 `npm run build` 產物（Docker build 的 frontend-build stage 複製進此目錄後一併打包）
+├── src/test/java/.../app/{family,expense,statistics,common,security}/
+├── src/test/resources/application-test.yml   # 測試用假機密
+├── http/app-service.http          # VS Code REST Client 手動測試腳本
+├── mvnw / mvnw.cmd / .mvn/        # Maven Wrapper
+└── Dockerfile                     # 多階段：frontend-build → maven build → jre；預設 SPRING_PROFILES_ACTIVE=prod
 
 notification-service/              # LINE Bot 整合：Webhook、每月排程推播、關鍵字查詢、發送重試紀錄
 ├── src/main/java/.../notification/
@@ -114,27 +120,35 @@ notification-service/              # LINE Bot 整合：Webhook、每月排程推
 │   ├── dto/
 │   └── scheduler/
 ├── src/main/resources/
-│   ├── application.yml
+│   ├── application.yml            # 共用設定，不含機密預設值
+│   ├── application-dev.yml / application-prod.yml
 │   ├── mapper/                    # MyBatis XML Mapper（*.xml）
 │   └── db/migration/              # Flyway 版本化 migration script（V{n}__xxx.sql，對應 notificationdb）
 ├── src/test/java/.../notification/
+├── src/test/resources/application-test.yml
+├── mvnw / mvnw.cmd / .mvn/        # Maven Wrapper
 └── Dockerfile
 
 frontend/                          # React + TypeScript 前端（獨立開發用專案）
 ├── src/
 │   ├── components/
-│   ├── pages/                     # 群組建立/邀請、支付帳戶、支出紀錄列表、統計頁
+│   ├── pages/                     # 群組建立/邀請、支付帳戶、支出紀錄列表（分頁）、統計頁
 │   ├── services/                  # API 客戶端（同源呼叫 app-service，無需經過任何閘道）
+│   ├── utils/                     # apiError：從 Problem Details 取出 detail / code
 │   └── hooks/
-└── tests/
+├── tests/
+├── eslint.config.js               # ESLint 9 flat config
+└── tsconfig.json / tsconfig.app.json / tsconfig.node.json
 
 docker-compose.yml                 # 一鍵啟動：MySQL + app-service + notification-service
-.github/workflows/ci.yml           # PR/push 觸發 build + test（含前端 build 產物複製進 app-service）
+.github/workflows/ci.yml           # PR/push 觸發：後端 matrix（`./mvnw verify`）＋前端（lint → build → test，並上傳 dist 產物）
 .github/workflows/cd.yml           # build image → push GHCR → 觸發 Northflank 部署 app-service、notification-service
+.vscode/{tasks.json,extensions.json}  # 共用的 VS Code tasks 與推薦擴充套件
+TESTING.md                         # 測試分類、執行方式、profile、Migration 規則
 README.md
 ```
 
-**Structure Decision**: 採用 Option 2（Web application）並依 constitution 規劃為 2 個獨立可建置、可容器化的 Spring Boot 專案目錄：`app-service/`（內部以套件模組 `family`/`expense`/`statistics` 維持業務邊界）與 `notification-service/`；`frontend/` 維持標準 React + TypeScript 開發專案，其建置產物於 CI 階段複製進 `app-service/src/main/resources/static/` 一併打包，不是獨立部署單位；設定使用各服務自身的 `application.yml` + 環境變數。擁有獨立資料庫的兩個服務（app-service、notification-service）的資料存取層仍採 application（repository 介面/port）與 infrastructure/persistence（RepositoryImpl adapter + MyBatis Mapper 介面）分層，SQL 以 `src/main/resources/mapper/` 下的 MyBatis XML Mapper 撰寫；資料庫 schema 以 Flyway migration script（`src/main/resources/db/migration/V{n}__{description}.sql`）版本化管理，app-service 的 migration 對應單一 `appdb` schema（各模組資料表各自獨立，不共用）。
+**Structure Decision**: 採用 Option 2（Web application）並依 constitution 規劃為 2 個獨立可建置、可容器化的 Spring Boot 專案目錄：`app-service/`（內部以套件模組 `family`/`expense`/`statistics` 維持業務邊界）與 `notification-service/`；`frontend/` 維持標準 React + TypeScript 開發專案，其建置產物於 Docker build 階段（`app-service/Dockerfile` 的 `frontend-build` stage，build context 為 repo 根目錄）複製進 `app-service/src/main/resources/static/` 一併打包，不是獨立部署單位；設定使用各服務自身的 `application.yml`（共用）＋ `application-{dev,prod,test}.yml`（依 profile 拆分，須以 `SPRING_PROFILES_ACTIVE` 明確指定）＋ 環境變數，見 research.md 決策 5。擁有獨立資料庫的兩個服務（app-service、notification-service）的資料存取層仍採 application（repository 介面/port）與 infrastructure/persistence（RepositoryImpl adapter + MyBatis Mapper 介面）分層，SQL 以 `src/main/resources/mapper/` 下的 MyBatis XML Mapper 撰寫；資料庫 schema 以 Flyway migration script（`src/main/resources/db/migration/V{n}__{description}.sql`）版本化管理，app-service 的 migration 對應單一 `appdb` schema（各模組資料表各自獨立，不共用）。
 
 ## Complexity Tracking
 

@@ -2,6 +2,7 @@ import React from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { AxiosError, AxiosHeaders } from 'axios';
 import LoginPage from '../src/pages/LoginPage';
 import * as userApi from '../src/services/userApi';
 import { AuthProvider } from '../src/hooks/useAuth';
@@ -24,9 +25,17 @@ describe('LoginPage', () => {
   });
 
   it('顯示驗證錯誤訊息，當登入失敗時', async () => {
-    vi.mocked(userApi.login).mockRejectedValue({
-      response: { data: { message: '帳號或密碼錯誤' } },
-    });
+    // 後端錯誤格式為 RFC 9457 Problem Details：訊息在 detail，錯誤代碼在 code
+    const config = { headers: new AxiosHeaders() };
+    vi.mocked(userApi.login).mockRejectedValue(
+      new AxiosError('Request failed', 'ERR_BAD_REQUEST', config, null, {
+        data: { status: 401, title: 'Unauthorized', detail: '帳號或密碼錯誤', code: 'INVALID_CREDENTIALS' },
+        status: 401,
+        statusText: '',
+        headers: {},
+        config,
+      }),
+    );
 
     renderLoginPage();
 

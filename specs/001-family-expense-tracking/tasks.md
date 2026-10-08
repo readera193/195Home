@@ -199,14 +199,33 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 **Purpose**: 跨 Story 的收尾工作與部署完整性
 
 - [X] T064 [P] 實作 `GET /api/notifications/logs?familyGroupId=&month=` 通知發送紀錄查詢端點（維運/測試用途）於 `notification-service/src/main/java/com/family195home/notification/controller/NotificationLogController.java`
-- [X] T065 [P] 前端建置產物整合：於 CI（`.github/workflows/ci.yml`）中 `frontend` build 完成後，將 `frontend/dist` 產物複製進 `app-service/src/main/resources/static/`，供 app-service 一併打包進映像檔（依 plan.md Project Structure）
+- [X] T065 [P] 前端建置產物整合：由 `app-service/Dockerfile` 的 `frontend-build` stage（build context 為 repo 根目錄）執行 `npm ci && npm run build`，並將 `frontend/dist` 複製進 `app-service/src/main/resources/static/` 一併打包進映像檔；CI 的 `frontend` job 另外上傳 `frontend-dist` artifact 供檢視（依 plan.md Project Structure）
 - [X] T066 [P] 完善 `docker-compose.yml`：加入 app-service、notification-service 健康檢查（Spring Boot Actuator）與 `depends_on` 條件式啟動順序、注入 `application.yml` 對應環境變數
 - [X] T067 [P] 建立 `.github/workflows/cd.yml`：build app-service、notification-service 映像檔 → 推送 GHCR → 觸發 Northflank 對應兩個 service 拉取並部署最新映像檔（見 research.md 決策 1、quickstart.md「部署到 Northflank」段落）
 - [X] T068 [P] 撰寫 `README.md`：系統架構圖、app-service（含 family/expense/statistics 模組）與 notification-service 職責說明、技術選型理由（含「為什麼不用 .NET」「為什麼不用訊息佇列」「為什麼只拆兩個服務，不是完整微服務」之具體回答，依 constitution 開發流程規範）
 - [X] T069 依 [quickstart.md](./quickstart.md) 逐項執行 US1-US6 驗證場景，確認端對端可正常運作
 - [X] T070 [P] 前端關鍵元件測試（Vitest + React Testing Library）：登入表單、支出新增表單驗證邏輯於 `frontend/tests/`
-- [X] T071 [P] app-service（family、expense 模組）、notification-service 補上 MyBatis Mapper slice 測試，驗證自訂 SQL 查詢語意（例如依 `familyGroupId`/`status` 篩選、分頁、排序），於各自 `src/test/java/.../infrastructure/persistence/`
+- [X] T071 [P] app-service（family、expense 模組）、notification-service 補上 MyBatis Mapper slice 測試，驗證自訂 SQL 查詢語意（例如依 `familyGroupId`/`status` 篩選、排序；分頁 SQL 見 T080），於各自 `src/test/java/.../infrastructure/persistence/`
 - [X] T072 [P] app-service、notification-service 補上正式資料庫 integration 測試（Testcontainers + MySQL，比照 task-board-practice `MySqlRepositoryIntegrationTest` 模式），驗證 Flyway migration 可於真實 MySQL 執行且 Mapper SQL 與 MySQL 方言相容，於各自 `src/test/java/.../`
+
+---
+
+## Phase 10: 架構精進（2026-10-08，對照 task-board-practice 後的改善）
+
+**Purpose**: 統一錯誤模型、補上分頁、強化設定與開發體驗；對應 research.md 決策 5、12、13、14、15。各項皆已含測試。
+
+- [X] T073 [P] app-service 統一錯誤模型：`GlobalExceptionHandler` 改為繼承 `ResponseEntityExceptionHandler`，所有錯誤輸出 RFC 9457 Problem Details（`application/problem+json`，含 `code`，驗證失敗另含 `errors[]`）；新增 `ProblemDetails` 工廠，移除 `ErrorResponse`；補上 `DateTimeParseException`→400 `INVALID_DATE_FORMAT`、未預期例外→500 `INTERNAL_ERROR`（不洩漏細節）；保留 `ApiException`／`ErrorKind`，**不引入 Result 型別**，於 `app-service/src/main/java/com/family195home/app/common/`，測試 `GlobalExceptionHandlerTest.java`（research.md 決策 13）
+- [X] T074 [P] Security 層 401／403 回傳 Problem Details：新增 `ProblemDetailAuthHandlers`（`AuthenticationEntryPoint` + `AccessDeniedHandler`）並於 `SecurityConfig` 註冊，於 `app-service/src/main/java/com/family195home/app/security/`，測試 `SecurityErrorResponseTest.java`（`@WebMvcTest`）
+- [X] T075 notification-service 對齊錯誤契約：`ErrorBody` 改讀 Problem Details 的 `code`／`detail`（忽略其餘欄位），錯誤解析抽為 `AppServiceClient.parseError` 並補測試 `AppServiceClientErrorParsingTest.java`；`spring.mvc.problemdetails.enabled=true` 使框架層錯誤格式一致
+- [X] T076 前端錯誤處理對齊：新增 `frontend/src/utils/apiError.ts`（`getErrorMessage`／`getErrorCode`）取代各頁面 `err.response?.data?.message`，移除 `catch (err: any)`；補測試 `frontend/tests/apiError.test.ts`、更新 `LoginPage.test.tsx`
+- [X] T077 支出列表分頁（後端）：新增 `common/PagedResult`、`ExpenseService.listPage`（`page`／`size` 驗證，上限 100，違規 `400 INVALID_PAGE_PARAMS`）、`ExpenseRecordRepository.findPageByFilter`／`countByFilter`、`ExpenseRecordMapper.xml`（共用 `filterWhere`、`ORDER BY occurred_at DESC, id DESC`、`LIMIT/OFFSET`）、`ExpenseController` 回傳分頁結構；statistics 仍走不分頁的 `list`（research.md 決策 14）
+- [X] T078 支出列表分頁（前端）：`expenseApi.listExpenses` 回傳 `PagedResponse`，`ExpenseListPage.tsx` 加上上一頁／下一頁與頁數資訊（切換篩選回第一頁），測試 `frontend/tests/ExpenseListPage.test.tsx`
+- [X] T079 設定依 profile 拆分：兩個服務各自 `application.yml`（無機密預設值）＋ `application-dev.yml`／`application-prod.yml`＋測試 `application-test.yml`；Dockerfile 預設 `SPRING_PROFILES_ACTIVE=prod`、`docker-compose.yml` 覆寫為 `dev`；整合測試加 `@ActiveProfiles("test")`（research.md 決策 5）
+- [X] T080 [P] 整合測試補分頁 SQL：`ExpenseRecordMapperIntegrationTest` 新增 `pageQuery_ordersNewestFirstWithStableTieBreakAndCountsAll`（Testcontainers，需 Docker）
+- [X] T081 [P] 兩個服務加入 Maven Wrapper（`mvnw`、`mvnw.cmd`、`.mvn/wrapper/`，Maven 3.9.9，only-script 型）與根目錄 `.gitattributes`（`mvnw` 固定 LF）；CI 改用 `./mvnw -B verify`，使 T007、quickstart 描述的 `./mvnw` 指令成真
+- [X] T082 [P] 前端工具鏈：新增 `eslint.config.js`（ESLint 9 flat config）、`npm run lint`；tsconfig 拆為 `tsconfig.app.json`／`tsconfig.node.json`（`vite.config.ts` 改由 `vitest/config` 匯入以通過型別檢查）；CI `frontend` job 改為 `npm ci` → `lint` → `build` → `test`；Dockerfile 前端 stage 改用 `npm ci`
+- [X] T083 [P] 開發輔助：`app-service/http/app-service.http`（REST Client）、`.vscode/tasks.json`／`extensions.json`（`.gitignore` 僅放行這兩個檔）、根目錄 `TESTING.md`（測試分類、profile、Migration 規則）；README 同步更新
+- [X] T084 規格書同步：spec.md（第八輪澄清、FR-007／SC-003、US3 情境 5、Assumptions）、contracts（共通約定、分頁、補齊 `familyGroupId` query 與漏列的錯誤代碼）、research.md（決策 5、12、13、14、15）、plan.md、quickstart.md（修正 `X-Internal-Token` 筆誤與測試指令）
 
 ---
 

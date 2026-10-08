@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getMyFamily } from '../services/familyApi';
 import { createAccount, deleteAccount, disableAccount, listAccounts, renameAccount } from '../services/expenseApi';
+import { getErrorMessage } from '../utils/apiError';
 
 export default function PaymentAccountsPage() {
   const queryClient = useQueryClient();
@@ -25,8 +26,8 @@ export default function PaymentAccountsPage() {
       await createAccount(familyGroupId, name);
       setName('');
       queryClient.invalidateQueries({ queryKey: ['accounts', familyGroupId] });
-    } catch (err: any) {
-      setError(err.response?.data?.message ?? '建立支付帳戶失敗');
+    } catch (err) {
+      setError(getErrorMessage(err, '建立支付帳戶失敗'));
     }
   }
 
@@ -35,8 +36,8 @@ export default function PaymentAccountsPage() {
     try {
       await action();
       queryClient.invalidateQueries({ queryKey: ['accounts', familyGroupId] });
-    } catch (err: any) {
-      setError(err.response?.data?.message ?? fallbackMessage);
+    } catch (err) {
+      setError(getErrorMessage(err, fallbackMessage));
     }
   }
 
