@@ -27,6 +27,7 @@ services:
       mysql:
         condition: service_healthy
     environment:
+      SPRING_PROFILES_ACTIVE: dev
       DB_HOST: mysql
       DB_PORT: "3306"
       APPDB_NAME: appdb
@@ -51,6 +52,7 @@ services:
       app-service:
         condition: service_healthy
     environment:
+      SPRING_PROFILES_ACTIVE: dev
       DB_HOST: mysql
       DB_PORT: "3306"
       NOTIFICATIONDB_NAME: notificationdb

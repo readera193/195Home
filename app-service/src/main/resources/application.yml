@@ -1,3 +1,7 @@
+# 共用設定：不含任何機密預設值。
+# 各環境差異放在 application-{dev,prod,test}.yml，須以 SPRING_PROFILES_ACTIVE 明確指定 profile：
+#   dev  → 本機開發（含可公開的開發用預設值，docker-compose 使用）
+#   prod → 正式環境（Northflank），機密一律由環境變數 / Secret Group 提供，缺少時啟動即失敗
 server:
   port: 8080
 
@@ -5,9 +9,9 @@ spring:
   application:
     name: app-service
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${APPDB_NAME:appdb}?useUnicode=true&characterEncoding=utf8mb4&serverTimezone=UTC
-    username: ${DB_USERNAME:app}
-    password: ${DB_PASSWORD:app}
+    url: jdbc:mysql://${DB_HOST}:${DB_PORT:3306}/${APPDB_NAME:appdb}?useUnicode=true&characterEncoding=utf8mb4&serverTimezone=UTC
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
   flyway:
     enabled: true
@@ -29,20 +33,11 @@ management:
 
 app:
   jwt:
-    secret: ${JWT_SECRET:dev-only-secret-key-change-me-please-32bytes+}
+    secret: ${JWT_SECRET}
     expiration-minutes: 120
   internal:
-    token: ${INTERNAL_TOKEN:dev-only-internal-token-change-me}
+    token: ${INTERNAL_TOKEN}
   line-binding-code:
     ttl-minutes: 10
   expense-lock:
     ttl-minutes: 5
-
----
-spring:
-  config:
-    activate:
-      on-profile: dev
-logging:
-  level:
-    com.family195home: DEBUG

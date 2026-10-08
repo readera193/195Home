@@ -1,0 +1,73 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "compose: up",
+      "type": "shell",
+      "command": "docker compose up -d --build",
+      "problemMatcher": []
+    },
+    {
+      "label": "compose: down (清除資料)",
+      "type": "shell",
+      "command": "docker compose down -v",
+      "problemMatcher": []
+    },
+    {
+      "label": "app-service: test",
+      "type": "shell",
+      "command": "./mvnw -B test",
+      "options": { "cwd": "${workspaceFolder}/app-service" },
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "app-service: test (略過需 Docker 的整合測試)",
+      "type": "shell",
+      "command": "./mvnw -B test -Dtest='!*IntegrationTest'",
+      "options": { "cwd": "${workspaceFolder}/app-service" },
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "app-service: run (dev profile)",
+      "type": "shell",
+      "command": "./mvnw spring-boot:run -Dspring-boot.run.profiles=dev",
+      "options": { "cwd": "${workspaceFolder}/app-service" },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "notification-service: test",
+      "type": "shell",
+      "command": "./mvnw -B test",
+      "options": { "cwd": "${workspaceFolder}/notification-service" },
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "notification-service: run (dev profile)",
+      "type": "shell",
+      "command": "./mvnw spring-boot:run -Dspring-boot.run.profiles=dev",
+      "options": { "cwd": "${workspaceFolder}/notification-service" },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "frontend: dev",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "frontend: lint + test + build",
+      "type": "shell",
+      "command": "npm run lint && npm test && npm run build",
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "group": "test",
+      "problemMatcher": []
+    }
+  ]
+}

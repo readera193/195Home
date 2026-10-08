@@ -6,6 +6,7 @@ import com.family195home.notification.infrastructure.persistence.NotificationLog
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.MySQLContainer;
@@ -22,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 與 MySQL 方言相容（見 tasks.md T071/T072）。
  */
 @Testcontainers
+@ActiveProfiles("test")
 @SpringBootTest(properties = {
         // line-bot-spring-boot 的自動組態需要非空白的 channel token/secret 才能建立 Bean，
         // 本測試僅驗證資料庫存取層，故帶入測試用假值即可，不會真的呼叫 LINE API

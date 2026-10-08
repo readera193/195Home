@@ -22,6 +22,13 @@ public interface ExpenseRecordRepository {
      */
     List<ExpenseRecord> findByFilter(Long familyGroupId, Long paymentAccountId, Long authorMemberId, String month);
 
+    /** 同 {@link #findByFilter}，加上分頁（依 occurred_at、id 由新到舊）；offset 為略過筆數。 */
+    List<ExpenseRecord> findPageByFilter(
+            Long familyGroupId, Long paymentAccountId, Long authorMemberId, String month, int offset, int limit);
+
+    /** 符合篩選條件的總筆數，供分頁計算總頁數。 */
+    long countByFilter(Long familyGroupId, Long paymentAccountId, Long authorMemberId, String month);
+
     /**
      * 條件式 UPDATE 取得鎖：僅當目前未鎖定或鎖已逾時才會成功，回傳影響列數（見 research.md 決策 3）。
      */

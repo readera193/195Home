@@ -15,6 +15,7 @@
 ## 3. 併發編輯鎖定機制（FR-027）
 
 - **Decision**: 於 app-service 的 `expense_records` 資料表（schema `appdb`）新增 `locked_by_member_id`、`locked_at` 欄位。取得編輯權時以單一交易執行條件式 UPDATE：`WHERE id = ? AND (locked_by_member_id IS NULL OR locked_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 MINUTE))`，影響列數為 1 才視為取得鎖；儲存或取消編輯時清除鎖定欄位；鎖定 TTL 設為 5 分鐘，避免使用者異常關閉頁面導致永久鎖死。
+- **釋放規則**: `unlock` 須為紀錄所屬群組的在職成員；鎖仍有效且由他人持有時拒絕（`LOCK_NOT_HELD_BY_CALLER`），未鎖定或已逾時則冪等成功。
 - **Rationale**: 善用既有 MySQL 交易機制即可達成互斥控制，不需引入 Redis 等分散式鎖工具，符合技術邊界限制（不得新增資料庫技術）與原則 VI（可讀性優先）。
 
 ## 4. 統計資料計算策略（FR-011）
@@ -24,8 +25,8 @@
 
 ## 5. 設定管理方式
 
-- **Decision**: 不使用 Spring Cloud Config Server。app-service、notification-service 各自使用 Spring Boot 標準的 `application.yml`（含 `dev`/`prod` profile），機密設定（資料庫連線字串、JWT 簽章密鑰、`X-Internal-Token` 共用密鑰、LINE channel secret/token）於正式環境改由 Northflank 的 Secret Group 掛載為環境變數覆寫，本機開發則透過 `docker-compose.yml` 的 `environment` 區塊注入。
-- **Rationale**: 服務數量僅 2 個，集中式 Config Server 對於「2 個服務共用少量設定」的規模而言，維運價值遠低於其占用一個獨立部署單位的成本（在 Northflank 免費方案下尤其昂貴——會多佔用寶貴的 service 額度）；Northflank 原生的環境變數/Secret 管理已可達到「機密不寫死於程式碼」的核心目的。
+- **Decision**: 不使用 Spring Cloud Config Server。app-service、notification-service 各自使用 Spring Boot 標準設定檔，**依 profile 拆檔**：`application.yml`（共用、不含任何機密預設值）＋ `application-dev.yml`（本機開發的公開預設值）＋ `application-prod.yml`（正式環境，機密無預設值）＋ `src/test/resources/application-test.yml`（測試用假值）。須以 `SPRING_PROFILES_ACTIVE` 明確指定 profile，**不設預設 profile**：Docker image 內建 `prod`，docker-compose 覆寫為 `dev`，整合測試以 `@ActiveProfiles("test")` 啟用 `test`。機密設定（資料庫連線、JWT 簽章密鑰、`X-Internal-Token` 共用密鑰、LINE channel secret/token）在正式環境由 Northflank 的 Secret Group 掛載為環境變數；`prod` 缺少任一必要環境變數時應用程式啟動即失敗（fail-fast）。
+- **Rationale**: 服務數量僅 2 個，集中式 Config Server 對於「2 個服務共用少量設定」的規模而言，維運價值遠低於其占用一個獨立部署單位的成本（在 Northflank 免費方案下尤其昂貴——會多佔用寶貴的 service 額度）；Northflank 原生的環境變數/Secret 管理已可達到「機密不寫死於程式碼」的核心目的。將開發用預設值移到 `application-dev.yml`、base 設定不留機密預設值，可避免忘了設定環境變數時 prod 悄悄使用 dev 密鑰。
 
 ## 6. 服務間通訊與服務發現
 
@@ -36,8 +37,9 @@
 
 - **Decision**:
   - Spring Security 搭配 BCrypt 雜湊密碼儲存於 app-service（family 模組）；登入成功後由 app-service 核發 **JWT**（HS256，簽章密鑰為 app-service 自身設定），Claim 包含 `sub`(userId)、`email`、`iat`、`exp`（有效期 2 小時）。
-  - 前端後續請求以 `Authorization: Bearer <JWT>` 帶入；app-service 內建 Spring Security filter **本地驗證**簽章與過期時間，驗證失敗回傳 `401`。**無獨立 Gateway 進程**——app-service 本身就是驗證與業務邏輯的唯一入口。
+  - 前端後續請求以 `Authorization: Bearer <JWT>` 帶入；app-service 內建 Spring Security filter **本地驗證**簽章與過期時間，驗證失敗回傳 `401`（Problem Details 格式，`code = UNAUTHORIZED`，見決策 13）。**無獨立 Gateway 進程**——app-service 本身就是驗證與業務邏輯的唯一入口。
   - 家庭成員角色（ADMIN/MEMBER）與在職狀態屬於可變動狀態，不放入 JWT claim；expense、statistics 模組需要判斷「當下角色/是否仍在職」時（例如編輯他人支出紀錄、月結統計歸屬驗證），**直接呼叫 family 模組的 service 方法**確認（同進程方法呼叫），避免已被踢出或角色已轉移的成員在 JWT 到期前仍持有舊權限。
+  - notification-service 自身的維運端點 `/api/notifications/**` 同樣以 `X-Internal-Token` 保護（`HandlerInterceptor`，常數時間比較），避免通知紀錄（含 LINE userId）被匿名讀取；LINE Webhook 仍由 `X-Line-Signature` 驗證。
   - notification-service 呼叫 app-service 的內部端點（取得所有 LINE 綁定清單、依綁定身分查詢月結彙總、消費綁定碼完成綁定）**無平台使用者 JWT**，改以服務間共用密鑰 Header `X-Internal-Token` 驗證呼叫來源為受信任的服務；此為系統中唯一保留的跨進程身分驗證機制。
   - 登出僅為前端捨棄 token 的客戶端行為；JWT 為無狀態設計，本階段不提供伺服器端強制註銷機制（如黑名單），屬可接受的簡化。
 - **Rationale**: 驗證與業務邏輯同在 app-service 一個進程內，直接以 Spring Security filter + service 方法呼叫確認角色即可，無需額外網路呼叫與重複的 JWT 解析邏輯。`X-Internal-Token` 機制對唯一的跨進程呼叫（notification-service → app-service）仍保留，因這是系統中唯一真正需要「服務對服務信任」的情境。
@@ -65,7 +67,24 @@
 ## 12. Schema Migration 工具
 
 - **Decision**: app-service、notification-service 皆採用 Flyway（`flyway-mysql`）管理各自 schema，migration script 置於 `src/main/resources/db/migration/`，命名慣例 `V{n}__{description}.sql`。app-service 的 migration 歷程對應單一 `appdb`，涵蓋 family/expense/statistics 三個模組的資料表建立與變更。
+- **版本規則**: 已合併到 `dev` / `main` 的 migration **不得修改**（Flyway 以 checksum 驗證，已部署的資料庫會因此啟動失敗）；任何 schema 變更一律新增下一個版本號（例如先 `V2` 加欄位、必要時再以 `V3` 改為 NOT NULL）。
 - **Rationale**: MyBatis 不像 JPA 有 `ddl-auto` 可隱含建表，需要顯式、可版本控制的 schema 定義；`flyway-mysql` 與 MySQL 相容，且與 constitution 原則 VI（可讀性、可解釋性）一致。
+
+## 13. API 錯誤模型
+
+- **Decision**: 全站（app-service 為主，notification-service 的框架層錯誤亦同）以 RFC 9457 Problem Details（`application/problem+json`）回應錯誤，欄位為 `status`、`title`、`detail`、`instance`，外加自訂的穩定錯誤代碼 `code`（驗證失敗時另有 `errors[]`）。業務錯誤**一律以 Exception 丟出**（`ApiException(ErrorKind, code, message)`），由單一 `GlobalExceptionHandler`（繼承 `ResponseEntityExceptionHandler`）轉換；Spring Security 在 filter 層的 401 / 403 由 `ProblemDetailAuthHandlers` 輸出相同格式。**不引入 `Result<T>` 型別**，也不維護 Result 與 Exception 兩套錯誤傳遞方式。
+- **Rationale**: ProblemDetail 是 Spring 6 內建標準，前端只需一套邏輯（讀 `detail` 顯示、讀 `code` 分支）；`code` 讓 notification-service 與前端不必比對訊息文字。Exception 搭配 `@RestControllerAdvice` 是 Spring 生態的慣用寫法，已有的 service 與測試無需改寫，也符合原則 VI（不為展示而引入額外抽象）。
+- **Alternatives considered**: `Result<T>`（需要 service、controller 全面改寫，且與既有 Exception 風格並存會混亂，已排除）。
+
+## 14. 列表分頁
+
+- **Decision**: 支出紀錄列表（`GET /api/expenses`）採 offset 分頁：query `page`（從 0 起算）、`size`（預設 20、上限 100），回應為 `{ items, page, size, totalElements, totalPages }`，排序固定為 `occurred_at DESC, id DESC`（`id` 為次要排序鍵，確保 `occurred_at` 相同時翻頁不重複不遺漏）。月結統計走 expense 模組同進程的不分頁查詢。支付帳戶、成員等天然小量的清單不分頁。
+- **Rationale**: 支出紀錄會隨時間無上限累積，是唯一需要分頁的清單；家庭規模下 offset 分頁足夠簡單，既有複合索引加上 `LIMIT/OFFSET` 即可滿足 SC-003，不需 keyset 分頁的額外複雜度。
+
+## 15. 前端工具鏈與開發輔助
+
+- **Decision**: 前端採 ESLint 9（flat config，`typescript-eslint` + `react-hooks` + `react-refresh`），tsconfig 拆為 `tsconfig.app.json`（`src/`、`tests/`）與 `tsconfig.node.json`（`vite.config.ts`），`npm run build` 以 `tsc -b` 型別檢查；CI 依序執行 `npm ci` → `lint` → `build` → `test`。後端兩個服務提供 Maven Wrapper（`mvnw`），本機、CI 與文件指令一律使用 `./mvnw`。開發輔助檔：`app-service/http/app-service.http`（REST Client 手動測試）、`.vscode/tasks.json` 與 `extensions.json`（共用，其餘 `.vscode/` 內容不納入版控）、根目錄 `TESTING.md`（測試分類、profile、Migration 規則）。
+- **Rationale**: lint 與型別檢查納入 CI 可擋下 `any` 濫用等問題；Maven Wrapper 固定建置版本，消除「我的電腦可以、CI 不行」；`.http` 與 tasks 讓新加入者以最少步驟操作與驗證系統（呼應 constitution 原則 VII 的低門檻精神）。
 
 ---
 

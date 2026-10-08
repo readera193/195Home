@@ -2,6 +2,7 @@ package com.family195home.app.config;
 
 import com.family195home.app.security.InternalTokenFilter;
 import com.family195home.app.security.JwtAuthFilter;
+import com.family195home.app.security.ProblemDetailAuthHandlers;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -17,10 +18,13 @@ public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
     private final InternalTokenFilter internalTokenFilter;
+    private final ProblemDetailAuthHandlers authHandlers;
 
-    public SecurityConfig(JwtAuthFilter jwtAuthFilter, InternalTokenFilter internalTokenFilter) {
+    public SecurityConfig(
+            JwtAuthFilter jwtAuthFilter, InternalTokenFilter internalTokenFilter, ProblemDetailAuthHandlers authHandlers) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.internalTokenFilter = internalTokenFilter;
+        this.authHandlers = authHandlers;
     }
 
     @Bean
@@ -28,6 +32,9 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(handling -> handling
+                        .authenticationEntryPoint(authHandlers)
+                        .accessDeniedHandler(authHandlers))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.POST, "/api/users/register", "/api/users/login").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()

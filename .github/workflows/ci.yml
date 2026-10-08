@@ -21,7 +21,8 @@ jobs:
           cache: maven
       - name: Build and test ${{ matrix.service }}
         working-directory: ${{ matrix.service }}
-        run: mvn -B verify
+        # 使用 Maven Wrapper，本機與 CI 的 Maven 版本一致；整合測試需要 Docker（Testcontainers，ubuntu-latest 已內建）
+        run: ./mvnw -B verify
 
   frontend:
     runs-on: ubuntu-latest
@@ -34,7 +35,10 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Install dependencies
         working-directory: frontend
-        run: npm install
+        run: npm ci
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
       - name: Build
         working-directory: frontend
         run: npm run build

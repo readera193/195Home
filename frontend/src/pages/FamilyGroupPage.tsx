@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { createFamilyGroup, getMyFamily, joinFamilyGroup } from '../services/familyApi';
+import { getErrorMessage } from '../utils/apiError';
 
 export default function FamilyGroupPage() {
   const queryClient = useQueryClient();
@@ -17,8 +18,8 @@ export default function FamilyGroupPage() {
     try {
       await createFamilyGroup(groupName);
       queryClient.invalidateQueries({ queryKey: ['myFamily'] });
-    } catch (err: any) {
-      setError(err.response?.data?.message ?? '建立群組失敗');
+    } catch (err) {
+      setError(getErrorMessage(err, '建立群組失敗'));
     }
   }
 
@@ -28,8 +29,8 @@ export default function FamilyGroupPage() {
     try {
       await joinFamilyGroup(inviteCode);
       queryClient.invalidateQueries({ queryKey: ['myFamily'] });
-    } catch (err: any) {
-      setError(err.response?.data?.message ?? '加入群組失敗');
+    } catch (err) {
+      setError(getErrorMessage(err, '加入群組失敗'));
     }
   }
 

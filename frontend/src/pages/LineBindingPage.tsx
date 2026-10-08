@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { generateLineBindingCode, getMyFamily } from '../services/familyApi';
+import { getErrorMessage } from '../utils/apiError';
 
 export default function LineBindingPage() {
   const { data: myFamily } = useQuery({ queryKey: ['myFamily'], queryFn: getMyFamily });
@@ -26,8 +27,8 @@ export default function LineBindingPage() {
       const response = await generateLineBindingCode(myFamily.familyMemberId);
       setCode(response.code);
       setExpiresAt(response.expiresAt);
-    } catch (err: any) {
-      setError(err.response?.data?.message ?? '產生綁定碼失敗');
+    } catch (err) {
+      setError(getErrorMessage(err, '產生綁定碼失敗'));
     }
   }
 

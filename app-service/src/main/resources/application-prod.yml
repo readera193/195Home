@@ -1,0 +1,11 @@
+# 正式環境：機密（DB_HOST / DB_USERNAME / DB_PASSWORD / JWT_SECRET / INTERNAL_TOKEN）
+# 皆無預設值，由 Northflank 環境變數 / Secret Group 提供，缺少任一項時應用程式啟動失敗（fail-fast）。
+logging:
+  level:
+    root: INFO
+    com.family195home: INFO
+
+management:
+  endpoint:
+    health:
+      show-details: never

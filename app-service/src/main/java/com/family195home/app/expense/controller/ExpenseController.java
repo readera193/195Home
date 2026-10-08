@@ -1,7 +1,9 @@
 package com.family195home.app.expense.controller;
 
+import com.family195home.app.common.PagedResult;
 import com.family195home.app.expense.application.PaymentAccountRepository;
 import com.family195home.app.expense.domain.ExpenseRecord;
+import com.family195home.app.expense.domain.PaymentAccount;
 import com.family195home.app.expense.dto.CreateExpenseRequest;
 import com.family195home.app.expense.dto.ExpenseResponse;
 import com.family195home.app.expense.dto.LockResponse;
@@ -16,7 +18,9 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/expenses")
@@ -45,17 +49,22 @@ public class ExpenseController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ExpenseResponse>> list(
+    public ResponseEntity<PagedResult<ExpenseResponse>> list(
             @AuthenticationPrincipal AuthenticatedUser caller,
             @RequestParam Long familyGroupId,
             @RequestParam(required = false) Long paymentAccountId,
             @RequestParam(required = false) Long authorMemberId,
-            @RequestParam(required = false) String month) {
+            @RequestParam(required = false) String month,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "" + ExpenseService.DEFAULT_PAGE_SIZE) int size) {
         // FR-017：家庭範圍隔離，呼叫者須為該家庭群組成員，否則回傳 403
         familyAccess.requireMember(familyGroupId, caller.userId());
-        List<ExpenseResponse> responses = expenseService.list(familyGroupId, paymentAccountId, authorMemberId, month).stream()
-                .map(this::toResponse)
-                .toList();
+        // 帳戶名稱整個群組只查一次（避免每筆紀錄各查一次 N+1）
+        Map<Long, String> accountNames = paymentAccountRepository.findByGroupId(familyGroupId, null).stream()
+                .collect(Collectors.toMap(PaymentAccount::getId, PaymentAccount::getName));
+        PagedResult<ExpenseResponse> responses = expenseService
+                .listPage(familyGroupId, paymentAccountId, authorMemberId, month, page, size)
+                .map(record -> toResponse(record, accountNames::get));
         return ResponseEntity.ok(responses);
     }
 
@@ -93,18 +102,21 @@ public class ExpenseController {
     }
 
     @PostMapping("/{expenseId}/unlock")
-    public ResponseEntity<Void> unlock(@PathVariable Long expenseId) {
-        expenseService.unlock(expenseId);
+    public ResponseEntity<Void> unlock(
+            @AuthenticationPrincipal AuthenticatedUser caller, @PathVariable Long expenseId) {
+        expenseService.unlock(expenseId, caller.userId());
         return ResponseEntity.noContent().build();
     }
 
     private ExpenseResponse toResponse(ExpenseRecord record) {
-        String accountName = paymentAccountRepository.findById(record.getPaymentAccountId())
-                .map(a -> a.getName())
-                .orElse(null);
+        return toResponse(record, id -> paymentAccountRepository.findById(id).map(PaymentAccount::getName).orElse(null));
+    }
+
+    private ExpenseResponse toResponse(ExpenseRecord record, Function<Long, String> accountNameLookup) {
         boolean locked = expenseService.isCurrentlyLocked(record);
         return new ExpenseResponse(
                 record.getId(), record.getAmount(), record.getNote(), record.getOccurredAt(),
-                record.getPaymentAccountId(), accountName, record.getAuthorMemberId(), locked);
+                record.getPaymentAccountId(), accountNameLookup.apply(record.getPaymentAccountId()),
+                record.getAuthorMemberId(), locked);
     }
 }

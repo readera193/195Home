@@ -1,0 +1,12 @@
+# 正式環境：機密與連線資訊（DB_HOST / DB_USERNAME / DB_PASSWORD / APP_SERVICE_BASE_URL /
+# INTERNAL_TOKEN / LINE_CHANNEL_TOKEN / LINE_CHANNEL_SECRET）皆由 Northflank 環境變數 / Secret Group 提供，
+# 其中無預設值者缺少時應用程式啟動失敗（fail-fast）。
+logging:
+  level:
+    root: INFO
+    com.family195home: INFO
+
+management:
+  endpoint:
+    health:
+      show-details: never

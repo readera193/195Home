@@ -2,6 +2,7 @@ package com.family195home.app.expense.service;
 
 import com.family195home.app.common.ApiException;
 import com.family195home.app.common.ErrorKind;
+import com.family195home.app.common.PagedResult;
 import com.family195home.app.expense.application.ExpenseRecordRepository;
 import com.family195home.app.expense.domain.ExpenseRecord;
 import com.family195home.app.family.application.FamilyAccess;
@@ -19,6 +20,9 @@ import java.util.List;
  */
 @Service
 public class ExpenseService {
+
+    public static final int DEFAULT_PAGE_SIZE = 20;
+    public static final int MAX_PAGE_SIZE = 100;
 
     private final ExpenseRecordRepository expenseRecordRepository;
     private final FamilyAccess familyAccess;
@@ -64,6 +68,21 @@ public class ExpenseService {
         return record;
     }
 
+    // FR-007~FR-010、SC-003：分頁列表；page 從 0 起算，size 上限 MAX_PAGE_SIZE
+    @Transactional(readOnly = true)
+    public PagedResult<ExpenseRecord> listPage(
+            Long familyGroupId, Long paymentAccountId, Long authorMemberId, String month, int page, int size) {
+        if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
+            throw new ApiException(ErrorKind.BAD_REQUEST, "INVALID_PAGE_PARAMS",
+                    "page 須 >= 0，size 須介於 1 到 " + MAX_PAGE_SIZE);
+        }
+        long total = expenseRecordRepository.countByFilter(familyGroupId, paymentAccountId, authorMemberId, month);
+        List<ExpenseRecord> items = expenseRecordRepository.findPageByFilter(
+                familyGroupId, paymentAccountId, authorMemberId, month, page * size, size);
+        return PagedResult.of(items, page, size, total);
+    }
+
+    /** 不分頁的完整查詢，供 statistics 模組彙總整月資料使用。 */
     @Transactional(readOnly = true)
     public List<ExpenseRecord> list(Long familyGroupId, Long paymentAccountId, Long authorMemberId, String month) {
         return expenseRecordRepository.findByFilter(familyGroupId, paymentAccountId, authorMemberId, month);
@@ -85,7 +104,18 @@ public class ExpenseService {
         return findRequired(expenseId);
     }
 
-    public void unlock(Long expenseId) {
+    // 取消編輯時釋放鎖：呼叫者須為該群組在職成員；鎖仍有效且由他人持有時拒絕（FR-017、FR-027）。
+    // 紀錄未被鎖定或鎖已逾時則視為已釋放，不報錯（冪等）
+    @Transactional
+    public void unlock(Long expenseId, Long callerUserId) {
+        ExpenseRecord record = findRequired(expenseId);
+        FamilyAccess.MemberRef caller = familyAccess.requireMember(record.getFamilyGroupId(), callerUserId);
+        if (record.getLockedByMemberId() == null) {
+            return;
+        }
+        if (!record.getLockedByMemberId().equals(caller.memberId()) && isCurrentlyLocked(record)) {
+            throw new ApiException(ErrorKind.FORBIDDEN, "LOCK_NOT_HELD_BY_CALLER", "此紀錄正由其他成員編輯中，無法解除鎖定");
+        }
         expenseRecordRepository.releaseLock(expenseId);
     }
 

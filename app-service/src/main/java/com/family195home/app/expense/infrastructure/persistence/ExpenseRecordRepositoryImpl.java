@@ -49,14 +49,33 @@ public class ExpenseRecordRepositoryImpl implements ExpenseRecordRepository {
 
     @Override
     public List<ExpenseRecord> findByFilter(Long familyGroupId, Long paymentAccountId, Long authorMemberId, String month) {
-        LocalDateTime monthStart = null;
-        LocalDateTime monthEndExclusive = null;
-        if (month != null && !month.isBlank()) {
+        MonthRange range = MonthRange.parse(month);
+        return mapper.selectByFilter(familyGroupId, paymentAccountId, authorMemberId, range.start(), range.endExclusive());
+    }
+
+    @Override
+    public List<ExpenseRecord> findPageByFilter(
+            Long familyGroupId, Long paymentAccountId, Long authorMemberId, String month, int offset, int limit) {
+        MonthRange range = MonthRange.parse(month);
+        return mapper.selectPageByFilter(
+                familyGroupId, paymentAccountId, authorMemberId, range.start(), range.endExclusive(), offset, limit);
+    }
+
+    @Override
+    public long countByFilter(Long familyGroupId, Long paymentAccountId, Long authorMemberId, String month) {
+        MonthRange range = MonthRange.parse(month);
+        return mapper.countByFilter(familyGroupId, paymentAccountId, authorMemberId, range.start(), range.endExclusive());
+    }
+
+    /** "YYYY-MM" 轉成 [月初, 下月初) 區間；month 為空時不限定月份（兩端皆 null）。 */
+    private record MonthRange(LocalDateTime start, LocalDateTime endExclusive) {
+        static MonthRange parse(String month) {
+            if (month == null || month.isBlank()) {
+                return new MonthRange(null, null);
+            }
             YearMonth yearMonth = YearMonth.parse(month, YEAR_MONTH_FORMAT);
-            monthStart = yearMonth.atDay(1).atStartOfDay();
-            monthEndExclusive = yearMonth.plusMonths(1).atDay(1).atStartOfDay();
+            return new MonthRange(yearMonth.atDay(1).atStartOfDay(), yearMonth.plusMonths(1).atDay(1).atStartOfDay());
         }
-        return mapper.selectByFilter(familyGroupId, paymentAccountId, authorMemberId, monthStart, monthEndExclusive);
     }
 
     @Override

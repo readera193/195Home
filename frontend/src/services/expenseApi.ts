@@ -53,14 +53,25 @@ export function createExpense(input: CreateExpenseInput): Promise<ExpenseRespons
   return apiClient.post('/expenses', input).then((res) => res.data);
 }
 
+/** 分頁回應，page 從 0 起算（對應後端 PagedResult）。 */
+export interface PagedResponse<T> {
+  items: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
 export interface ListExpensesParams {
   familyGroupId: number;
   paymentAccountId?: number;
   authorMemberId?: number;
   month?: string;
+  page?: number;
+  size?: number;
 }
 
-export function listExpenses(params: ListExpensesParams): Promise<ExpenseResponse[]> {
+export function listExpenses(params: ListExpensesParams): Promise<PagedResponse<ExpenseResponse>> {
   return apiClient.get('/expenses', { params }).then((res) => res.data);
 }
 

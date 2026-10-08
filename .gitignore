@@ -17,7 +17,10 @@ frontend/coverage/
 # IDE / OS
 .idea/
 *.iml
-.vscode/
+# 個人編輯器設定不納入版控，但共用的 tasks / 推薦擴充套件要保留
+.vscode/*
+!.vscode/tasks.json
+!.vscode/extensions.json
 .DS_Store
 Thumbs.db
 

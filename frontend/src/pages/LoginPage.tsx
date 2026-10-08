@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { login } from '../services/userApi';
 import { useAuth } from '../hooks/useAuth';
+import { getErrorMessage } from '../utils/apiError';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -19,8 +20,8 @@ export default function LoginPage() {
       const response = await login({ email, password });
       auth.login(response.token);
       navigate('/');
-    } catch (err: any) {
-      setError(err.response?.data?.message ?? '登入失敗，請確認帳號密碼');
+    } catch (err) {
+      setError(getErrorMessage(err, '登入失敗，請確認帳號密碼'));
     } finally {
       setSubmitting(false);
     }

@@ -77,11 +77,18 @@ public class AppServiceClient {
     }
 
     private AppServiceClientException toClientException(WebClientResponseException e) {
+        return parseError(objectMapper, e.getStatusCode().value(), e.getResponseBodyAsString(), e.getMessage());
+    }
+
+    /** 解析 app-service 的 Problem Details 錯誤本體；本體無法解析時以 UNKNOWN 錯誤代碼回報。 */
+    static AppServiceClientException parseError(ObjectMapper objectMapper, int statusCode, String responseBody, String fallbackMessage) {
         try {
-            ErrorBody body = objectMapper.readValue(e.getResponseBodyAsString(), ErrorBody.class);
-            return new AppServiceClientException(e.getStatusCode().value(), body.code(), body.message());
+            ErrorBody body = objectMapper.readValue(responseBody, ErrorBody.class);
+            String code = body.code() != null ? body.code() : "UNKNOWN";
+            String message = body.detail() != null ? body.detail() : fallbackMessage;
+            return new AppServiceClientException(statusCode, code, message);
         } catch (Exception parseError) {
-            return new AppServiceClientException(e.getStatusCode().value(), "UNKNOWN", e.getMessage());
+            return new AppServiceClientException(statusCode, "UNKNOWN", fallbackMessage);
         }
     }
 }

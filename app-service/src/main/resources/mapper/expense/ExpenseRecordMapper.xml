@@ -42,8 +42,7 @@
         SELECT * FROM expense_records WHERE id = #{id}
     </select>
 
-    <select id="selectByFilter" resultMap="ExpenseRecordResultMap">
-        SELECT * FROM expense_records
+    <sql id="filterWhere">
         WHERE family_group_id = #{familyGroupId}
         <if test="paymentAccountId != null">
             AND payment_account_id = #{paymentAccountId}
@@ -54,7 +53,25 @@
         <if test="monthStart != null">
             AND occurred_at &gt;= #{monthStart} AND occurred_at &lt; #{monthEndExclusive}
         </if>
-        ORDER BY occurred_at DESC
+    </sql>
+
+    <select id="selectByFilter" resultMap="ExpenseRecordResultMap">
+        SELECT * FROM expense_records
+        <include refid="filterWhere"/>
+        ORDER BY occurred_at DESC, id DESC
+    </select>
+
+    <!-- 分頁：加上 id 作為次要排序鍵，確保 occurred_at 相同時翻頁結果穩定 -->
+    <select id="selectPageByFilter" resultMap="ExpenseRecordResultMap">
+        SELECT * FROM expense_records
+        <include refid="filterWhere"/>
+        ORDER BY occurred_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByFilter" resultType="long">
+        SELECT COUNT(*) FROM expense_records
+        <include refid="filterWhere"/>
     </select>
 
     <!-- 條件式 UPDATE 取得鎖（research.md 決策 3）：僅當目前未鎖定或鎖已逾時（lockExpiredBefore 之前）才會成功 -->

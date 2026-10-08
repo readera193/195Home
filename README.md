@@ -42,7 +42,8 @@
 | 資料庫存取 | MyBatis + Flyway | 顯式 SQL、可讀性優先，避免 JPA 隱性行為 |
 | 身份驗證 | Spring Security + JWT（jjwt） | app-service 內建本地驗證，無需獨立 Gateway |
 | 服務間通訊 | 同步 REST（僅 notification→app-service 一條） | 家庭規模不需訊息佇列 |
-| 前端 | React 18 + TypeScript + Vite | 已具備技術，同源部署簡化設定 |
+| 前端 | React 18 + TypeScript + Vite + ESLint | 已具備技術，同源部署簡化設定 |
+| API 錯誤格式 | RFC 9457 Problem Details（`application/problem+json`） | Spring 6 內建標準，前端以單一邏輯處理所有錯誤；業務錯誤仍以 Exception 丟出，不使用 Result 型別 |
 | 部署 | Northflank Sandbox 免費方案 | 2 個免費 service + 1 個免費 database，恰好對應 2 個部署服務的架構 |
 
 ### 為什麼不用 .NET？
@@ -65,6 +66,8 @@
 docker compose up -d --build
 ```
 
+docker-compose 以 `SPRING_PROFILES_ACTIVE=dev` 啟動（使用開發用預設機密）；正式環境 profile 為 `prod`，所有機密須由環境變數提供，缺少時應用程式啟動失敗。
+
 啟動後：
 - 網頁與 API 入口：http://localhost:8080
 - app-service 健康檢查：http://localhost:8080/actuator/health
@@ -79,12 +82,15 @@ docker compose down -v
 ## 執行測試
 
 ```bash
-# app-service / notification-service（於各自服務目錄下）
-mvn test
+# app-service / notification-service（於各自服務目錄下，使用 Maven Wrapper）
+./mvnw -B test
 
 # 前端
-cd frontend && npm install && npm test
+cd frontend && npm ci && npm run lint && npm test
 ```
+
+整合測試使用 Testcontainers，需要 Docker；測試分類、profile 與 Migration 規則見 [TESTING.md](TESTING.md)。
+手動測試 API 可使用 [`app-service/http/app-service.http`](app-service/http/app-service.http)（VS Code REST Client）。
 
 ## 部署到 Northflank
 
@@ -102,6 +108,8 @@ app-service/            # family + expense + statistics 模組 + 前端靜態檔
 notification-service/   # LINE Bot 整合
 frontend/               # React + TypeScript 前端原始碼
 docker-compose.yml      # 本機一鍵啟動
-.github/workflows/      # CI（build+test）、CD（部署至 Northflank）
+.github/workflows/      # CI（build+test+lint）、CD（部署至 Northflank）
+.vscode/                # 共用的 tasks.json、推薦擴充套件
 specs/                  # spec-kit 規格與設計文件
+TESTING.md              # 測試分類、執行方式、profile 與 Migration 規則
 ```

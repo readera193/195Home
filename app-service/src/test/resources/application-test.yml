@@ -1,0 +1,11 @@
+# 測試專用：固定的假機密；資料庫連線由各整合測試以 @DynamicPropertySource 指向 Testcontainers
+app:
+  jwt:
+    secret: test-only-secret-key-for-unit-tests-32bytes+
+  internal:
+    token: test-only-internal-token
+spring:
+  datasource:
+    username: test
+    password: test
+    url: jdbc:mysql://localhost:3306/appdb

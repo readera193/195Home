@@ -1,13 +1,22 @@
+# 共用設定：不含任何機密預設值。
+# 各環境差異放在 application-{dev,prod,test}.yml，須以 SPRING_PROFILES_ACTIVE 明確指定 profile：
+#   dev  → 本機開發（含可公開的開發用預設值，docker-compose 使用）
+#   prod → 正式環境（Northflank），機密一律由環境變數 / Secret Group 提供，缺少時啟動即失敗
 server:
   port: 8081
 
 spring:
   application:
     name: notification-service
+  mvc:
+    # 框架層錯誤（缺少參數、格式錯誤、404 等）一律回應 RFC 9457 Problem Details，
+    # 與 app-service 的錯誤格式一致
+    problemdetails:
+      enabled: true
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${NOTIFICATIONDB_NAME:notificationdb}?useUnicode=true&characterEncoding=utf8mb4&serverTimezone=UTC
-    username: ${DB_USERNAME:notification}
-    password: ${DB_PASSWORD:notification}
+    url: jdbc:mysql://${DB_HOST}:${DB_PORT:3306}/${NOTIFICATIONDB_NAME:notificationdb}?useUnicode=true&characterEncoding=utf8mb4&serverTimezone=UTC
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
   flyway:
     enabled: true
@@ -26,9 +35,9 @@ management:
 
 app:
   app-service:
-    base-url: ${APP_SERVICE_BASE_URL:http://app-service:8080}
+    base-url: ${APP_SERVICE_BASE_URL}
   internal:
-    token: ${INTERNAL_TOKEN:dev-only-internal-token-change-me}
+    token: ${INTERNAL_TOKEN}
   notification:
     max-retries: 3
 
@@ -39,12 +48,3 @@ line:
     channel-secret: ${LINE_CHANNEL_SECRET:}
     handler:
       path: /api/line/webhook
-
----
-spring:
-  config:
-    activate:
-      on-profile: dev
-logging:
-  level:
-    com.family195home: DEBUG
