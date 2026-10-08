@@ -1,14 +1,10 @@
 package com.family195home.app.family.application;
 
 import com.family195home.app.shared.ApiException;
-import com.family195home.app.family.application.FamilyMemberRepository;
-import com.family195home.app.family.application.LineBindingCodeRepository;
-import com.family195home.app.family.application.LineBindingRepository;
 import com.family195home.app.family.domain.FamilyMember;
 import com.family195home.app.family.domain.LineBindingCode;
 import com.family195home.app.family.domain.MemberRole;
 import com.family195home.app.family.domain.MemberStatus;
-import com.family195home.app.family.application.LineBindingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

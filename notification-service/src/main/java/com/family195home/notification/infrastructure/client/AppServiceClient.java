@@ -1,7 +1,6 @@
 package com.family195home.notification.infrastructure.client;
 
 import com.family195home.notification.application.dto.BindingResult;
-import com.family195home.notification.infrastructure.client.ErrorBody;
 import com.family195home.notification.application.dto.LineBindingView;
 import com.family195home.notification.application.dto.MonthlySummaryView;
 import com.fasterxml.jackson.databind.ObjectMapper;

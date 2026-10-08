@@ -3,7 +3,6 @@ package com.family195home.app.expense.application;
 import com.family195home.app.shared.ApiException;
 import com.family195home.app.shared.ErrorKind;
 import com.family195home.app.shared.PagedResult;
-import com.family195home.app.expense.application.ExpenseRecordRepository;
 import com.family195home.app.expense.domain.ExpenseRecord;
 import com.family195home.app.family.application.FamilyAccess;
 import org.springframework.beans.factory.annotation.Value;

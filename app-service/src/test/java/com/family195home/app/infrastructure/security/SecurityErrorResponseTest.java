@@ -56,7 +56,7 @@ class SecurityErrorResponseTest {
 
     @Test
     void validToken_passesSecurityFilterChain() throws Exception {
-        String token = jwtTokenProvider.generateToken(1L, "a@example.com").token();
+        String token = jwtTokenProvider.issue(1L, "a@example.com").token();
 
         mockMvc.perform(get("/api/probe").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk());
@@ -64,7 +64,7 @@ class SecurityErrorResponseTest {
 
     @Test
     void authenticatedRequestToUnknownPath_returns404ProblemDetail() throws Exception {
-        String token = jwtTokenProvider.generateToken(1L, "a@example.com").token();
+        String token = jwtTokenProvider.issue(1L, "a@example.com").token();
 
         mockMvc.perform(get("/api/does-not-exist").header("Authorization", "Bearer " + token))
                 .andExpect(status().isNotFound())

@@ -9,7 +9,6 @@ import com.family195home.notification.domain.NotificationStatus;
 import com.family195home.notification.application.dto.AccountSummaryView;
 import com.family195home.notification.application.dto.LineBindingView;
 import com.family195home.notification.application.dto.MonthlySummaryView;
-import com.family195home.notification.presentation.scheduler.MonthlyNotificationScheduler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;

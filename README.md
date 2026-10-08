@@ -128,4 +128,6 @@ shared/                     # 跨模組共用（例外、分頁、身分）
 config/                     # Spring 設定類別
 ```
 
+依賴方向：presentation → application → domain；infrastructure 實作 application 定義的 port（Repository、`TokenIssuer`），application 不直接依賴 infrastructure。
+
 app-service 依業務領域（family / expense / statistics）分模組，模組內再依上述分層；statistics 無持久化，因此沒有 infrastructure。測試目錄鏡像 main 的套件結構。

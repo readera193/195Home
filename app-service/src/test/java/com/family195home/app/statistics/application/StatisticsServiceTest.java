@@ -5,7 +5,6 @@ import com.family195home.app.expense.domain.ExpenseRecord;
 import com.family195home.app.expense.domain.PaymentAccount;
 import com.family195home.app.expense.application.ExpenseService;
 import com.family195home.app.statistics.domain.MonthlySummary;
-import com.family195home.app.statistics.application.StatisticsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

@@ -1,5 +1,6 @@
 package com.family195home.app.infrastructure.security;
 
+import com.family195home.app.family.application.TokenIssuer;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -15,11 +16,11 @@ import java.util.Date;
 import java.util.Optional;
 
 /**
- * JWT 簽發與本地驗證：app-service 內建 Spring Security filter 直接使用本類別
- * （見 research.md 決策 7）。
+ * JWT 簽發與本地驗證（見 research.md 決策 7）。
+ * 簽發透過 {@link TokenIssuer} port 供 family 模組使用；驗證由 Spring Security filter 直接使用本類別。
  */
 @Component
-public class JwtTokenProvider {
+public class JwtTokenProvider implements TokenIssuer {
 
     private final SecretKey key;
     private final long expirationMinutes;
@@ -31,7 +32,8 @@ public class JwtTokenProvider {
         this.expirationMinutes = expirationMinutes;
     }
 
-    public GeneratedToken generateToken(Long userId, String email) {
+    @Override
+    public IssuedToken issue(Long userId, String email) {
         Instant now = Instant.now();
         Instant expiry = now.plus(expirationMinutes, ChronoUnit.MINUTES);
         String token = Jwts.builder()
@@ -41,7 +43,7 @@ public class JwtTokenProvider {
                 .expiration(Date.from(expiry))
                 .signWith(key)
                 .compact();
-        return new GeneratedToken(token, expiry);
+        return new IssuedToken(token, expiry);
     }
 
     public Optional<Claims> parseClaims(String token) {
@@ -59,8 +61,5 @@ public class JwtTokenProvider {
 
     public Long getUserId(Claims claims) {
         return Long.valueOf(claims.getSubject());
-    }
-
-    public record GeneratedToken(String token, Instant expiresAt) {
     }
 }

@@ -88,7 +88,7 @@ app-service/                       # 單一 Spring Boot 應用：family + expens
 │   ├── presentation/
 │   │   └── exception/             # GlobalExceptionHandler、ProblemDetails（Problem Details 輸出）
 │   ├── infrastructure/
-│   │   └── security/              # JWT 簽發/本地驗證、`X-Internal-Token` 驗證、401/403 的 Problem Details 輸出
+│   │   └── security/              # JWT 簽發（實作 family 的 TokenIssuer port）/本地驗證、`X-Internal-Token` 驗證、401/403 的 Problem Details 輸出
 │   ├── shared/                    # 跨模組共用：ApiException/ErrorKind、PagedResult、AuthenticatedUser
 │   └── config/                    # Spring Boot 標準設定類別（SecurityConfig、PasswordEncoderConfig）
 ├── src/main/resources/

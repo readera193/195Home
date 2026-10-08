@@ -2,7 +2,6 @@ package com.family195home.notification.infrastructure.persistence;
 
 import com.family195home.notification.domain.NotificationLog;
 import com.family195home.notification.domain.NotificationStatus;
-import com.family195home.notification.infrastructure.persistence.NotificationLogMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
