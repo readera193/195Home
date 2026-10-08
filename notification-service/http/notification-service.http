@@ -1,0 +1,11 @@
+### notification-service 維運端點手動測試（VS Code REST Client）
+### /api/notifications/** 須帶 X-Internal-Token；以下為 dev profile 的預設密鑰。
+
+@baseUrl = http://localhost:8081
+
+### 通知發送紀錄
+GET {{baseUrl}}/api/notifications/logs?familyGroupId=1&month=2026-09
+X-Internal-Token: dev-only-internal-token-change-me
+
+### 錯誤範例：未帶密鑰 → 401，code=UNAUTHORIZED
+GET {{baseUrl}}/api/notifications/logs?familyGroupId=1&month=2026-09

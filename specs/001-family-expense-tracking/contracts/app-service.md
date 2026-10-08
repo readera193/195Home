@@ -162,7 +162,7 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 
 ### `GET /api/expenses?familyGroupId=&paymentAccountId=&authorMemberId=&month=YYYY-MM&page=&size=`
 - Header: `Authorization`（呼叫者須為該群組在職成員，否則 `403 NOT_GROUP_MEMBER`，FR-017）
-- Response 200（分頁，見「共通約定 → 分頁」）: `{ items: [{ expenseId, amount, note, occurredAt, paymentAccountId, paymentAccountName, authorMemberId, locked: boolean }], page, size, totalElements, totalPages }`
+- Response 200（分頁，見「共通約定 → 分頁」；`paymentAccountName` 於伺服器端每次請求僅查詢一次帳戶清單後對應，不隨筆數增加查詢次數）: `{ items: [{ expenseId, amount, note, occurredAt, paymentAccountId, paymentAccountName, authorMemberId, locked: boolean }], page, size, totalElements, totalPages }`
 - 篩選條件可單獨或同時套用 `paymentAccountId`、`authorMemberId`（FR-008、FR-009、FR-010）；`month` 省略時不限月份
 - Errors: `400 INVALID_PAGE_PARAMS`、`400 INVALID_DATE_FORMAT`（`month` 格式錯誤）
 - 說明：statistics 模組彙總整月資料時走同進程的不分頁查詢，不受 `size` 上限影響（SC-004）
@@ -184,8 +184,9 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 - Errors: `403 LOCK_NOT_HELD_BY_CALLER`、`403 NOT_GROUP_MEMBER`、`403 EXPENSE_NOT_IN_GROUP`
 
 ### `POST /api/expenses/{expenseId}/unlock`
-- Header: `Authorization`（取消編輯時釋放鎖）
-- Response 204
+- Header: `Authorization`（取消編輯時釋放鎖；呼叫者須為該紀錄所屬群組的在職成員，群組由紀錄本身推得，不需另帶 `familyGroupId`）
+- Response 204（冪等：紀錄未被鎖定或鎖已逾時亦回 204）
+- Errors: `404 EXPENSE_NOT_FOUND`、`403 NOT_GROUP_MEMBER`（FR-017）、`403 LOCK_NOT_HELD_BY_CALLER`（鎖仍有效且由其他成員持有，FR-027）
 
 ## 統計（公開 API）
 

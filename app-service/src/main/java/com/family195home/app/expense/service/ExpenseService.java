@@ -104,7 +104,18 @@ public class ExpenseService {
         return findRequired(expenseId);
     }
 
-    public void unlock(Long expenseId) {
+    // 取消編輯時釋放鎖：呼叫者須為該群組在職成員；鎖仍有效且由他人持有時拒絕（FR-017、FR-027）。
+    // 紀錄未被鎖定或鎖已逾時則視為已釋放，不報錯（冪等）
+    @Transactional
+    public void unlock(Long expenseId, Long callerUserId) {
+        ExpenseRecord record = findRequired(expenseId);
+        FamilyAccess.MemberRef caller = familyAccess.requireMember(record.getFamilyGroupId(), callerUserId);
+        if (record.getLockedByMemberId() == null) {
+            return;
+        }
+        if (!record.getLockedByMemberId().equals(caller.memberId()) && isCurrentlyLocked(record)) {
+            throw new ApiException(ErrorKind.FORBIDDEN, "LOCK_NOT_HELD_BY_CALLER", "此紀錄正由其他成員編輯中，無法解除鎖定");
+        }
         expenseRecordRepository.releaseLock(expenseId);
     }
 

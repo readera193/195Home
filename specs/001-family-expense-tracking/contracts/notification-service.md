@@ -4,6 +4,8 @@
 
 ## 驗證模型
 
+> 本服務對外有兩類端點：LINE Webhook（`X-Line-Signature`）與維運用的 `/api/notifications/**`（`X-Internal-Token`）；後者不應對公網開放，Northflank 上僅供內部網域存取，並仍以共用密鑰作第二層保護。
+
 本服務對 app-service 的所有呼叫皆發生於 LINE Webhook 或排程情境，**無平台使用者 JWT** 可用，一律以 Header `X-Internal-Token`（共用密鑰）驗證呼叫來源（不使用 `Authorization: Bearer <JWT>`，見 research.md 決策 7）。app-service 的呼叫目標位址（base URL）由環境變數設定：本機開發指向 docker-compose 服務名稱（例如 `http://app-service:8080`），Northflank 正式環境指向 app-service 對應 Northflank service 的內部網域。
 
 ## 與 app-service 的錯誤契約
@@ -38,4 +40,5 @@ app-service 的錯誤回應為 RFC 9457 Problem Details（見 `contracts/app-ser
 ## 查詢紀錄（供維運/測試檢視，非核心功能）
 
 ### `GET /api/notifications/logs?familyGroupId=&month=YYYY-MM`
+- Header: `X-Internal-Token`（與 app-service 相同的共用密鑰；缺少或錯誤 → `401 UNAUTHORIZED` Problem Details。LINE Webhook 不受此限，由 `X-Line-Signature` 驗證）
 - Response 200: `[{ familyMemberId, lineUserId, status, attempts, lastAttemptAt, errorMessage }]`

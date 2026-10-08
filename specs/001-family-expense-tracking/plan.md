@@ -110,6 +110,7 @@ app-service/                       # 單一 Spring Boot 應用：family + expens
 
 notification-service/              # LINE Bot 整合：Webhook、每月排程推播、關鍵字查詢、發送重試紀錄
 ├── src/main/java/.../notification/
+│   ├── config/                    # InternalTokenInterceptor（保護 /api/notifications/**）、WebConfig
 │   ├── controller/
 │   ├── service/
 │   ├── client/                    # 呼叫 app-service 內部 REST API 的 WebClient 元件

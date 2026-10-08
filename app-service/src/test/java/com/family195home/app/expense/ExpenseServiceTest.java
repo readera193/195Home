@@ -235,4 +235,78 @@ class ExpenseServiceTest {
                 .isInstanceOf(ApiException.class);
         verifyNoInteractions(ignoreStubs(expenseRecordRepository));
     }
+
+    private ExpenseRecord lockedRecord(Long lockedByMemberId, LocalDateTime lockedAt) {
+        ExpenseRecord record = new ExpenseRecord();
+        record.setId(500L);
+        record.setFamilyGroupId(10L);
+        record.setLockedByMemberId(lockedByMemberId);
+        record.setLockedAt(lockedAt);
+        when(expenseRecordRepository.findById(500L)).thenReturn(Optional.of(record));
+        return record;
+    }
+
+    @Test
+    void unlock_releasesLockHeldByCaller() {
+        lockedRecord(1L, LocalDateTime.now());
+        when(familyAccess.requireMember(10L, 7L)).thenReturn(new FamilyAccess.MemberRef(1L));
+
+        expenseService.unlock(500L, 7L);
+
+        verify(expenseRecordRepository).releaseLock(500L);
+    }
+
+    @Test
+    void unlock_rejectsWhenLockHeldByAnotherMember() {
+        // FR-027：他人仍持有有效鎖時，不可被其他成員解除
+        lockedRecord(2L, LocalDateTime.now());
+        when(familyAccess.requireMember(10L, 7L)).thenReturn(new FamilyAccess.MemberRef(1L));
+
+        assertThatThrownBy(() -> expenseService.unlock(500L, 7L))
+                .isInstanceOfSatisfying(ApiException.class, e -> {
+                    assertThat(e.getKind()).isEqualTo(ErrorKind.FORBIDDEN);
+                    assertThat(e.getCode()).isEqualTo("LOCK_NOT_HELD_BY_CALLER");
+                });
+        verify(expenseRecordRepository, never()).releaseLock(any());
+    }
+
+    @Test
+    void unlock_allowsClearingAnotherMembersExpiredLock() {
+        lockedRecord(2L, LocalDateTime.now().minusMinutes(30));
+        when(familyAccess.requireMember(10L, 7L)).thenReturn(new FamilyAccess.MemberRef(1L));
+
+        expenseService.unlock(500L, 7L);
+
+        verify(expenseRecordRepository).releaseLock(500L);
+    }
+
+    @Test
+    void unlock_isNoOpWhenNotLocked() {
+        lockedRecord(null, null);
+        when(familyAccess.requireMember(10L, 7L)).thenReturn(new FamilyAccess.MemberRef(1L));
+
+        expenseService.unlock(500L, 7L);
+
+        verify(expenseRecordRepository, never()).releaseLock(any());
+    }
+
+    @Test
+    void unlock_rejectsNonMemberOfTheRecordsGroup() {
+        // FR-017：非該群組在職成員不可對紀錄做任何操作
+        lockedRecord(1L, LocalDateTime.now());
+        when(familyAccess.requireMember(10L, 99L))
+                .thenThrow(new ApiException(ErrorKind.FORBIDDEN, "NOT_GROUP_MEMBER", "不是群組成員"));
+
+        assertThatThrownBy(() -> expenseService.unlock(500L, 99L))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("NOT_GROUP_MEMBER"));
+        verify(expenseRecordRepository, never()).releaseLock(any());
+    }
+
+    @Test
+    void unlock_unknownExpenseIsNotFound() {
+        when(expenseRecordRepository.findById(404L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> expenseService.unlock(404L, 7L))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("EXPENSE_NOT_FOUND"));
+    }
 }

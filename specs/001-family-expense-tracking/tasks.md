@@ -226,6 +226,10 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 - [X] T082 [P] 前端工具鏈：新增 `eslint.config.js`（ESLint 9 flat config）、`npm run lint`；tsconfig 拆為 `tsconfig.app.json`／`tsconfig.node.json`（`vite.config.ts` 改由 `vitest/config` 匯入以通過型別檢查）；CI `frontend` job 改為 `npm ci` → `lint` → `build` → `test`；Dockerfile 前端 stage 改用 `npm ci`
 - [X] T083 [P] 開發輔助：`app-service/http/app-service.http`（REST Client）、`.vscode/tasks.json`／`extensions.json`（`.gitignore` 僅放行這兩個檔）、根目錄 `TESTING.md`（測試分類、profile、Migration 規則）；README 同步更新
 - [X] T084 規格書同步：spec.md（第八輪澄清、FR-007／SC-003、US3 情境 5、Assumptions）、contracts（共通約定、分頁、補齊 `familyGroupId` query 與漏列的錯誤代碼）、research.md（決策 5、12、13、14、15）、plan.md、quickstart.md（修正 `X-Internal-Token` 筆誤與測試指令）
+- [X] T085 修正 `unlock` 缺少授權：`ExpenseService.unlock(expenseId, callerUserId)` 驗證呼叫者為紀錄所屬群組在職成員，且鎖仍有效時僅持有者可釋放（`403 LOCK_NOT_HELD_BY_CALLER`），紀錄不存在回 `404 EXPENSE_NOT_FOUND`，未鎖定／已逾時冪等；測試 `ExpenseServiceTest`（FR-017、FR-027）
+- [X] T086 [P] 保護 notification-service 維運端點：新增 `config/InternalTokenInterceptor`、`WebConfig`，`/api/notifications/**` 須帶 `X-Internal-Token`（常數時間比較，401 回 Problem Details），測試 `InternalTokenInterceptorTest.java`（research.md 決策 7）
+- [X] T087 [P] 消除支出列表 N+1：`ExpenseController.list` 每次請求只查一次群組帳戶清單並以 Map 對應 `paymentAccountName`，不再逐筆 `findById`
+- [X] T088 規格書同步：contracts（unlock 授權與錯誤、logs 的 `X-Internal-Token`、`paymentAccountName` 說明）、spec.md 邊界情境（鎖的釋放規則）、research.md 決策 3、7、plan.md
 
 ---
 

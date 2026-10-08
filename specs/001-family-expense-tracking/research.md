@@ -15,6 +15,7 @@
 ## 3. 併發編輯鎖定機制（FR-027）
 
 - **Decision**: 於 app-service 的 `expense_records` 資料表（schema `appdb`）新增 `locked_by_member_id`、`locked_at` 欄位。取得編輯權時以單一交易執行條件式 UPDATE：`WHERE id = ? AND (locked_by_member_id IS NULL OR locked_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 MINUTE))`，影響列數為 1 才視為取得鎖；儲存或取消編輯時清除鎖定欄位；鎖定 TTL 設為 5 分鐘，避免使用者異常關閉頁面導致永久鎖死。
+- **釋放規則**: `unlock` 須為紀錄所屬群組的在職成員；鎖仍有效且由他人持有時拒絕（`LOCK_NOT_HELD_BY_CALLER`），未鎖定或已逾時則冪等成功。
 - **Rationale**: 善用既有 MySQL 交易機制即可達成互斥控制，不需引入 Redis 等分散式鎖工具，符合技術邊界限制（不得新增資料庫技術）與原則 VI（可讀性優先）。
 
 ## 4. 統計資料計算策略（FR-011）
@@ -38,6 +39,7 @@
   - Spring Security 搭配 BCrypt 雜湊密碼儲存於 app-service（family 模組）；登入成功後由 app-service 核發 **JWT**（HS256，簽章密鑰為 app-service 自身設定），Claim 包含 `sub`(userId)、`email`、`iat`、`exp`（有效期 2 小時）。
   - 前端後續請求以 `Authorization: Bearer <JWT>` 帶入；app-service 內建 Spring Security filter **本地驗證**簽章與過期時間，驗證失敗回傳 `401`（Problem Details 格式，`code = UNAUTHORIZED`，見決策 13）。**無獨立 Gateway 進程**——app-service 本身就是驗證與業務邏輯的唯一入口。
   - 家庭成員角色（ADMIN/MEMBER）與在職狀態屬於可變動狀態，不放入 JWT claim；expense、statistics 模組需要判斷「當下角色/是否仍在職」時（例如編輯他人支出紀錄、月結統計歸屬驗證），**直接呼叫 family 模組的 service 方法**確認（同進程方法呼叫），避免已被踢出或角色已轉移的成員在 JWT 到期前仍持有舊權限。
+  - notification-service 自身的維運端點 `/api/notifications/**` 同樣以 `X-Internal-Token` 保護（`HandlerInterceptor`，常數時間比較），避免通知紀錄（含 LINE userId）被匿名讀取；LINE Webhook 仍由 `X-Line-Signature` 驗證。
   - notification-service 呼叫 app-service 的內部端點（取得所有 LINE 綁定清單、依綁定身分查詢月結彙總、消費綁定碼完成綁定）**無平台使用者 JWT**，改以服務間共用密鑰 Header `X-Internal-Token` 驗證呼叫來源為受信任的服務；此為系統中唯一保留的跨進程身分驗證機制。
   - 登出僅為前端捨棄 token 的客戶端行為；JWT 為無狀態設計，本階段不提供伺服器端強制註銷機制（如黑名單），屬可接受的簡化。
 - **Rationale**: 驗證與業務邏輯同在 app-service 一個進程內，直接以 Spring Security filter + service 方法呼叫確認角色即可，無需額外網路呼叫與重複的 JWT 解析邏輯。`X-Internal-Token` 機制對唯一的跨進程呼叫（notification-service → app-service）仍保留，因這是系統中唯一真正需要「服務對服務信任」的情境。
