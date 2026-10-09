@@ -14,7 +14,7 @@ spring:
     problemdetails:
       enabled: true
   datasource:
-    url: jdbc:mysql://${DB_HOST}:${DB_PORT:3306}/${NOTIFICATIONDB_NAME:notificationdb}?useUnicode=true&characterEncoding=utf8mb4&serverTimezone=UTC
+    url: jdbc:mysql://${DB_HOST}:${DB_PORT:3306}/${NOTIFICATIONDB_NAME:notificationdb}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=UTC
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
