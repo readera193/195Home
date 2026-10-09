@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getMembers, getMyFamily, kickMember, leaveGroup, restoreMemberEligibility } from '../services/familyApi';
 
@@ -42,49 +43,78 @@ export default function MembersPage() {
   }
 
   if (!familyGroupId) {
-    return <p>您尚未加入任何家庭群組</p>;
+    return (
+      <div className="card empty">
+        <p>您尚未加入任何家庭群組</p>
+        <Link to="/family">前往建立或加入群組</Link>
+      </div>
+    );
   }
   if (isLoading) {
-    return <p>載入中...</p>;
+    return <p className="empty">載入中...</p>;
   }
 
   const isAdmin = myFamily?.role === 'ADMIN';
 
   return (
     <div>
-      <h1>成員列表</h1>
-      <table>
-        <thead>
-          <tr>
-            <th>Email</th>
-            <th>角色</th>
-            <th>狀態</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          {members?.map((member) => (
-            <tr key={member.familyMemberId}>
-              <td>{member.email}</td>
-              <td>{member.role === 'ADMIN' ? '管理者' : '一般成員'}</td>
-              <td>{member.status === 'ACTIVE' ? '在職' : member.status === 'REMOVED' ? '已移出' : '已離開'}</td>
-              <td>
-                {member.status === 'ACTIVE' && (
-                  <>
-                    <button onClick={() => handleLeave(member.familyMemberId)}>離開群組</button>
-                    {isAdmin && member.role !== 'ADMIN' && (
-                      <button onClick={() => handleKick(member.familyMemberId)}>移出</button>
-                    )}
-                  </>
-                )}
-                {isAdmin && member.status === 'REMOVED' && (
-                  <button onClick={() => handleRestore(member.familyMemberId)}>復原</button>
-                )}
-              </td>
+      <div className="page-header">
+        <h1>成員列表</h1>
+      </div>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>角色</th>
+              <th>狀態</th>
+              <th>操作</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {members?.map((member) => (
+              <tr key={member.familyMemberId}>
+                <td>{member.email}</td>
+                <td>
+                  <span className={`badge ${member.role === 'ADMIN' ? 'badge-primary' : ''}`}>
+                    {member.role === 'ADMIN' ? '管理者' : '一般成員'}
+                  </span>
+                </td>
+                <td>
+                  <span
+                    className={`badge ${
+                      member.status === 'ACTIVE' ? 'badge-success' : member.status === 'REMOVED' ? 'badge-danger' : ''
+                    }`}
+                  >
+                    {member.status === 'ACTIVE' ? '在職' : member.status === 'REMOVED' ? '已移出' : '已離開'}
+                  </span>
+                </td>
+                <td>
+                  <div className="actions">
+                    {member.status === 'ACTIVE' && (
+                      <>
+                        <button className="btn-secondary btn-sm" onClick={() => handleLeave(member.familyMemberId)}>
+                          離開群組
+                        </button>
+                        {isAdmin && member.role !== 'ADMIN' && (
+                          <button className="btn-danger btn-sm" onClick={() => handleKick(member.familyMemberId)}>
+                            移出
+                          </button>
+                        )}
+                      </>
+                    )}
+                    {isAdmin && member.status === 'REMOVED' && (
+                      <button className="btn-secondary btn-sm" onClick={() => handleRestore(member.familyMemberId)}>
+                        復原
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

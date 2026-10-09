@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
 import ProtectedRoute from './components/ProtectedRoute';
+import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import HomePage from './pages/HomePage';
@@ -21,69 +22,21 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route
-            path="/"
             element={
               <ProtectedRoute>
-                <HomePage />
+                <Layout />
               </ProtectedRoute>
             }
-          />
-          <Route
-            path="/family"
-            element={
-              <ProtectedRoute>
-                <FamilyGroupPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/members"
-            element={
-              <ProtectedRoute>
-                <MembersPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/accounts"
-            element={
-              <ProtectedRoute>
-                <PaymentAccountsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/expenses/new"
-            element={
-              <ProtectedRoute>
-                <ExpenseFormPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/expenses"
-            element={
-              <ProtectedRoute>
-                <ExpenseListPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/statistics"
-            element={
-              <ProtectedRoute>
-                <StatisticsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/line-binding"
-            element={
-              <ProtectedRoute>
-                <LineBindingPage />
-              </ProtectedRoute>
-            }
-          />
+          >
+            <Route path="/" element={<HomePage />} />
+            <Route path="/family" element={<FamilyGroupPage />} />
+            <Route path="/members" element={<MembersPage />} />
+            <Route path="/accounts" element={<PaymentAccountsPage />} />
+            <Route path="/expenses/new" element={<ExpenseFormPage />} />
+            <Route path="/expenses" element={<ExpenseListPage />} />
+            <Route path="/statistics" element={<StatisticsPage />} />
+            <Route path="/line-binding" element={<LineBindingPage />} />
+          </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

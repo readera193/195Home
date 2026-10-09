@@ -28,31 +28,33 @@ export default function LoginPage() {
   }
 
   return (
-    <div>
-      <h1>登入</h1>
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label htmlFor="email">Email</label>
-          <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        </div>
-        <div>
-          <label htmlFor="password">密碼</label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </div>
-        {error && <p role="alert">{error}</p>}
-        <button type="submit" disabled={submitting}>
-          登入
-        </button>
-      </form>
-      <p>
-        還沒有帳號？<Link to="/register">註冊</Link>
-      </p>
+    <div className="auth-wrap">
+      <div className="auth-card">
+        <h1>登入</h1>
+        <form onSubmit={handleSubmit}>
+          <div className="field">
+            <label htmlFor="email">Email</label>
+            <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          </div>
+          <div className="field">
+            <label htmlFor="password">密碼</label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          {error && <p role="alert">{error}</p>}
+          <button type="submit" className="btn-block" disabled={submitting}>
+            登入
+          </button>
+        </form>
+        <p className="auth-footer">
+          還沒有帳號？<Link to="/register">註冊</Link>
+        </p>
+      </div>
     </div>
   );
 }

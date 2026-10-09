@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getMyFamily } from '../services/familyApi';
 import { createExpense, listAccounts } from '../services/expenseApi';
@@ -60,23 +60,30 @@ export default function ExpenseFormPage() {
   }
 
   if (!familyGroupId) {
-    return <p>您尚未加入任何家庭群組</p>;
+    return (
+      <div className="card empty">
+        <p>您尚未加入任何家庭群組</p>
+        <Link to="/family">前往建立或加入群組</Link>
+      </div>
+    );
   }
 
   return (
-    <div>
-      <h1>新增支出紀錄</h1>
-      {error && <p role="alert">{error}</p>}
-      <form onSubmit={handleSubmit}>
-        <div>
+    <div className="container-narrow">
+      <div className="page-header">
+        <h1>新增支出紀錄</h1>
+      </div>
+      <form className="card" onSubmit={handleSubmit}>
+        {error && <p role="alert">{error}</p>}
+        <div className="field">
           <label htmlFor="amount">金額（整數，正數為流入、負數為流出、0 表示無金額異動）</label>
           <input id="amount" value={amount} onChange={(e) => setAmount(e.target.value)} required />
         </div>
-        <div>
+        <div className="field">
           <label htmlFor="note">備註</label>
           <input id="note" value={note} onChange={(e) => setNote(e.target.value)} required />
         </div>
-        <div>
+        <div className="field">
           <label htmlFor="paymentAccountId">支付帳戶</label>
           <select
             id="paymentAccountId"
@@ -92,7 +99,7 @@ export default function ExpenseFormPage() {
             ))}
           </select>
         </div>
-        <div>
+        <div className="field">
           <label htmlFor="occurredAt">日期時間（留空則為現在）</label>
           <input
             id="occurredAt"
@@ -101,7 +108,7 @@ export default function ExpenseFormPage() {
             onChange={(e) => setOccurredAt(e.target.value)}
           />
         </div>
-        <button type="submit" disabled={submitting}>
+        <button type="submit" className="btn-block" disabled={submitting}>
           新增
         </button>
       </form>

@@ -27,32 +27,34 @@ export default function RegisterPage() {
   }
 
   return (
-    <div>
-      <h1>註冊帳號</h1>
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label htmlFor="email">Email</label>
-          <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        </div>
-        <div>
-          <label htmlFor="password">密碼</label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </div>
-        {error && <p role="alert">{error}</p>}
-        {success && <p>註冊成功，正在導向登入頁...</p>}
-        <button type="submit" disabled={submitting}>
-          註冊
-        </button>
-      </form>
-      <p>
-        已經有帳號？<Link to="/login">登入</Link>
-      </p>
+    <div className="auth-wrap">
+      <div className="auth-card">
+        <h1>註冊帳號</h1>
+        <form onSubmit={handleSubmit}>
+          <div className="field">
+            <label htmlFor="email">Email</label>
+            <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          </div>
+          <div className="field">
+            <label htmlFor="password">密碼</label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          {error && <p role="alert">{error}</p>}
+          {success && <p className="notice notice-success">註冊成功，正在導向登入頁...</p>}
+          <button type="submit" className="btn-block" disabled={submitting}>
+            註冊
+          </button>
+        </form>
+        <p className="auth-footer">
+          已經有帳號？<Link to="/login">登入</Link>
+        </p>
+      </div>
     </div>
   );
 }

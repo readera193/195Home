@@ -1,6 +1,7 @@
 import React from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import ExpenseListPage from '../src/pages/ExpenseListPage';
 import * as familyApi from '../src/services/familyApi';
@@ -26,7 +27,9 @@ function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <ExpenseListPage />
+      <MemoryRouter>
+        <ExpenseListPage />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
