@@ -2,7 +2,7 @@
 
 單一 Spring Boot 應用，內部依業務領域分為 family、expense、statistics 三個套件模組，資料庫：`appdb`。對外提供兩組介面：
 
-1. **公開 API**：前端（同源，因前端靜態檔案由 app-service 直接 serve）呼叫，需 `Authorization: Bearer <JWT>`（除註冊/登入外）。
+1. **公開 API**：前端（同源，因前端靜態檔案由 app-service 直接 serve）呼叫，需 `Authorization: Bearer <JWT>`（除 `POST /api/auth/line` 外）。
 2. **內部 API**：僅供 notification-service 呼叫，因該情境無平台使用者 JWT（發話者是 LINE 帳號），一律以共用密鑰 Header `X-Internal-Token` 驗證呼叫來源（見 research.md 決策 7）。
 
 app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense 模組確認呼叫者角色、statistics 模組取得支出資料）皆為同進程 Java service 方法呼叫，**不透過 HTTP，因此不出現在本合約中**——本合約僅描述跨部署服務邊界（前端 ↔ app-service、notification-service ↔ app-service）的介面。
@@ -30,7 +30,7 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 | `detail` | 給使用者看的錯誤訊息（前端直接顯示） |
 | `code` | **穩定的機器可讀錯誤代碼**，即本合約各端點 `Errors` 所列的代碼；前端與 notification-service 以 `code` 判斷分支，不可依賴 `detail` 文字 |
 | `instance` | 發生錯誤的請求路徑 |
-| `errors`（僅 `VALIDATION_ERROR`） | 欄位驗證失敗清單：`[{ "field": "email", "message": "..." }]` |
+| `errors`（僅 `VALIDATION_ERROR`） | 欄位驗證失敗清單：`[{ "field": "code", "message": "..." }]` |
 
 實作策略：業務錯誤一律以 `ApiException(kind, code, message)` 丟出，由 `GlobalExceptionHandler` 統一轉成 Problem Details（`ErrorKind` 對應 HTTP 狀態碼）；**不使用 Result 型別**。Spring MVC 自身的例外（缺少參數、JSON 格式錯誤、路徑不存在等）同樣轉為 Problem Details，`code` 為其 HTTP 狀態名稱（如 `BAD_REQUEST`、`NOT_FOUND`）。
 
@@ -50,7 +50,7 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 |------|------|------|
 | 403 | `NOT_GROUP_MEMBER` | 呼叫者不是該家庭群組的在職成員（FR-017） |
 | 403 | `NOT_GROUP_ADMIN` | 該操作限群組管理者 |
-| 403 | `NOT_SELF` | 該操作限成員本人（離開群組、產生 LINE 綁定碼） |
+| 403 | `NOT_SELF` | 該操作限成員本人（離開群組） |
 | 404 | `GROUP_NOT_FOUND` / `ACCOUNT_NOT_FOUND` / `EXPENSE_NOT_FOUND` / `MEMBER_NOT_FOUND` | 資源不存在 |
 | 409 | `MEMBER_NOT_ACTIVE` | 目標成員目前不是在職狀態（離開／移出時） |
 | 500 | `NO_ELIGIBLE_ADMIN` | 管理者離開時找不到可接任者（資料異常，正常流程不會發生） |
@@ -67,16 +67,11 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 
 ## 帳號與登入（公開 API）
 
-### `POST /api/users/register`
-- Request: `{ email: string, password: string }`
-- Response 201: `{ userId: number, email: string }`
-- Errors: `409 EMAIL_ALREADY_REGISTERED`（FR-024）
-
-### `POST /api/users/login`
-- Request: `{ email: string, password: string }`
-- Response 200: `{ token: string (JWT), userId: number, email: string, expiresAt: string }`
-- Errors: `401 INVALID_CREDENTIALS`
-- 說明：`token` 為 HS256 簽章 JWT，Claim 含 `sub`(userId)、`email`、`iat`、`exp`（2 小時後過期），由 app-service 自行簽發與驗證。
+### `POST /api/auth/line`
+- Request: `{ code: string }`（真實 LINE Login 為授權碼；dev/test 假登入下 code 即暱稱，`lineUserId = "dev-" + code`）
+- Response 200: `{ token: string (JWT), userId: number, displayName: string, expiresAt: string }`；首次登入自動建立帳號，之後登入同步 LINE 暱稱（FR-024）
+- Errors: `400`（`code` 為空）
+- 說明：`token` 為 HS256 簽章 JWT，Claim 含 `sub`(userId)、`displayName`、`iat`、`exp`（2 小時後過期），由 app-service 自行簽發與驗證。
 
 > 無 `POST /api/users/logout` 端點：JWT 為無狀態設計，登出僅為前端捨棄 token 的客戶端行為，伺服器不做強制註銷（見 research.md 決策 7）。
 
@@ -86,7 +81,7 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 - Header: `Authorization`
 - Response 200（已加入群組）: `{ familyGroupId, name, status: "ACTIVE"|"DISSOLVED", role: "ADMIN"|"MEMBER", inviteCode, familyMemberId }`
 - Response 200（未加入任何群組）: `{ familyGroupId: null, name: null, status: null, role: null, inviteCode: null, familyMemberId: null }`
-- 說明：實作階段補上的查詢端點，供前端取得目前使用者所屬家庭群組與角色（原規劃遺漏，實作時補齊）
+- 說明：供前端取得目前使用者所屬家庭群組與角色
 
 ### `POST /api/families`
 - Header: `Authorization`
@@ -97,13 +92,13 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 ### `POST /api/families/join`
 - Header: `Authorization`
 - Request: `{ inviteCode: string }`
-- Response 200: `{ familyGroupId, name, role: "MEMBER" | "ADMIN", status: "ACTIVE" }`
+- Response 200: `{ familyGroupId, name: null, role: "MEMBER" | "ADMIN", status: "ACTIVE" }`（`name` 目前恆為 `null`，前端加入後以 `GET /api/families/me` 取得群組名稱）
 - Errors: `404 INVALID_INVITE_CODE`、`409 ALREADY_IN_A_GROUP`（FR-026）、`409 GROUP_DISSOLVED`、`403 MEMBER_REMOVED`（被管理者移出者不可以邀請碼重新加入，FR-030）
 
 ### `GET /api/families/{familyGroupId}/members`
 - Header: `Authorization`
 - Query: `includeLeft=true|false`（預設 true，供篩選清單使用，FR-021）
-- Response 200: `[{ familyMemberId, userId, email, status: "ACTIVE"|"LEFT"|"REMOVED", role, joinedAt, leftAt }]`
+- Response 200: `[{ familyMemberId, userId, displayName, status: "ACTIVE"|"LEFT"|"REMOVED", role, joinedAt, leftAt }]`
 
 ### `POST /api/families/{familyGroupId}/members/{memberId}/leave`
 - Header: `Authorization`（限本人）
@@ -120,10 +115,6 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 - Header: `Authorization`（限該群組 ADMIN）
 - Response 200: `{ memberId, status: "LEFT" }`（`REMOVED` → `LEFT`，之後該成員可依 FR-025 以邀請碼重新加入，FR-030）
 - Errors: `403 NOT_GROUP_ADMIN`、`404 MEMBER_NOT_FOUND`、`409 MEMBER_NOT_REMOVED`
-
-### `POST /api/families/members/{memberId}/line-binding-codes`
-- Header: `Authorization`（限本人）
-- Response 201: `{ code: string, expiresAt: string }`（10 分鐘有效，FR-023）
 
 ## 支付帳戶（公開 API）
 
@@ -211,23 +202,18 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 
 以下端點皆發生於 LINE Webhook 或排程情境，**無平台使用者 JWT**（發話者是 LINE 帳號而非已登入的平台 Session），一律以 Header `X-Internal-Token`（共用密鑰，見 research.md 決策 7）驗證呼叫來源（不使用 `Authorization: Bearer <JWT>`）：
 
-### `POST /api/internal/line-bindings`
-- Header: `X-Internal-Token`
-- Request: `{ code: string, lineUserId: string }`
-- Response 200: `{ familyMemberId, familyGroupId }`
-- Errors: `410 CODE_EXPIRED_OR_USED`、`409 LINE_ACCOUNT_ALREADY_BOUND`（FR-020）
-
 ### `GET /api/internal/line-bindings/by-line-user/{lineUserId}`
 - Header: `X-Internal-Token`
 - Response 200: `{ familyMemberId, familyGroupId }`
-- Errors: `404 NOT_BOUND`
+- 用途：LINE 關鍵字查詢時，依發話者的 LINE userId 找出其目前所屬家庭（路徑沿用 `line-bindings` 名稱，語意為「LINE 身分對應的在職成員」，無獨立綁定資料表）
+- Errors: `404 NOT_BOUND`（該 LINE 帳號尚未登入過平台，或目前不屬於任何家庭群組）
 
 ### `GET /api/internal/line-bindings`
 - Header: `X-Internal-Token`
 - Response 200: `[{ familyMemberId, familyGroupId, lineUserId }]`
-- 用途：每月排程通知（notification-service）取得所有已綁定成員（跨所有家庭）
+- 用途：每月排程通知（notification-service）取得所有家庭的在職成員及其 LINE userId
 
 ### `GET /api/internal/statistics/monthly?familyGroupId=&month=YYYY-MM`
 - Header: `X-Internal-Token`
 - Response：格式同公開版 `GET /api/statistics/monthly`
-- 用途：notification-service 於每月排程通知與 LINE 關鍵字查詢時取得指定家庭的月結彙總；此情境已由 notification-service 依 LINE 綁定關係決定家庭歸屬，故不再重複驗證呼叫者屬於該家庭
+- 用途：notification-service 於每月排程通知與 LINE 關鍵字查詢時取得指定家庭的月結彙總；此情境已由 notification-service 依發話者的 LINE 身分決定家庭歸屬，故不再重複驗證呼叫者屬於該家庭

@@ -36,12 +36,13 @@
 ## 7. 身份驗證與服務間信任機制（FR-024）
 
 - **Decision**:
-  - Spring Security 搭配 BCrypt 雜湊密碼儲存於 app-service（family 模組）；登入成功後由 app-service 核發 **JWT**（HS256，簽章密鑰為 app-service 自身設定），Claim 包含 `sub`(userId)、`email`、`iat`、`exp`（有效期 2 小時）。
+  - 平台以 **LINE 身分登入**（FR-024），無密碼：`POST /api/auth/line` 帶入 `code`，由 `family/application/LineLoginClient`（port）換取 `LineProfile(lineUserId, displayName)`；首次登入自動建立 `users` 紀錄，之後登入同步 LINE 暱稱。目前僅有 `DevLineLoginClient`（`@Profile({"dev","test"})`，`code` 即暱稱、`lineUserId = "dev-" + code`）；prod profile 尚無 `LineLoginClient` 實作，真實 LINE Login（OAuth 授權碼換 profile）為後續工作，之後只需新增 adapter 並替換前端登入頁按鈕。真實 LINE Login channel 與 Messaging API channel 須屬同一個 LINE Provider，userId 才一致。
+  - 登入成功後由 app-service 核發 **JWT**（HS256，簽章密鑰為 app-service 自身設定），Claim 包含 `sub`(userId)、`displayName`、`iat`、`exp`（有效期 2 小時）。
   - 前端後續請求以 `Authorization: Bearer <JWT>` 帶入；app-service 內建 Spring Security filter **本地驗證**簽章與過期時間，驗證失敗回傳 `401`（Problem Details 格式，`code = UNAUTHORIZED`，見決策 13）。**無獨立 Gateway 進程**——app-service 本身就是驗證與業務邏輯的唯一入口。
   - 分層：登入簽發透過 `family/application/TokenIssuer`（port）抽象，`infrastructure/security/JwtTokenProvider` 為其 adapter，`UserService` 不直接依賴 infrastructure；本地驗證由 Spring Security filter（`JwtAuthFilter`）直接使用 `JwtTokenProvider`。
   - 家庭成員角色（ADMIN/MEMBER）與在職狀態屬於可變動狀態，不放入 JWT claim；expense、statistics 模組需要判斷「當下角色/是否仍在職」時（例如編輯他人支出紀錄、月結統計歸屬驗證），**直接呼叫 family 模組的 service 方法**確認（同進程方法呼叫），避免已被踢出或角色已轉移的成員在 JWT 到期前仍持有舊權限。
   - notification-service 自身的維運端點 `/api/notifications/**` 同樣以 `X-Internal-Token` 保護（`HandlerInterceptor`，常數時間比較），避免通知紀錄（含 LINE userId）被匿名讀取；LINE Webhook 仍由 `X-Line-Signature` 驗證。
-  - notification-service 呼叫 app-service 的內部端點（取得所有 LINE 綁定清單、依綁定身分查詢月結彙總、消費綁定碼完成綁定）**無平台使用者 JWT**，改以服務間共用密鑰 Header `X-Internal-Token` 驗證呼叫來源為受信任的服務；此為系統中唯一保留的跨進程身分驗證機制。
+  - notification-service 呼叫 app-service 的內部端點（取得所有在職成員的 LINE 身分清單、依 LINE userId 查詢所屬家庭、查詢月結彙總）**無平台使用者 JWT**，改以服務間共用密鑰 Header `X-Internal-Token` 驗證呼叫來源為受信任的服務；此為系統中唯一保留的跨進程身分驗證機制。
   - 登出僅為前端捨棄 token 的客戶端行為；JWT 為無狀態設計，本階段不提供伺服器端強制註銷機制（如黑名單），屬可接受的簡化。
 - **Rationale**: 驗證與業務邏輯同在 app-service 一個進程內，直接以 Spring Security filter + service 方法呼叫確認角色即可，無需額外網路呼叫與重複的 JWT 解析邏輯。`X-Internal-Token` 機制對唯一的跨進程呼叫（notification-service → app-service）仍保留，因這是系統中唯一真正需要「服務對服務信任」的情境。
 
@@ -52,7 +53,7 @@
 
 ## 9. 前端資料串接方式
 
-- **Decision**: React + TypeScript 搭配 Axios 處理 API 呼叫，並使用 TanStack Query (React Query) 管理伺服器狀態快取與重新驗證。前端建置產物直接由 app-service serve（同源部署，`/api/**` 與靜態頁面同一個 origin），呼叫 API 不需額外的 CORS 設定，也無獨立的 gateway 入口。
+- **Decision**: React + TypeScript 搭配 Axios 處理 API 呼叫，並使用 TanStack Query (React Query) 管理伺服器狀態快取與重新驗證。前端建置產物直接由 app-service serve（同源部署，`/api/**` 與靜態頁面同一個 origin），呼叫 API 不需額外的 CORS 設定，也無獨立的 gateway 入口。前端使用 BrowserRouter，`SpaFallbackConfig` 對找不到對應靜態檔案的非 `api/`、`actuator/` 路徑回傳 `index.html`，使直接開啟或重新整理前端路由（如 `/login`）可正常運作；本機開發由 Vite dev server 將 `/api` proxy 到 `localhost:8080`。
 - **Rationale**: 屬於「已具備技術」範疇內的常見周邊工具，能簡化列表篩選、統計月份切換等需重複查詢情境的狀態管理；同源部署進一步降低本機與正式環境設定的落差。
 
 ## 10. 資料庫存取技術（ORM/Mapper 選型）
@@ -73,9 +74,8 @@
 
 ## 13. API 錯誤模型
 
-- **Decision**: 全站（app-service 為主，notification-service 的框架層錯誤亦同）以 RFC 9457 Problem Details（`application/problem+json`）回應錯誤，欄位為 `status`、`title`、`detail`、`instance`，外加自訂的穩定錯誤代碼 `code`（驗證失敗時另有 `errors[]`）。業務錯誤**一律以 Exception 丟出**（`ApiException(ErrorKind, code, message)`），由單一 `GlobalExceptionHandler`（繼承 `ResponseEntityExceptionHandler`）轉換；Spring Security 在 filter 層的 401 / 403 由 `ProblemDetailAuthHandlers` 輸出相同格式。**不引入 `Result<T>` 型別**，也不維護 Result 與 Exception 兩套錯誤傳遞方式。
+- **Decision**: 全站（app-service 為主，notification-service 的框架層錯誤亦同）以 RFC 9457 Problem Details（`application/problem+json`）回應錯誤，欄位為 `status`、`title`、`detail`、`instance`，外加自訂的穩定錯誤代碼 `code`（驗證失敗時另有 `errors[]`）。業務錯誤**一律以 Exception 丟出**（`ApiException(ErrorKind, code, message)`），由單一 `GlobalExceptionHandler`（繼承 `ResponseEntityExceptionHandler`）轉換；Spring Security 在 filter 層的 401 / 403 由 `ProblemDetailAuthHandlers` 輸出相同格式。**不引入 `Result<T>` 型別**，只維護 Exception 一套錯誤傳遞方式。
 - **Rationale**: ProblemDetail 是 Spring 6 內建標準，前端只需一套邏輯（讀 `detail` 顯示、讀 `code` 分支）；`code` 讓 notification-service 與前端不必比對訊息文字。Exception 搭配 `@RestControllerAdvice` 是 Spring 生態的慣用寫法，已有的 service 與測試無需改寫，也符合原則 VI（不為展示而引入額外抽象）。
-- **Alternatives considered**: `Result<T>`（需要 service、controller 全面改寫，且與既有 Exception 風格並存會混亂，已排除）。
 
 ## 14. 列表分頁
 

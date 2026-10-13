@@ -10,7 +10,7 @@
 
 ## 與 app-service 的錯誤契約
 
-app-service 的錯誤回應為 RFC 9457 Problem Details（見 `contracts/app-service.md` 共通約定）。`AppServiceClient` 只讀取 `code` 與 `detail` 兩個欄位（其餘欄位忽略），轉成 `AppServiceClientException(statusCode, errorCode, message)` 供上層依 `errorCode` 決定 LINE 回覆內容（目前使用 `CODE_EXPIRED_OR_USED`、`LINE_ACCOUNT_ALREADY_BOUND`；「未綁定」則依 404 狀態判斷）；回應本體不是 Problem Details（例如閘道 502 的 HTML）時，`errorCode` 為 `UNKNOWN`。
+app-service 的錯誤回應為 RFC 9457 Problem Details（見 `contracts/app-service.md` 共通約定）。`AppServiceClient` 只讀取 `code` 與 `detail` 兩個欄位（其餘欄位忽略），轉成 `AppServiceClientException(statusCode, errorCode, message)` 供上層依 `errorCode` 決定 LINE 回覆內容（「LINE 帳號尚未加入任何家庭」依 404 狀態判斷）；回應本體不是 Problem Details（例如閘道 502 的 HTML）時，`errorCode` 為 `UNKNOWN`。
 
 本服務自身的 HTTP 錯誤（缺少 query 參數、路徑不存在等）同樣以 Problem Details 回應（`spring.mvc.problemdetails.enabled=true`），與 app-service 格式一致。
 
@@ -20,21 +20,21 @@ app-service 的錯誤回應為 RFC 9457 Problem Details（見 `contracts/app-ser
 - Header: `X-Line-Signature`（由 line-bot-sdk-java 驗證簽章）
 - Request: LINE Messaging API 事件格式（text message event）
 - 處理邏輯：
-  1. 若訊息為 6 碼綁定碼格式 → 呼叫 app-service `POST /api/internal/line-bindings` 完成綁定，回覆綁定成功/失敗訊息（FR-023）
-  2. 若訊息符合 `YYYY-MM` 格式 → 呼叫 app-service `GET /api/internal/line-bindings/by-line-user/{lineUserId}` 確認身分：
-     - 未綁定 → 回覆「此帳號尚未綁定家庭成員身分」，不洩漏任何家庭資料（FR-015）
-     - 已綁定 → 呼叫 app-service `GET /api/internal/statistics/monthly` 並回覆該月依支付帳戶彙總結果（FR-014）
-  3. 其他格式訊息 → 回覆格式提示訊息，不視為有效查詢（FR-014）
+  1. 若訊息符合 `YYYY-MM` 格式 → 呼叫 app-service `GET /api/internal/line-bindings/by-line-user/{lineUserId}` 確認發話者身分：
+     - 找不到（404）→ 回覆「此帳號尚未加入任何家庭，請先至平台以 LINE 登入並建立或加入家庭。」，不洩漏任何家庭資料（FR-015）
+     - 找到 → 呼叫 app-service `GET /api/internal/statistics/monthly` 並回覆該月依支付帳戶彙總結果（FR-014）
+  2. 其他格式訊息 → 回覆格式提示訊息，不視為有效查詢（FR-014）
+  3. 非文字訊息事件（follow、unfollow、join 等）一律忽略
 - Response 200（LINE 平台要求立即回應，實際回覆訊息透過 LINE Reply/Push API 非同步送出）
 
 ## 每月排程通知（內部排程觸發，非對外 API）
 
 - `@Scheduled(cron = "0 0 23 L * ?")`：每月最後一天 23:00 執行
 - 邏輯：
-  1. 呼叫 app-service `GET /api/internal/line-bindings` 取得所有已綁定成員（跨所有家庭）
-  2. 若某家庭當下無任何已綁定 LINE 的成員 → 略過該家庭，不視為錯誤
-  3. 對每位已綁定成員，呼叫 app-service `GET /api/internal/statistics/monthly` 取得其家庭當月（自月初至觸發當下）彙總，透過 LINE Push API 發送（FR-013）
-  4. 發送失敗 → 自動重試最多 3 次；仍失敗 → 寫入 `NotificationLog(status=FAILED)` 並放棄，不影響其他成員（FR-013）
+  1. 呼叫 app-service `GET /api/internal/line-bindings` 取得所有家庭的在職成員及其 LINE userId
+  2. 無在職成員的家庭不會出現在清單中，等同略過，不視為錯誤
+  3. 對每位成員，呼叫 app-service `GET /api/internal/statistics/monthly` 取得其家庭當月（自月初至觸發當下）彙總，透過 LINE Push API 發送（FR-013）
+  4. 發送失敗 → 最多嘗試 3 次（`app.notification.max-retries`）；仍失敗 → 寫入 `NotificationLog(status=FAILED)` 並放棄，不影響其他成員（FR-013）
   5. 成功 → 寫入 `NotificationLog(status=SUCCESS)`
 
 ## 查詢紀錄（供維運/測試檢視，非核心功能）

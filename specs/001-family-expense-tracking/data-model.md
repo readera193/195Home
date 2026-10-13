@@ -13,11 +13,11 @@ schema 定義對應 `app-service/src/main/resources/db/migration/`（Flyway migr
 | 欄位 | 型別 | 說明 |
 |------|------|------|
 | id | BIGINT PK | |
-| email | VARCHAR(255) UNIQUE NOT NULL | 全系統唯一（FR-024） |
-| passwordHash | VARCHAR(255) NOT NULL | BCrypt 雜湊 |
+| lineUserId | VARCHAR(64) UNIQUE NOT NULL | LINE userId，即登入身分，全系統唯一（FR-020、FR-024）；dev 假登入為 `"dev-" + 暱稱` |
+| displayName | VARCHAR(255) NOT NULL | LINE 暱稱；每次登入時同步更新 |
 | createdAt | DATETIME(6) NOT NULL | |
 
-**驗證規則**：註冊時 email 已存在 → 拒絕並提示「此 Email 已被註冊，請改用登入」（FR-024）。
+**驗證規則**：以 `lineUserId` 查詢，不存在則於首次登入時自動建立（FR-024）；無密碼欄位。
 
 #### FamilyGroup（家庭群組）
 
@@ -58,29 +58,9 @@ schema 定義對應 `app-service/src/main/resources/db/migration/`（Flyway migr
 - `LEFT` 與 `REMOVED` 皆視為「已離開」顯示於成員篩選清單（FR-021），且皆不佔用 FR-026 的在職名額，可建立或加入其他群組。
 - `role`：`ADMIN` 離開仍有其他在職成員的群組時，自動將 `ADMIN` 轉移給群組內 `joinedAt` 最早的其他在職成員（FR-029）。
 
-#### LineBindingCode（LINE 綁定碼）
+#### 登入驗證
 
-| 欄位 | 型別 | 說明 |
-|------|------|------|
-| id | BIGINT PK | |
-| familyMemberId | BIGINT FK → FamilyMember | |
-| code | VARCHAR(16) UNIQUE NOT NULL | |
-| expiresAt | DATETIME(6) NOT NULL | 產生後 10 分鐘（FR-023） |
-| used | TINYINT(1) NOT NULL DEFAULT 0 | |
-| createdAt | DATETIME(6) NOT NULL | |
-
-**驗證規則**：`used = 1` 或 `expiresAt < now` 的綁定碼不可再使用，須重新產生（FR-023）。
-
-#### LineBinding（LINE 帳號綁定關係）
-
-| 欄位 | 型別 | 說明 |
-|------|------|------|
-| id | BIGINT PK | |
-| familyMemberId | BIGINT FK → FamilyMember UNIQUE | 每個成員身分僅一個綁定 |
-| lineUserId | VARCHAR(64) UNIQUE NOT NULL | 每個 LINE 帳號僅能綁定一個成員身分（FR-020） |
-| boundAt | DATETIME(6) NOT NULL | |
-
-**登入驗證**：採 JWT（見 research.md 決策 7），不儲存 Session 資料表；token 本身即攜帶 `userId`、`email`、簽發/過期時間，由 app-service 簽發與本地驗證，無需查詢資料庫。
+採 JWT（見 research.md 決策 7），不儲存 Session 資料表；token 本身攜帶 `userId`（`sub`）、`displayName`、簽發/過期時間，由 app-service 簽發與本地驗證，無需查詢資料庫。LINE 身分與家庭成員的對應直接由 `users.line_user_id` → 在職的 `family_members` 推得，無獨立的綁定資料表。
 
 ---
 
@@ -169,8 +149,6 @@ schema 定義對應 `notification-service/src/main/resources/db/migration/`（Fl
 ┌─────────────────────────── app-service（單一進程） ───────────────────────────┐
 │                                                                              │
 │   User ──< FamilyMember >── FamilyGroup        (family 模組)                │
-│              │                                                              │
-│              ├─ LineBinding / LineBindingCode                              │
 │              │                                                              │
 │              ▼ （同進程方法呼叫，確認角色/在職狀態）                         │
 │   PaymentAccount ──< ExpenseRecord             (expense 模組)               │

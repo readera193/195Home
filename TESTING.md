@@ -4,7 +4,7 @@
 
 | 類型 | 位置 | 需要 Docker | 說明 |
 |------|------|:-----------:|------|
-| 單元測試（Service / 工具類別） | `*/src/test/java/**/*Test.java` | 否 | JUnit 5 + Mockito；覆蓋核心商業邏輯（權限判斷、金額驗證、併發鎖定、月結彙總、LINE 綁定、通知重試、分頁參數） |
+| 單元測試（Service / 工具類別） | `*/src/test/java/**/*Test.java` | 否 | JUnit 5 + Mockito；覆蓋核心商業邏輯（權限判斷、金額驗證、併發鎖定、月結彙總、LINE 身分對應成員、通知重試、分頁參數） |
 | Web 層測試 | `GlobalExceptionHandlerTest`、`SecurityErrorResponseTest` | 否 | MockMvc；驗證所有錯誤皆為 Problem Details（`application/problem+json`，含 `code`） |
 | 整合測試（Mapper + Flyway） | `*IntegrationTest.java` | **是** | Testcontainers 啟動真實 MySQL 8.4，驗證 migration 與 MyBatis SQL（篩選、分頁、條件式鎖定） |
 | 前端測試 | `frontend/tests/` | 否 | Vitest + React Testing Library |
@@ -44,7 +44,7 @@ cd app-service && ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
 
 ## 手動 API 測試
 
-`app-service/http/app-service.http`（VS Code 安裝 REST Client 擴充套件後可逐一送出請求），涵蓋註冊 → 登入 → 建立家庭 → 支付帳戶 → 支出（含分頁與篩選）→ 統計，以及各種錯誤回應範例。
+`app-service/http/app-service.http`（VS Code 安裝 REST Client 擴充套件後可逐一送出請求），涵蓋 LINE 登入 → 建立家庭 → 支付帳戶 → 支出（含分頁與篩選）→ 統計，以及各種錯誤回應範例。
 
 ## 資料庫 Migration 規則
 

@@ -9,7 +9,7 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 **Prerequisites**: [plan.md](./plan.md)、[spec.md](./spec.md)、[research.md](./research.md)、[data-model.md](./data-model.md)、[contracts/](./contracts/)、[quickstart.md](./quickstart.md)、[.specify/memory/constitution.md](../../.specify/memory/constitution.md)（架構：app-service + notification-service 2 個部署服務）
 
-**Tests**: 依 constitution 原則 IV（核心商業邏輯測試優先），下方各 User Story 皆包含針對 plan.md Technical Context 明列之核心邏輯（家庭成員權限判斷、金額整數驗證、併發鎖定、月結彙總計算、LINE 綁定唯一性、通知重試邏輯）的單元測試任務；不涵蓋樣板程式碼（getter/setter、DTO 轉換）測試。
+**Tests**: 依 constitution 原則 IV（核心商業邏輯測試優先），下方各 User Story 皆包含針對 plan.md Technical Context 明列之核心邏輯（家庭成員權限判斷、金額整數驗證、併發鎖定、月結彙總計算、LINE 身分對應成員、通知重試邏輯）的單元測試任務；不涵蓋樣板程式碼（getter/setter、DTO 轉換）測試。
 
 **Organization**: 任務依 User Story 分組，各 Story 皆可獨立實作與測試。
 
@@ -52,19 +52,19 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 ## Phase 2: Foundational（阻擋性前置需求）
 
-**Purpose**: 使用者帳號、登入、JWT 簽發與驗證機制、內部 API 驗證機制——所有 User Story 皆須先完成登入才能操作（FR-024），故列為阻擋性基礎設施
+**Purpose**: 使用者帳號（LINE 身分登入）、JWT 簽發與驗證機制、內部 API 驗證機制——所有 User Story 皆須先完成登入才能操作（FR-024），故列為阻擋性基礎設施
 
 **⚠️ CRITICAL**: 本階段完成前，不可開始任何 User Story 的開發
 
-- [X] T009 [P] 建立 User 資料模型（POJO）、repository 介面與 MyBatis Mapper 於 `app-service/src/main/java/com/family195home/app/family/domain/User.java`、`application/UserRepository.java`、`infrastructure/persistence/UserRepositoryImpl.java`、`infrastructure/persistence/UserMapper.java`、`resources/mapper/family/UserMapper.xml`（對應 `appdb`）
-- [X] T010 [P] 實作 BCrypt 密碼雜湊設定與 JWT 簽發/驗證工具類別（HS256、Claim 含 `sub`/`email`/`iat`/`exp`，2 小時過期）於 `app-service/src/main/java/com/family195home/app/infrastructure/security/JwtTokenProvider.java`；簽發能力以 `family/application/TokenIssuer`（port）對外提供，`JwtTokenProvider` 為其 adapter，`UserService` 僅依賴 `TokenIssuer`
-- [X] T011 實作 `POST /api/users/register`、`POST /api/users/login` API（含 Email 全系統唯一性檢查，重複則回傳 `409 EMAIL_ALREADY_REGISTERED`，FR-024）於 `app-service/src/main/java/com/family195home/app/family/presentation/UserController.java` 與對應 service 層（依賴 T009、T010）
-- [X] T012 [P] 於 `app-service/src/main/java/com/family195home/app/infrastructure/security/JwtAuthFilter.java` 實作 Spring Security filter chain：對 `/api/**`（排除 `/api/users/register`、`/api/users/login`、`/api/internal/**`、靜態資源）以簽章密鑰本地驗證 JWT 與過期時間，失敗回傳 `401`（同進程完成驗證，無獨立 Gateway 進程，見 research.md 決策 7）
+- [X] T009 [P] 建立 User 資料模型（POJO，`lineUserId` 唯一、`displayName`）、repository 介面與 MyBatis Mapper 於 `app-service/src/main/java/com/family195home/app/family/domain/User.java`、`application/UserRepository.java`、`infrastructure/persistence/UserRepositoryImpl.java`、`infrastructure/persistence/UserMapper.java`、`resources/mapper/family/UserMapper.xml`（對應 `appdb`）
+- [X] T010 [P] 實作 JWT 簽發/驗證工具類別（HS256、Claim 含 `sub`(userId)/`displayName`/`iat`/`exp`，2 小時過期）於 `app-service/src/main/java/com/family195home/app/infrastructure/security/JwtTokenProvider.java`；簽發能力以 `family/application/TokenIssuer`（port）對外提供，`JwtTokenProvider` 為其 adapter，`UserService` 僅依賴 `TokenIssuer`
+- [X] T011 實作 `POST /api/auth/line` 登入 API：`family/application/LineLoginClient`（port）換取 `LineProfile`，`UserService.loginWithLine` 首次登入自動建立帳號、之後同步 LINE 暱稱並簽發 JWT（FR-024）；dev/test 以 `infrastructure/line/DevLineLoginClient` 假登入（`code` 即暱稱）；Controller 於 `app-service/src/main/java/com/family195home/app/family/presentation/UserController.java`（依賴 T009、T010）
+- [X] T012 [P] 於 `app-service/src/main/java/com/family195home/app/infrastructure/security/JwtAuthFilter.java` 實作 Spring Security filter chain：對 `/api/**`（排除 `POST /api/auth/line`、`/api/internal/**`、`/actuator/health`、靜態資源）以簽章密鑰本地驗證 JWT 與過期時間，失敗回傳 `401`（同進程完成驗證，無獨立 Gateway 進程，見 research.md 決策 7）
 - [X] T013 [P] 於 `app-service/src/main/java/com/family195home/app/infrastructure/security/InternalTokenFilter.java` 實作 `X-Internal-Token` 驗證 filter，套用於 `/api/internal/**`，僅允許持有共用密鑰的呼叫者存取（僅供 notification-service 呼叫，見 contracts/app-service.md）
-- [X] T014 [P] 前端建立登入/註冊頁面與 Axios 攔截器（自動帶入 `Authorization: Bearer <JWT>`、401 導回登入頁）於 `frontend/src/pages/LoginPage.tsx`、`frontend/src/pages/RegisterPage.tsx`、`frontend/src/services/apiClient.ts`
+- [X] T014 [P] 前端建立 LINE 登入頁（dev 為輸入暱稱的假登入）與 Axios 攔截器（自動帶入 `Authorization: Bearer <JWT>`、401 導回登入頁）於 `frontend/src/pages/LoginPage.tsx`、`frontend/src/services/apiClient.ts`、`frontend/src/services/userApi.ts`
 - [X] T015 [P] 前端建立路由骨架與受保護路由（React Router，未登入導向登入頁）於 `frontend/src/App.tsx`
 
-**Checkpoint**: 帳號註冊/登入、JWT 簽發與本地驗證、內部 API 驗證機制就緒，可開始平行進行各 User Story 開發
+**Checkpoint**: LINE 登入、JWT 簽發與本地驗證、內部 API 驗證機制就緒，可開始平行進行各 User Story 開發
 
 ---
 
@@ -94,7 +94,7 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 ## Phase 4: User Story 2 - 建立支付帳戶並記錄支出 (Priority: P1)
 
-**Goal**: 成員可建立支付帳戶，並新增/編輯/刪除支出紀錄（含併發編輯鎖定），金額可正可負可零且為整數，備註必填
+**Goal**: 管理者可建立支付帳戶，成員可，並新增/編輯/刪除支出紀錄（含併發編輯鎖定），金額可正可負可零且為整數，備註必填
 
 **Independent Test**: 成員建立一個支付帳戶後，新增一筆支出紀錄，驗證該紀錄正確包含備註、金額、日期與支付帳戶，且未指定日期時預設為當下
 
@@ -110,8 +110,8 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 - [X] T034 [P] [US2] 實作 `POST /api/expenses` 建立端點於 `app-service/src/main/java/com/family195home/app/expense/presentation/ExpenseController.java`（依賴 T031）
 - [X] T035 [US2] 實作 `PUT /api/expenses/{id}`、`DELETE /api/expenses/{id}`、`POST /api/expenses/{id}/lock`、`POST /api/expenses/{id}/unlock` 端點於 `ExpenseController.java`（依賴 T032、T033）
 - [X] T036 [P] [US2] 單元測試：金額整數與正負零驗證（FR-016）、併發鎖定取得與釋放邏輯（FR-027）、編輯/刪除權限判斷（群組任一在職成員皆可、非成員拒絕，FR-019，含呼叫 `assertMemberAuthorized` 的整合行為）於 `app-service/src/test/java/com/family195home/app/expense/application/ExpenseServiceTest.java`
-- [X] T037 [P] [US2] 前端支付帳戶管理頁面（建立、停用支付帳戶）於 `frontend/src/pages/PaymentAccountsPage.tsx`
-- [X] T038 [P] [US2] 前端新增/編輯支出表單（金額、備註、支付帳戶、日期，含前端整數驗證與必填提示）於 `frontend/src/pages/ExpenseFormPage.tsx`
+- [X] T037 [P] [US2] 前端支付帳戶管理頁面（管理者可建立、改名、停用、刪除支付帳戶，一般成員僅檢視）於 `frontend/src/pages/PaymentAccountsPage.tsx`
+- [X] T038 [P] [US2] 前端新增支出表單（金額、說明、支付帳戶、日期，含前端整數驗證與必填提示），內嵌於 `frontend/src/pages/ExpenseListPage.tsx`
 - [X] T039 [US2] 前端封裝支出相關 API 呼叫於 `frontend/src/services/expenseApi.ts`（依賴 T014 的 apiClient）
 
 **Checkpoint**: User Story 1、2 應皆可獨立運作；核心記帳功能完成
@@ -154,25 +154,20 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 ## Phase 7: User Story 5 - 每月自動 LINE 通知支出匯總 (Priority: P3)
 
-**Goal**: 成員可於平台產生 LINE 綁定碼並在 LINE Bot 完成綁定；系統於每月最後一天 23:00 自動推播當月支出匯總，失敗自動重試
+**Goal**: 系統於每月最後一天 23:00 自動推播當月支出匯總，失敗自動重試
 
-**Independent Test**: 設定好家庭成員的 LINE 綁定後，於每月最後一天 23:00 觸發通知流程，驗證每位已綁定成員皆收到當月完整支出匯總訊息，且失敗重試不影響其他成員
+**Independent Test**: 家庭成員皆已以 LINE 登入並加入家庭群組後，於每月最後一天 23:00 觸發通知流程，驗證每位在職成員皆收到當月完整支出匯總訊息，且失敗重試不影響其他成員
 
 ### Implementation for User Story 5
 
-- [X] T048 [P] [US5] 建立 LineBindingCode 資料模型（POJO）、repository 介面與 MyBatis Mapper（10 分鐘有效期、單次使用）於 `app-service/src/main/java/com/family195home/app/family/domain/LineBindingCode.java`、`application/LineBindingCodeRepository.java`、`infrastructure/persistence/LineBindingCodeRepositoryImpl.java`、`infrastructure/persistence/LineBindingCodeMapper.java`、`resources/mapper/family/LineBindingCodeMapper.xml`
-- [X] T049 [P] [US5] 建立 LineBinding 資料模型（POJO）、repository 介面與 MyBatis Mapper（每個 `lineUserId` 唯一，僅能綁定一個成員身分，FR-020）於 `app-service/src/main/java/com/family195home/app/family/domain/LineBinding.java`、`application/LineBindingRepository.java`、`infrastructure/persistence/LineBindingRepositoryImpl.java`、`infrastructure/persistence/LineBindingMapper.java`、`resources/mapper/family/LineBindingMapper.xml`
-- [X] T050 [US5] 實作 `LineBindingService` 產生綁定碼邏輯（限本人，10 分鐘有效，FR-023）於 `app-service/src/main/java/com/family195home/app/family/application/LineBindingService.java`（依賴 T048）
-- [X] T051 [US5] 實作 `LineBindingService` 消費綁定碼邏輯（驗證碼有效性與單次使用，過期/已用拋出對應例外供 `410 CODE_EXPIRED_OR_USED`；LINE 帳號重複綁定 `409 LINE_ACCOUNT_ALREADY_BOUND`，FR-020）與依 `lineUserId` 查詢綁定身分邏輯於 `LineBindingService.java`（依賴 T049、T050）
-- [X] T052 [US5] 實作 `POST /api/families/members/{id}/line-binding-codes` 公開端點；`POST /api/internal/line-bindings`、`GET /api/internal/line-bindings/by-line-user/{lineUserId}`、`GET /api/internal/line-bindings` 三個內部端點（受 T013 的 `X-Internal-Token` filter 保護，僅供 notification-service 呼叫）於 `app-service/src/main/java/com/family195home/app/family/presentation/LineBindingController.java`（依賴 T051）
-- [X] T053 [US5] 實作 `GET /api/internal/statistics/monthly` 內部端點（略過 `assertMemberAuthorized` 呼叫，家庭歸屬已由 notification-service 依 LINE 綁定關係決定）於 `app-service/src/main/java/com/family195home/app/statistics/presentation/StatisticsController.java`（依賴 T043、T013）
-- [X] T054 [P] [US5] 單元測試：綁定碼過期/已使用拒絕、同一 LINE 帳號重複綁定拒絕（FR-020）於 `app-service/src/test/java/com/family195home/app/family/application/LineBindingServiceTest.java`
+- [X] T050 [US5] 實作 `LineBindingService`：依 LINE userId 查詢其目前所屬家庭的在職成員（FR-015）、列出所有家庭的在職成員及其 LINE userId（供月結排程），身分直接由 `users.line_user_id` 對應在職 `family_members` 推得，無獨立綁定資料表，於 `app-service/src/main/java/com/family195home/app/family/application/LineBindingService.java`
+- [X] T052 [US5] 實作 `GET /api/internal/line-bindings/by-line-user/{lineUserId}`、`GET /api/internal/line-bindings` 兩個內部端點（受 T013 的 `X-Internal-Token` filter 保護，僅供 notification-service 呼叫）於 `app-service/src/main/java/com/family195home/app/family/presentation/LineBindingController.java`（依賴 T050）
+- [X] T053 [US5] 實作 `GET /api/internal/statistics/monthly` 內部端點（略過 `assertMemberAuthorized` 呼叫，家庭歸屬已由 notification-service 依發話者的 LINE 身分決定）於 `app-service/src/main/java/com/family195home/app/statistics/presentation/StatisticsController.java`（依賴 T043、T013）
+- [X] T054 [P] [US5] 單元測試：LINE 身分對應在職成員（未登入過／已離開者查無結果）、列出所有在職成員於 `app-service/src/test/java/com/family195home/app/family/application/LineBindingServiceTest.java`；LINE 登入建立帳號與沿用既有帳號並同步暱稱於 `UserServiceTest.java`
 - [X] T055 [P] [US5] 建立 NotificationLog 資料模型（POJO）、repository 介面與 MyBatis Mapper 於 `notification-service/src/main/java/com/family195home/notification/domain/NotificationLog.java`、`application/NotificationLogRepository.java`、`infrastructure/persistence/NotificationLogRepositoryImpl.java`、`infrastructure/persistence/NotificationLogMapper.java`、`resources/mapper/NotificationLogMapper.xml`
 - [X] T056 [US5] 實作呼叫 app-service 內部 API 的 WebClient client 元件（請求自動帶入 `X-Internal-Token` Header，app-service base URL 由環境變數設定，本機為 docker-compose 服務名稱，正式環境為 Northflank 內部網域，見 research.md 決策 6）於 `notification-service/src/main/java/com/family195home/notification/infrastructure/client/AppServiceClient.java`
-- [X] T057 [US5] 實作 LINE Webhook 綁定碼處理分支：`POST /api/line/webhook` 收到綁定碼格式訊息時呼叫 `AppServiceClient` 完成綁定並回覆結果（FR-023）於 `notification-service/src/main/java/com/family195home/notification/presentation/LineWebhookController.java`（依賴 T052、T056）
-- [X] T058 [US5] 實作每月排程通知邏輯：`@Scheduled(cron = "0 0 23 L * ?")` 呼叫 `AppServiceClient` 取得所有綁定（跨家庭）、無綁定成員的家庭略過、呼叫 `AppServiceClient` 取得當月彙總、透過 LINE Push API 發送、失敗自動重試最多 3 次仍失敗則寫入 `NotificationLog(status=FAILED)` 並不影響其他成員（FR-013）於 `notification-service/src/main/java/com/family195home/notification/presentation/scheduler/MonthlyNotificationScheduler.java`（依賴 T055、T056、T053）
-- [X] T059 [P] [US5] 單元測試：發送失敗重試邏輯（達重試上限標記 FAILED、不影響其他已綁定成員，FR-013）於 `notification-service/src/test/java/com/family195home/notification/presentation/scheduler/MonthlyNotificationSchedulerTest.java`
-- [X] T060 [P] [US5] 前端成員設定頁面新增「產生 LINE 綁定碼」功能（顯示綁定碼與剩餘有效時間）於 `frontend/src/pages/LineBindingPage.tsx`
+- [X] T058 [US5] 實作每月排程通知邏輯：`@Scheduled(cron = "0 0 23 L * ?")` 呼叫 `AppServiceClient` 取得所有在職成員（跨家庭）、無在職成員的家庭不會出現在清單中、呼叫 `AppServiceClient` 取得當月彙總、透過 LINE Push API 發送、失敗最多嘗試 3 次仍失敗則寫入 `NotificationLog(status=FAILED)` 並不影響其他成員（FR-013）於 `notification-service/src/main/java/com/family195home/notification/presentation/scheduler/MonthlyNotificationScheduler.java`（依賴 T055、T056、T053）
+- [X] T059 [P] [US5] 單元測試：發送失敗重試邏輯（達重試上限標記 FAILED、不影響其他成員，FR-013）於 `notification-service/src/test/java/com/family195home/notification/presentation/scheduler/MonthlyNotificationSchedulerTest.java`
 
 **Checkpoint**: User Story 1-5 應皆可獨立運作
 
@@ -180,15 +175,15 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 ## Phase 8: User Story 6 - 透過 LINE 關鍵字主動查詢月支出匯總 (Priority: P3)
 
-**Goal**: 已綁定成員可透過 LINE 傳送「YYYY-MM」格式訊息主動查詢指定月份的家庭支出匯總
+**Goal**: 在職成員可透過 LINE 傳送「YYYY-MM」格式訊息主動查詢指定月份的家庭支出匯總
 
-**Independent Test**: 已綁定 LINE 的成員透過 LINE 傳送指定月份（格式為「YYYY-MM」）的查詢訊息，驗證系統回覆該月份正確的支出匯總內容；未綁定帳號查詢時不洩漏任何家庭資料
+**Independent Test**: 在職成員透過 LINE 傳送指定月份（格式為「YYYY-MM」）的查詢訊息，驗證系統回覆該月份正確的支出匯總內容；未加入任何家庭的帳號查詢時不洩漏任何家庭資料
 
 ### Implementation for User Story 6
 
-- [X] T061 [US6] 擴充 LINE Webhook 邏輯：解析 `YYYY-MM` 格式訊息，呼叫 `AppServiceClient` 依 `lineUserId` 確認綁定身分（未綁定回覆「此帳號尚未綁定家庭成員身分」，不洩漏家庭資料，FR-015），已綁定則呼叫 `AppServiceClient` 取得月結彙總並回覆結果（FR-014）於 `notification-service/src/main/java/com/family195home/notification/presentation/LineWebhookController.java`（依賴 T057）
-- [X] T062 [US6] 擴充 LINE Webhook 邏輯：非綁定碼、非 `YYYY-MM` 格式訊息一律回覆格式提示訊息，不視為有效查詢（FR-014）於 `LineWebhookController.java`（依賴 T061）
-- [X] T063 [P] [US6] 單元測試：`YYYY-MM` 格式解析正確性、未綁定帳號查詢阻擋（FR-015）、無效格式回覆提示於 `notification-service/src/test/java/com/family195home/notification/presentation/LineWebhookControllerTest.java`
+- [X] T061 [US6] 實作 LINE Webhook 月份查詢：解析 `YYYY-MM` 格式訊息，呼叫 `AppServiceClient` 依 `lineUserId` 確認所屬家庭（查無時回覆「此帳號尚未加入任何家庭，請先至平台以 LINE 登入並建立或加入家庭。」，不洩漏家庭資料，FR-015），找到則呼叫 `AppServiceClient` 取得月結彙總並回覆結果（FR-014）於 `notification-service/src/main/java/com/family195home/notification/presentation/LineWebhookController.java`（依賴 T056）
+- [X] T062 [US6] LINE Webhook：非 `YYYY-MM` 格式訊息一律回覆格式提示訊息，不視為有效查詢（FR-014）；非文字訊息事件忽略，於 `LineWebhookController.java`（依賴 T061）
+- [X] T063 [P] [US6] 單元測試：`YYYY-MM` 格式解析正確性、未加入任何家庭的帳號查詢阻擋（FR-015）、無效格式回覆提示於 `notification-service/src/test/java/com/family195home/notification/presentation/LineWebhookControllerTest.java`
 
 **Checkpoint**: 所有 User Story（US1-US6）應皆可獨立運作
 
@@ -204,13 +199,13 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 - [X] T067 [P] 建立 `.github/workflows/cd.yml`：build app-service、notification-service 映像檔 → 推送 GHCR → 觸發 Northflank 對應兩個 service 拉取並部署最新映像檔（見 research.md 決策 1、quickstart.md「部署到 Northflank」段落）
 - [X] T068 [P] 撰寫 `README.md`：系統架構圖、app-service（含 family/expense/statistics 模組）與 notification-service 職責說明、技術選型理由（含「為什麼不用 .NET」「為什麼不用訊息佇列」「為什麼只拆兩個服務，不是完整微服務」之具體回答，依 constitution 開發流程規範）
 - [X] T069 依 [quickstart.md](./quickstart.md) 逐項執行 US1-US6 驗證場景，確認端對端可正常運作
-- [X] T070 [P] 前端關鍵元件測試（Vitest + React Testing Library）：登入表單、支出新增表單驗證邏輯於 `frontend/tests/`
+- [X] T070 [P] 前端關鍵元件測試（Vitest + React Testing Library）：LINE 登入表單、支出列表（含新增表單與分頁）、錯誤訊息解析於 `frontend/tests/`
 - [X] T071 [P] app-service（family、expense 模組）、notification-service 補上 MyBatis Mapper slice 測試，驗證自訂 SQL 查詢語意（例如依 `familyGroupId`/`status` 篩選、排序；分頁 SQL 見 T080），於各自 `src/test/java/.../infrastructure/persistence/`
 - [X] T072 [P] app-service、notification-service 補上正式資料庫 integration 測試（Testcontainers + MySQL，比照 task-board-practice `MySqlRepositoryIntegrationTest` 模式），驗證 Flyway migration 可於真實 MySQL 執行且 Mapper SQL 與 MySQL 方言相容，於各自 `src/test/java/.../`
 
 ---
 
-## Phase 10: 架構精進（2026-10-08，對照 task-board-practice 後的改善）
+## Phase 10: 架構精進（錯誤模型、分頁、設定、開發輔助）
 
 **Purpose**: 統一錯誤模型、補上分頁、強化設定與開發體驗；對應 research.md 決策 5、12、13、14、15。各項皆已含測試。
 
@@ -218,7 +213,7 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 - [X] T074 [P] Security 層 401／403 回傳 Problem Details：新增 `ProblemDetailAuthHandlers`（`AuthenticationEntryPoint` + `AccessDeniedHandler`）並於 `SecurityConfig` 註冊，於 `app-service/src/main/java/com/family195home/app/infrastructure/security/`，測試 `SecurityErrorResponseTest.java`（`@WebMvcTest`）
 - [X] T075 notification-service 對齊錯誤契約：`ErrorBody` 改讀 Problem Details 的 `code`／`detail`（忽略其餘欄位），錯誤解析抽為 `AppServiceClient.parseError` 並補測試 `AppServiceClientErrorParsingTest.java`；`spring.mvc.problemdetails.enabled=true` 使框架層錯誤格式一致
 - [X] T076 前端錯誤處理對齊：新增 `frontend/src/utils/apiError.ts`（`getErrorMessage`／`getErrorCode`）取代各頁面 `err.response?.data?.message`，移除 `catch (err: any)`；補測試 `frontend/tests/apiError.test.ts`、更新 `LoginPage.test.tsx`
-- [X] T077 支出列表分頁（後端）：新增 `common/PagedResult`、`ExpenseService.listPage`（`page`／`size` 驗證，上限 100，違規 `400 INVALID_PAGE_PARAMS`）、`ExpenseRecordRepository.findPageByFilter`／`countByFilter`、`ExpenseRecordMapper.xml`（共用 `filterWhere`、`ORDER BY occurred_at DESC, id DESC`、`LIMIT/OFFSET`）、`ExpenseController` 回傳分頁結構；statistics 仍走不分頁的 `list`（research.md 決策 14）
+- [X] T077 支出列表分頁（後端）：新增 `shared/PagedResult`、`ExpenseService.listPage`（`page`／`size` 驗證，上限 100，違規 `400 INVALID_PAGE_PARAMS`）、`ExpenseRecordRepository.findPageByFilter`／`countByFilter`、`ExpenseRecordMapper.xml`（共用 `filterWhere`、`ORDER BY occurred_at DESC, id DESC`、`LIMIT/OFFSET`）、`ExpenseController` 回傳分頁結構；statistics 仍走不分頁的 `list`（research.md 決策 14）
 - [X] T078 支出列表分頁（前端）：`expenseApi.listExpenses` 回傳 `PagedResponse`，`ExpenseListPage.tsx` 加上上一頁／下一頁與頁數資訊（切換篩選回第一頁），測試 `frontend/tests/ExpenseListPage.test.tsx`
 - [X] T079 設定依 profile 拆分：兩個服務各自 `application.yml`（無機密預設值）＋ `application-dev.yml`／`application-prod.yml`＋測試 `application-test.yml`；Dockerfile 預設 `SPRING_PROFILES_ACTIVE=prod`、`docker-compose.yml` 覆寫為 `dev`；整合測試加 `@ActiveProfiles("test")`（research.md 決策 5）
 - [X] T080 [P] 整合測試補分頁 SQL：`ExpenseRecordMapperIntegrationTest` 新增 `pageQuery_ordersNewestFirstWithStableTieBreakAndCountsAll`（Testcontainers，需 Docker）
@@ -233,6 +228,19 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 ---
 
+## Phase 11: LINE 登入與前端介面（2026-10-13）
+
+**Purpose**: 帳號改為 LINE 身分登入（FR-024）、前端共用版面與 SPA 路由支援；對應 research.md 決策 7、9。
+
+- [X] T089 以 LINE 登入取代 Email + 密碼與綁定碼流程：新增 Flyway `V2__line_login.sql`（移除 `line_binding_codes`、`line_bindings` 與 `users.email`／`password_hash`，新增 `users.line_user_id`／`display_name`）、`LineLoginClient`／`LineProfile` port、`DevLineLoginClient`（dev/test 假登入）、`POST /api/auth/line`；移除 `PasswordEncoderConfig`、註冊頁、綁定頁與相關 DTO／Mapper
+- [X] T090 [P] 新增 `config/SpaFallbackConfig`：前端 BrowserRouter 路由（如 `/login`）直接開啟或重新整理時回傳 `index.html`（`api/`、`actuator/` 路徑除外）
+- [X] T091 [P] 前端共用版面與樣式：`components/Layout.tsx`（導覽列、登出）、`components/InfoTip.tsx`（說明 tooltip）、`styles.css`，各頁面套用；新增支出表單併入 `ExpenseListPage`
+- [X] T092 [P] 本機開發體驗：README 「本機開發」兩種方式（只跑 MySQL＋前後端本機執行／全 Docker）、`.vscode/tasks.json` 一鍵啟動、`~/.195home/*.yml` 選用覆蓋檔、`vite.config.ts` 將 `/api` proxy 到 8080
+- [ ] T093 實作真實 LINE Login：新增 `LineLoginClient` 的 prod adapter（以授權碼向 LINE 換取 profile）、前端登入頁改為導向 LINE 授權頁並於 callback 以授權碼呼叫 `POST /api/auth/line`；目前 prod profile 沒有 `LineLoginClient` 實作，app-service 無法於 prod 啟動（research.md 決策 7）
+- [ ] T094 前端支出編輯／刪除：於 `ExpenseListPage` 提供編輯、刪除操作，串接既有 `lockExpense`／`updateExpense`／`deleteExpense`／`unlockExpense`（`expenseApi.ts` 已封裝），並顯示「紀錄目前正被編輯中」提示（FR-019、FR-027；後端端點已完成）
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -242,7 +250,7 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 - **User Stories (Phase 3-8)**：皆依賴 Foundational 完成後才可開始
   - US1、US2（P1）可平行開發（app-service 內不同套件模組：family vs expense，檔案互不重疊）
   - US3、US4（P2）依賴 US2 的 ExpenseRecord/PaymentAccount 端點已存在（T034、T030），故需在 US2 完成後開始
-  - US5、US6（P3）依賴 US1（FamilyMember/`assertMemberAuthorized`）與 US4（StatisticsService）已完成；US6 直接建立於 US5 的 Webhook 控制器之上（T061 依賴 T057），為序列相依
+  - US5、US6（P3）依賴 US1（FamilyMember/`assertMemberAuthorized`）與 US4（StatisticsService）已完成；US6 的月份查詢建立於 notification-service 的 Webhook 控制器與 `AppServiceClient` 之上（T061 依賴 T056），為序列相依
 - **Polish (Phase 9)**：依賴所有欲交付的 User Story 完成
 
 ### User Story Dependencies
@@ -288,7 +296,7 @@ Task: "前端成員列表頁面於 frontend/src/pages/MembersPage.tsx"
 ### MVP First（User Story 1 + 2）
 
 1. 完成 Phase 1：Setup
-2. 完成 Phase 2：Foundational（阻擋所有 Story，含帳號註冊/登入、JWT 機制與內部 API 驗證機制）
+2. 完成 Phase 2：Foundational（阻擋所有 Story，含 LINE 登入、JWT 機制與內部 API 驗證機制）
 3. 完成 Phase 3：User Story 1（建立家庭群組並邀請成員）
 4. 完成 Phase 4：User Story 2（建立支付帳戶並記錄支出）
 5. **STOP 並驗證**：依 quickstart.md US1、US2 場景獨立測試

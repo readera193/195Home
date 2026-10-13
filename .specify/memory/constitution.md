@@ -1,40 +1,10 @@
 <!--
 Sync Impact Report
-- Version change: 2.0.0 → 3.0.0（架構層級變更：對既有原則「系統依業務功能拆分為多個獨立的
-  Spring Boot 微服務」做不相容於原意的重新定義——收斂為 2 個部署服務，屬 MAJOR）
-- Modified principles:
-  - I. 微服務邊界與資料自主權 → 更名為「服務邊界與資料自主權」：服務數量由「多個獨立微服務」
-    收斂為 2 個部署服務（app-service、notification-service），改以套件（package）層級模組化
-    取代進程層級拆分
-  - II. Java 17 + Spring Boot 技術棧一致性：移除 Spring Cloud Gateway、Spring Cloud Config
-    做為允許使用元件的範例，並新增 MUST NOT 條款禁止為湊治理知識展示而在 2 服務規模下引入
-    這類僅在多服務拓樸才有意義的基礎設施
-  - V. CI/CD 需含實際部署：由「至少一個服務」實際部署，改為 app-service 與 notification-service
-    兩者皆須實際部署
-  - VI. 可讀性與可解釋性優先於炫技：rationale 補充「服務數量收斂本身即為本原則的具體實踐」
-- Modified sections:
-  - 技術範疇與邊界：「本次學習並應用技術」移除 Spring Cloud Gateway/Config Server 範例；
-    「技術邊界（不可跨越）」新增服務數量上限（2 個）條款、前端由 app-service 直接 serve 靜態
-    檔案條款、Northflank 部署平台與免費方案額度條款；移除原「前端 MUST 透過統一的 API 入口」
-    條款（因已無獨立 Gateway）
-  - 開發與品質流程：README 須回答問題新增「為什麼只拆兩個服務，不是完整微服務」
-  - 非目標：新增「不追求完整微服務治理基礎設施（服務註冊中心、API Gateway、集中式 Config
-    Server）」
-- Added sections: 無
-- Removed sections: 無
-- Rationale：專案僅供家人自用、非高併發，且確定部署目標為 Northflank 免費 Sandbox 方案
-  （2 個免費 service + 1 個免費 database）；原本 6 個獨立微服務遠超過免費額度，維持該架構
-  已不符合原則 VI（可讀性與可解釋性優先於炫技）。收斂為 2 個部署服務、以套件模組化保留業務
-  邊界，仍可說明「何時該拆、何時不該拆」的架構判斷，且完全落在免費方案內。
-- Templates requiring updates:
-  - .specify/templates/plan-template.md ✅ 無需變更（通用範本，未寫死服務數量）
-  - .specify/templates/spec-template.md ✅ 無需變更
-  - .specify/templates/tasks-template.md ✅ 無需變更
-  - .specify/templates/checklist-template.md ✅ 無需變更
-- Follow-up TODOs：
-  - specs/001-family-expense-tracking/{plan.md, research.md, data-model.md, contracts/,
-    quickstart.md, tasks.md} 尚未依本次架構變更更新，須重新執行 `/speckit-plan`、
-    `/speckit-tasks` 產生對應新版設計文件（詳見本次回覆的 Next Actions）
+- Version: 3.0.1（PATCH：文字澄清，不影響語意）
+- 本檔依「決策過程與決策結果的記錄範圍」規定，僅記錄當下最新結論，不保留被取代的舊版說明
+- 本次調整：原則 IV 測試範例「LINE 綁定唯一性」改為「LINE 身分對應成員」（平台改以 LINE 身分登入，
+  無獨立綁定流程）；原則 VI 的 Rationale 移除服務數量變更的歷史敘述；本 Sync Impact Report 精簡為現況
+- Templates 狀態：.specify/templates/{plan,spec,tasks,checklist}-template.md 皆為通用範本，無需變更
 -->
 
 # 家庭共享支出平台 Constitution
@@ -74,7 +44,7 @@ API 設計與服務間依賴管理等核心能力，避免技術廣度失焦成�
 
 ### IV. 核心商業邏輯測試優先（Core Business Logic Testing）
 每個服務至少須有自動化單元測試覆蓋其核心商業邏輯（例如：家庭成員權限判斷、金額計算、
-併發鎖定、月結彙總、LINE 綁定唯一性等），測試須能在 CI pipeline 中自動執行並作為合併門檻
+併發鎖定、月結彙總、LINE 身分對應成員等），測試須能在 CI pipeline 中自動執行並作為合併門檻
 之一。非核心的樣板程式碼（如簡單 getter/setter、DTO 轉換）不強制要求測試覆蓋率指標。
 **Rationale**：測試品質是「工程品質展示」的具體證據，但範圍應聚焦於真正有邏輯風險的程式碼，
 避免為了衝測試覆蓋率數字而寫大量無意義測試，違反可讀性與可解釋性優先的原則。
@@ -91,9 +61,8 @@ build/push 之外，MUST 將 app-service 與 notification-service 兩者皆實�
 這個服務、為何選這個技術、有哪些取捨）須能清楚說明。MUST NOT 為了展示技術廣度而引入不必要的
 抽象層、過度設計的通用框架，或使用難以向他人解釋動機的技術選型。
 **Rationale**：本專案的展示優先順序為「架構設計能力 > 程式碼品質 > 功能完整度」，過度設計或
-為炫技而炫技的程式碼，反而會讓面試官質疑工程判斷力，與展示目標背道而馳。將服務數量從 6 個
-收斂為 2 個，正是本原則的具體實踐——依實際規模與部署限制做出恰如其分的架構決定，而非為了展示
-「拆得多」而拆。
+為炫技而炫技的程式碼，反而會讓面試官質疑工程判斷力，與展示目標背道而馳。服務數量收斂為 2 個，
+正是本原則的具體實踐——依實際規模與部署限制做出恰如其分的架構決定，而非為了展示「拆得多」而拆。
 
 ### VII. 容器化與一鍵啟動（Containerization & One-Command Startup）
 每個服務 MUST 能以 Docker 容器獨立建置與啟動，並提供對應的 Dockerfile。整套系統 MUST 能透過
@@ -179,5 +148,5 @@ pipeline（例如 GitHub Actions，部署至 Northflank）；依業務職責在�
 Core Principles 與技術範疇邊界逐項確認是否合規；發現複雜度或範疇擴張須先在本文件中
 說明理由並完成修訂，才可繼續實作。
 
-**Version**: 3.0.0 | **Ratified**: 2026-08-08 | **Last Amended**: 2026-09-29
+**Version**: 3.0.1 | **Ratified**: 2026-08-08 | **Last Amended**: 2026-10-13
 </content>

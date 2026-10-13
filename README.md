@@ -11,7 +11,7 @@
 │                                                                │
 │   family 模組 ── expense 模組 ── statistics 模組               │
 │  （帳號/家庭群組     （支付帳戶/         （月結彙總，            │
-│   /成員/LINE綁定）    支出紀錄）          即時運算不持久化）      │
+│   /成員/LINE 登入）    支出紀錄）          即時運算不持久化）      │
 │                                                                │
 │   模組間一律以 Java service 方法直接呼叫（同進程），            │
 │   不透過 HTTP                                                 │
@@ -29,7 +29,7 @@
 
 系統依 [constitution](.specify/memory/constitution.md) 採 **2 個部署服務**：
 
-- **app-service**：帳號註冊/登入、家庭群組、支付帳戶、支出紀錄、月結統計，並直接 serve 前端建置後的靜態檔案（同源部署，無需 CORS、無需獨立 Gateway）。內部依業務領域（family/expense/statistics）維持套件模組邊界。
+- **app-service**：LINE 身分登入、家庭群組、支付帳戶、支出紀錄、月結統計，並直接 serve 前端建置後的靜態檔案（同源部署，無需 CORS、無需獨立 Gateway）。內部依業務領域（family/expense/statistics）維持套件模組邊界。
 - **notification-service**：LINE Bot Webhook、每月最後一天 23:00 自動推播、LINE 關鍵字查詢。與 app-service 之間唯一透過內部 REST API（`X-Internal-Token` 驗證）溝通。
 
 完整規格與設計文件見 [`specs/001-family-expense-tracking/`](specs/001-family-expense-tracking/)（spec.md、plan.md、research.md、data-model.md、contracts/、tasks.md）。
@@ -40,7 +40,7 @@
 |------|------|------|
 | 後端語言/框架 | Java 17 + Spring Boot 3.2 | constitution 核心學習目標 |
 | 資料庫存取 | MyBatis + Flyway | 顯式 SQL、可讀性優先，避免 JPA 隱性行為 |
-| 身份驗證 | Spring Security + JWT（jjwt） | app-service 內建本地驗證，無需獨立 Gateway |
+| 身份驗證 | LINE 身分登入 + Spring Security + JWT（jjwt） | 無密碼，LINE userId 即帳號；app-service 內建本地驗證，無需獨立 Gateway |
 | 服務間通訊 | 同步 REST（僅 notification→app-service 一條） | 家庭規模不需訊息佇列 |
 | 前端 | React 18 + TypeScript + Vite + ESLint | 已具備技術，同源部署簡化設定 |
 | API 錯誤格式 | RFC 9457 Problem Details（`application/problem+json`） | Spring 6 內建標準，前端以單一邏輯處理所有錯誤；業務錯誤仍以 Exception 丟出，不使用 Result 型別 |
@@ -60,7 +60,75 @@
 
 ## 本機開發
 
-前置需求：Docker / Docker Compose。
+前置需求：Docker / Docker Compose、JDK 17、Node.js。
+
+### 方式一：只用 Docker 跑 MySQL，前後端在本機執行（日常開發建議）
+
+```bash
+# 1. 只啟動 MySQL（對外 port 為 3307，會自動建立 appdb 與 notificationdb）
+docker compose up -d mysql
+
+# 2. 啟動 app-service（http://localhost:8080）
+cd app-service
+SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
+
+# 3. （需要 LINE 功能時）啟動 notification-service（http://localhost:8081）
+cd notification-service
+SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
+
+# 4. 啟動前端（http://localhost:5173，/api 會 proxy 到 localhost:8080）
+cd frontend && npm install && npm run dev
+```
+
+> **登入方式**：平台以 LINE 身分登入（不使用帳號密碼）。開發階段（dev/test profile）為假登入——在登入頁輸入暱稱即可登入，同暱稱視為同一帳號；真實 LINE Login（OAuth）尚未串接，後端以 `LineLoginClient` port 隔離，之後只需新增真實作並替換登入頁按鈕。因此 dev 階段無法實測 LINE 月結推播／關鍵字查詢（假帳號的 `lineUserId` 不是真實 LINE ID）。
+
+說明：
+
+- `application-dev.yml` 的連線預設為 `localhost:3307`（對應 Docker MySQL），帳號密碼、`JWT_SECRET`、`INTERNAL_TOKEN` 皆有 dev 預設值，不需額外設定。
+- Windows PowerShell 請改用 `$env:SPRING_PROFILES_ACTIVE="dev"; ./mvnw spring-boot:run`。
+- 前端由 Vite dev server 提供 HMR；後端程式碼修改後需重啟（或加入 `spring-boot-devtools` 自動重啟）。
+
+#### 使用 VS Code Tasks 一鍵啟動
+
+[`.vscode/tasks.json`](.vscode/tasks.json) 已包含上述指令（`Ctrl+Shift+P` → `Tasks: Run Task`）：
+
+| Task | 說明 |
+|------|------|
+| `dev: 啟動 MySQL + 前後端` | 先啟動並等待 MySQL healthy，再同時啟動 app-service 與前端（預設 build task，可直接按 `Ctrl+Shift+B`） |
+| `mysql: up` | 只啟動 MySQL |
+| `app-service: run (dev profile)` | 單獨啟動 app-service |
+| `notification-service: run (dev profile)` | 單獨啟動 notification-service（需要 LINE 功能時才跑） |
+| `frontend: dev` | 單獨啟動前端 |
+
+注意：若 Docker 內的 `app-service` / `notification-service` 容器仍在執行，會佔用 8080 / 8081，需先 `docker compose stop app-service notification-service`。
+
+#### 本機機密與覆蓋設定（類似 .NET user-secrets）
+
+`dev` profile 會自動載入使用者目錄下**選用**的設定檔（不存在也不會報錯），內容優先於 `application-dev.yml` 的預設值。檔案位於 repo 之外，不會進版控：
+
+| 服務 | 檔案位置 |
+|------|----------|
+| app-service | `~/.195home/app-service.yml`（Windows：`C:\Users\<使用者>\.195home\app-service.yml`） |
+| notification-service | `~/.195home/notification-service.yml` |
+
+範例（`notification-service.yml`，填入真實的 LINE 憑證）：
+
+```yaml
+line:
+  bot:
+    channel-token: <你的 LINE channel token>
+    channel-secret: <你的 LINE channel secret>
+```
+
+範例（`app-service.yml`，覆蓋 JWT 密鑰）：
+
+```yaml
+app:
+  jwt:
+    secret: <至少 32 bytes 的自訂字串>
+```
+
+### 方式二：全部以 Docker 執行（驗證完整部署）
 
 ```bash
 docker compose up -d --build
@@ -96,7 +164,7 @@ cd frontend && npm ci && npm run lint && npm test
 
 1. 於 Northflank 建立專案，開通 1 個免費 MySQL database，建立 `appdb`、`notificationdb` 兩個 schema
 2. 建立 2 個 Northflank service：`app-service`、`notification-service`，各自設定對應的映像檔來源（GHCR）
-3. 設定各服務所需環境變數：資料庫連線資訊、`JWT_SECRET`、`INTERNAL_TOKEN`、`LINE_CHANNEL_TOKEN`、`LINE_CHANNEL_SECRET`、`APP_SERVICE_BASE_URL`（notification-service 指向 app-service 的 Northflank 內部網域）
+3. 設定各服務所需環境變數（注意：真實 LINE Login 尚未串接，app-service 在 prod profile 沒有 `LineLoginClient` 實作而無法啟動，需先完成後才能部署）：資料庫連線資訊、`JWT_SECRET`、`INTERNAL_TOKEN`、`LINE_CHANNEL_TOKEN`、`LINE_CHANNEL_SECRET`、`APP_SERVICE_BASE_URL`（notification-service 指向 app-service 的 Northflank 內部網域）
 4. `.github/workflows/cd.yml` 於 push 到 `main` 分支時建置映像檔、推送至 GHCR，並觸發 Northflank 兩個 service 重新部署（實際觸發方式請對照 Northflank API/CLI 文件核實）
 
 詳見 [quickstart.md](specs/001-family-expense-tracking/quickstart.md)。
