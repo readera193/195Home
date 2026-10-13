@@ -37,7 +37,5 @@ app:
     expiration-minutes: 120
   internal:
     token: ${INTERNAL_TOKEN}
-  line-binding-code:
-    ttl-minutes: 10
   expense-lock:
     ttl-minutes: 5

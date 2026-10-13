@@ -41,12 +41,12 @@ class LineWebhookControllerTest {
 
     @Test
     void determineReply_blocksQueryFromUnboundLineAccount() {
-        // FR-015：未綁定帳號查詢阻擋，不洩漏任何家庭資料
+        // FR-015：未加入家庭的帳號查詢阻擋，不洩漏任何家庭資料
         when(appServiceClient.findByLineUserId("line-user-unbound")).thenReturn(Optional.empty());
 
         String reply = controller.determineReply("2026-07", "line-user-unbound");
 
-        assertThat(reply).contains("尚未綁定");
+        assertThat(reply).contains("尚未加入");
     }
 
     @Test

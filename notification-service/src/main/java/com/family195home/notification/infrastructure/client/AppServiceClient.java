@@ -4,18 +4,19 @@ import com.family195home.notification.application.dto.BindingResult;
 import com.family195home.notification.application.dto.LineBindingView;
 import com.family195home.notification.application.dto.MonthlySummaryView;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 /**
  * 呼叫 app-service 內部 API（/api/internal/**）的唯一元件，帶入 X-Internal-Token 共用密鑰
  * （見 contracts/app-service.md、research.md 決策 6、7）。這是系統中唯一保留的跨進程呼叫。
+ * 非 2xx 回應一律轉成 {@link AppServiceClientException}（解析 Problem Details 的 code / detail）。
  */
 @Component
 public class AppServiceClient {
@@ -23,23 +24,19 @@ public class AppServiceClient {
     private final WebClient webClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    @Autowired
     public AppServiceClient(
             @Value("${app.app-service.base-url}") String baseUrl,
             @Value("${app.internal.token}") String internalToken) {
-        this.webClient = WebClient.builder()
+        this(WebClient.builder()
                 .baseUrl(baseUrl)
                 .defaultHeader("X-Internal-Token", internalToken)
-                .build();
+                .build());
     }
 
-    public BindingResult consumeBindingCode(String code, String lineUserId) {
-        return webClient.post()
-                .uri("/api/internal/line-bindings")
-                .bodyValue(Map.of("code", code, "lineUserId", lineUserId))
-                .retrieve()
-                .bodyToMono(BindingResult.class)
-                .onErrorMap(WebClientResponseException.class, this::toClientException)
-                .block();
+    /** 供測試注入自訂 WebClient（例如以 ExchangeFunction 模擬回應）。 */
+    AppServiceClient(WebClient webClient) {
+        this.webClient = webClient;
     }
 
     public Optional<BindingResult> findByLineUserId(String lineUserId) {
@@ -48,10 +45,15 @@ public class AppServiceClient {
                     .uri("/api/internal/line-bindings/by-line-user/{lineUserId}", lineUserId)
                     .retrieve()
                     .bodyToMono(BindingResult.class)
+                    .onErrorMap(WebClientResponseException.class, this::toClientException)
                     .block();
             return Optional.ofNullable(result);
-        } catch (WebClientResponseException.NotFound e) {
-            return Optional.empty();
+        } catch (AppServiceClientException e) {
+            // 404 NOT_BOUND：此 LINE 帳號尚未加入任何家庭，不視為錯誤
+            if (e.getStatusCode() == 404) {
+                return Optional.empty();
+            }
+            throw e;
         }
     }
 
@@ -61,6 +63,7 @@ public class AppServiceClient {
                 .retrieve()
                 .bodyToFlux(LineBindingView.class)
                 .collectList()
+                .onErrorMap(WebClientResponseException.class, this::toClientException)
                 .block();
     }
 
@@ -72,6 +75,7 @@ public class AppServiceClient {
                         .build())
                 .retrieve()
                 .bodyToMono(MonthlySummaryView.class)
+                .onErrorMap(WebClientResponseException.class, this::toClientException)
                 .block();
     }
 

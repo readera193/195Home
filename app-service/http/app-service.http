@@ -4,30 +4,23 @@
 ### 所有錯誤皆為 RFC 9457 Problem Details（application/problem+json）：status / title / detail / code。
 
 @baseUrl = http://localhost:8080
-@email = demo@example.com
-@password = Passw0rd!
+@nickname = demo
 
-### 1. 註冊
-POST {{baseUrl}}/api/users/register
-Content-Type: application/json
-
-{ "email": "{{email}}", "password": "{{password}}" }
-
-### 2. 登入（取得 JWT，後續請求自動帶入）
+### 1. 以 LINE 登入（dev/test 為假登入：code 即暱稱；首次登入自動建立帳號，取得 JWT 後續請求自動帶入）
 # @name login
-POST {{baseUrl}}/api/users/login
+POST {{baseUrl}}/api/auth/line
 Content-Type: application/json
 
-{ "email": "{{email}}", "password": "{{password}}" }
+{ "code": "{{nickname}}" }
 
 ###
 @token = {{login.response.body.token}}
 
-### 3. 錯誤格式範例：密碼錯誤 → 401，body 含 code=INVALID_CREDENTIALS
-POST {{baseUrl}}/api/users/login
+### 2. 錯誤格式範例：code 為空 → 400
+POST {{baseUrl}}/api/auth/line
 Content-Type: application/json
 
-{ "email": "{{email}}", "password": "wrong-password" }
+{ "code": "" }
 
 ### 4. 錯誤格式範例：未帶 token → 401，code=UNAUTHORIZED
 GET {{baseUrl}}/api/families/me
@@ -91,10 +84,6 @@ Authorization: Bearer {{token}}
 GET {{baseUrl}}/api/statistics/monthly?familyGroupId={{familyGroupId}}&month=2026-09
 Authorization: Bearer {{token}}
 
-### 15. 產生 LINE 綁定碼
-POST {{baseUrl}}/api/families/members/{{familyMemberId}}/line-binding-codes
-Authorization: Bearer {{token}}
-
-### 16. 內部 API（僅 notification-service 使用；dev profile 的預設共用密鑰）
+### 15. 內部 API（僅 notification-service 使用；dev profile 的預設共用密鑰）
 GET {{baseUrl}}/api/internal/line-bindings
 X-Internal-Token: dev-only-internal-token-change-me

@@ -24,13 +24,13 @@ describe('LoginPage', () => {
     vi.resetAllMocks();
   });
 
-  it('顯示驗證錯誤訊息，當登入失敗時', async () => {
+  it('顯示錯誤訊息，當登入失敗時', async () => {
     // 後端錯誤格式為 RFC 9457 Problem Details：訊息在 detail，錯誤代碼在 code
     const config = { headers: new AxiosHeaders() };
-    vi.mocked(userApi.login).mockRejectedValue(
+    vi.mocked(userApi.loginWithLine).mockRejectedValue(
       new AxiosError('Request failed', 'ERR_BAD_REQUEST', config, null, {
-        data: { status: 401, title: 'Unauthorized', detail: '帳號或密碼錯誤', code: 'INVALID_CREDENTIALS' },
-        status: 401,
+        data: { status: 400, title: 'Bad Request', detail: '登入失敗', code: 'LOGIN_FAILED' },
+        status: 400,
         statusText: '',
         headers: {},
         config,
@@ -39,31 +39,29 @@ describe('LoginPage', () => {
 
     renderLoginPage();
 
-    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'a@example.com' } });
-    fireEvent.change(screen.getByLabelText('密碼'), { target: { value: 'wrong-password' } });
-    fireEvent.click(screen.getByRole('button', { name: '登入' }));
+    fireEvent.change(screen.getByLabelText('LINE 暱稱'), { target: { value: '小明' } });
+    fireEvent.click(screen.getByRole('button', { name: '使用 LINE 登入' }));
 
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('帳號或密碼錯誤');
+      expect(screen.getByRole('alert')).toHaveTextContent('登入失敗');
     });
   });
 
-  it('登入成功時呼叫 login API 並帶入輸入的帳密', async () => {
-    vi.mocked(userApi.login).mockResolvedValue({
+  it('登入成功時以輸入的暱稱呼叫 loginWithLine', async () => {
+    vi.mocked(userApi.loginWithLine).mockResolvedValue({
       token: 'jwt-token',
       userId: 1,
-      email: 'a@example.com',
+      displayName: '小明',
       expiresAt: '2026-01-01T00:00:00Z',
     });
 
     renderLoginPage();
 
-    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'a@example.com' } });
-    fireEvent.change(screen.getByLabelText('密碼'), { target: { value: 'correct-password' } });
-    fireEvent.click(screen.getByRole('button', { name: '登入' }));
+    fireEvent.change(screen.getByLabelText('LINE 暱稱'), { target: { value: ' 小明 ' } });
+    fireEvent.click(screen.getByRole('button', { name: '使用 LINE 登入' }));
 
     await waitFor(() => {
-      expect(userApi.login).toHaveBeenCalledWith({ email: 'a@example.com', password: 'correct-password' });
+      expect(userApi.loginWithLine).toHaveBeenCalledWith('小明');
     });
   });
 });

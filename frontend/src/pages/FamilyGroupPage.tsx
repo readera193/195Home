@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { createFamilyGroup, getMyFamily, joinFamilyGroup } from '../services/familyApi';
 import { getErrorMessage } from '../utils/apiError';
+import InfoTip from '../components/InfoTip';
 
 export default function FamilyGroupPage() {
   const queryClient = useQueryClient();
@@ -54,12 +55,13 @@ export default function FamilyGroupPage() {
                 {myFamily.role === 'ADMIN' ? '管理者' : '一般成員'}
               </span>
             </dd>
-            <dt>邀請碼</dt>
+            <dt>
+              邀請碼 <InfoTip text="可重複使用、無時限，分享給家人即可加入。" />
+            </dt>
             <dd>
               <strong className="code-box">{myFamily.inviteCode}</strong>
             </dd>
           </dl>
-          <p className="muted">（可重複使用、無時限，分享給家人即可加入）</p>
           <Link to="/members">查看成員列表 →</Link>
         </div>
       </div>

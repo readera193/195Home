@@ -2,15 +2,18 @@ package com.family195home.app.family.application;
 
 import com.family195home.app.family.domain.User;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface UserRepository {
 
-    boolean existsByEmail(String email);
-
     User save(User user);
 
-    Optional<User> findByEmail(String email);
+    void updateDisplayName(Long id, String displayName);
+
+    Optional<User> findByLineUserId(String lineUserId);
 
     Optional<User> findById(Long id);
+
+    List<User> findAll();
 }

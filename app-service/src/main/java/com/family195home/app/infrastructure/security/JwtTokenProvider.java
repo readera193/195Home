@@ -33,12 +33,12 @@ public class JwtTokenProvider implements TokenIssuer {
     }
 
     @Override
-    public IssuedToken issue(Long userId, String email) {
+    public IssuedToken issue(Long userId, String displayName) {
         Instant now = Instant.now();
         Instant expiry = now.plus(expirationMinutes, ChronoUnit.MINUTES);
         String token = Jwts.builder()
                 .subject(String.valueOf(userId))
-                .claim("email", email)
+                .claim("displayName", displayName)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiry))
                 .signWith(key)

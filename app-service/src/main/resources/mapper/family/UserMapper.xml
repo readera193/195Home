@@ -4,26 +4,30 @@
 
     <resultMap id="UserResultMap" type="com.family195home.app.family.domain.User">
         <id property="id" column="id"/>
-        <result property="email" column="email"/>
-        <result property="passwordHash" column="password_hash"/>
+        <result property="lineUserId" column="line_user_id"/>
+        <result property="displayName" column="display_name"/>
         <result property="createdAt" column="created_at"/>
     </resultMap>
 
-    <select id="countByEmail" resultType="int">
-        SELECT COUNT(*) FROM users WHERE email = #{email}
-    </select>
-
     <insert id="insert" parameterType="com.family195home.app.family.domain.User" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO users (email, password_hash, created_at)
-        VALUES (#{email}, #{passwordHash}, #{createdAt})
+        INSERT INTO users (line_user_id, display_name, created_at)
+        VALUES (#{lineUserId}, #{displayName}, #{createdAt})
     </insert>
 
-    <select id="selectByEmail" resultMap="UserResultMap">
-        SELECT id, email, password_hash, created_at FROM users WHERE email = #{email}
+    <update id="updateDisplayName">
+        UPDATE users SET display_name = #{displayName} WHERE id = #{id}
+    </update>
+
+    <select id="selectByLineUserId" resultMap="UserResultMap">
+        SELECT id, line_user_id, display_name, created_at FROM users WHERE line_user_id = #{lineUserId}
     </select>
 
     <select id="selectById" resultMap="UserResultMap">
-        SELECT id, email, password_hash, created_at FROM users WHERE id = #{id}
+        SELECT id, line_user_id, display_name, created_at FROM users WHERE id = #{id}
+    </select>
+
+    <select id="selectAll" resultMap="UserResultMap">
+        SELECT id, line_user_id, display_name, created_at FROM users
     </select>
 
 </mapper>

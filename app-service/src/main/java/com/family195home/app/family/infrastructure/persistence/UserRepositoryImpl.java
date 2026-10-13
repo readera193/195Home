@@ -4,6 +4,7 @@ import com.family195home.app.family.application.UserRepository;
 import com.family195home.app.family.domain.User;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -16,23 +17,28 @@ public class UserRepositoryImpl implements UserRepository {
     }
 
     @Override
-    public boolean existsByEmail(String email) {
-        return userMapper.countByEmail(email) > 0;
-    }
-
-    @Override
     public User save(User user) {
         userMapper.insert(user);
         return user;
     }
 
     @Override
-    public Optional<User> findByEmail(String email) {
-        return Optional.ofNullable(userMapper.selectByEmail(email));
+    public void updateDisplayName(Long id, String displayName) {
+        userMapper.updateDisplayName(id, displayName);
+    }
+
+    @Override
+    public Optional<User> findByLineUserId(String lineUserId) {
+        return Optional.ofNullable(userMapper.selectByLineUserId(lineUserId));
     }
 
     @Override
     public Optional<User> findById(Long id) {
         return Optional.ofNullable(userMapper.selectById(id));
+    }
+
+    @Override
+    public List<User> findAll() {
+        return userMapper.selectAll();
     }
 }

@@ -1,7 +1,10 @@
 # 本機開發用：預設值僅供開發，MUST NOT 用於正式環境
 spring:
+  config:
+    # 選用的本機覆蓋檔（放在 repo 之外，不進版控），存在時優先於本檔的預設值
+    import: optional:file:${user.home}/.195home/app-service.yml
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${APPDB_NAME:appdb}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=UTC
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3307}/${APPDB_NAME:appdb}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=UTC
     username: ${DB_USERNAME:app}
     password: ${DB_PASSWORD:app}
 

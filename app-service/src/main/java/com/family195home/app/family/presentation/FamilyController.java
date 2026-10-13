@@ -102,11 +102,11 @@ public class FamilyController {
     }
 
     private MemberView toView(FamilyMember member) {
-        String email = userRepository.findById(member.getUserId()).map(u -> u.getEmail()).orElse(null);
+        String displayName = userRepository.findById(member.getUserId()).map(u -> u.getDisplayName()).orElse(null);
         return new MemberView(
                 member.getId(),
                 member.getUserId(),
-                email,
+                displayName,
                 member.getStatus().name(),
                 member.getRole().name(),
                 member.getJoinedAt(),

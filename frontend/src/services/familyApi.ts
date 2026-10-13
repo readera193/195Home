@@ -17,7 +17,7 @@ export interface JoinFamilyGroupResponse {
 export interface MemberView {
   familyMemberId: number;
   userId: number;
-  email: string;
+  displayName: string;
   status: 'ACTIVE' | 'LEFT' | 'REMOVED';
   role: 'ADMIN' | 'MEMBER';
   joinedAt: string;
@@ -72,13 +72,4 @@ export function restoreMemberEligibility(
   return apiClient
     .post(`/families/${familyGroupId}/members/${memberId}/restore-eligibility`)
     .then((res) => res.data);
-}
-
-export interface GenerateCodeResponse {
-  code: string;
-  expiresAt: string;
-}
-
-export function generateLineBindingCode(memberId: number): Promise<GenerateCodeResponse> {
-  return apiClient.post(`/families/members/${memberId}/line-binding-codes`).then((res) => res.data);
 }

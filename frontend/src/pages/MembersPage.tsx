@@ -16,6 +16,7 @@ export default function MembersPage() {
 
   async function handleKick(memberId: number) {
     if (!familyGroupId) return;
+    if (!window.confirm('確定要將此成員移出群組嗎？被移出的成員無法再用邀請碼加入，除非管理者復原其資格。')) return;
     await kickMember(familyGroupId, memberId);
     queryClient.invalidateQueries({ queryKey: ['members', familyGroupId] });
   }
@@ -37,6 +38,7 @@ export default function MembersPage() {
 
   async function handleLeave(memberId: number) {
     if (!familyGroupId) return;
+    if (!window.confirm('確定要離開此群組嗎？若您是最後一位在職成員，群組將自動解散。')) return;
     await leaveGroup(familyGroupId, memberId);
     queryClient.invalidateQueries({ queryKey: ['myFamily'] });
     queryClient.invalidateQueries({ queryKey: ['members', familyGroupId] });
@@ -65,7 +67,7 @@ export default function MembersPage() {
         <table>
           <thead>
             <tr>
-              <th>Email</th>
+              <th>成員</th>
               <th>角色</th>
               <th>狀態</th>
               <th>操作</th>
@@ -74,7 +76,7 @@ export default function MembersPage() {
           <tbody>
             {members?.map((member) => (
               <tr key={member.familyMemberId}>
-                <td>{member.email}</td>
+                <td>{member.displayName}</td>
                 <td>
                   <span className={`badge ${member.role === 'ADMIN' ? 'badge-primary' : ''}`}>
                     {member.role === 'ADMIN' ? '管理者' : '一般成員'}
@@ -91,17 +93,15 @@ export default function MembersPage() {
                 </td>
                 <td>
                   <div className="actions">
-                    {member.status === 'ACTIVE' && (
-                      <>
-                        <button className="btn-secondary btn-sm" onClick={() => handleLeave(member.familyMemberId)}>
-                          離開群組
-                        </button>
-                        {isAdmin && member.role !== 'ADMIN' && (
-                          <button className="btn-danger btn-sm" onClick={() => handleKick(member.familyMemberId)}>
-                            移出
-                          </button>
-                        )}
-                      </>
+                    {member.status === 'ACTIVE' && member.familyMemberId === myFamily?.familyMemberId && (
+                      <button className="btn-secondary btn-sm" onClick={() => handleLeave(member.familyMemberId)}>
+                        離開群組
+                      </button>
+                    )}
+                    {member.status === 'ACTIVE' && isAdmin && member.familyMemberId !== myFamily?.familyMemberId && (
+                      <button className="btn-danger btn-sm" onClick={() => handleKick(member.familyMemberId)}>
+                        移出
+                      </button>
                     )}
                     {isAdmin && member.status === 'REMOVED' && (
                       <button className="btn-secondary btn-sm" onClick={() => handleRestore(member.familyMemberId)}>

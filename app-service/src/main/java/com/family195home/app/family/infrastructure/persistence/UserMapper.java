@@ -4,14 +4,18 @@ import com.family195home.app.family.domain.User;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.List;
+
 @Mapper
 public interface UserMapper {
 
-    int countByEmail(@Param("email") String email);
-
     void insert(User user);
 
-    User selectByEmail(@Param("email") String email);
+    void updateDisplayName(@Param("id") Long id, @Param("displayName") String displayName);
+
+    User selectByLineUserId(@Param("lineUserId") String lineUserId);
 
     User selectById(@Param("id") Long id);
+
+    List<User> selectAll();
 }

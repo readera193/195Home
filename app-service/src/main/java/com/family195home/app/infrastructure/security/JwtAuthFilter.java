@@ -16,7 +16,7 @@ import java.util.List;
 import com.family195home.app.shared.AuthenticatedUser;
 
 /**
- * 對 /api/**（排除 /api/users/register、/api/users/login、/api/internal/**、靜態資源）
+ * 對 /api/**（排除 /api/auth/line、/api/internal/**、靜態資源）
  * 以簽章密鑰本地驗證 JWT（見 research.md 決策 7）。
  * 驗證失敗（缺少/過期/簽章錯誤）不會在此丟出例外，而是保持未驗證狀態，
  * 交由 Spring Security 的 authorizeHttpRequests 規則統一回傳 401。
@@ -46,8 +46,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private void setAuthentication(Claims claims) {
         Long userId = jwtTokenProvider.getUserId(claims);
-        String email = claims.get("email", String.class);
-        AuthenticatedUser principal = new AuthenticatedUser(userId, email);
+        String displayName = claims.get("displayName", String.class);
+        AuthenticatedUser principal = new AuthenticatedUser(userId, displayName);
         var authentication = new UsernamePasswordAuthenticationToken(principal, null, List.of());
         SecurityContextHolder.getContext().setAuthentication(authentication);
     }

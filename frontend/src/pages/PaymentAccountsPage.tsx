@@ -43,6 +43,7 @@ export default function PaymentAccountsPage() {
   }
 
   function handleDisable(accountId: number) {
+    if (!window.confirm('確定要停用此支付帳戶嗎？停用後將無法用於新的支出。')) return;
     return runAdminAction(() => disableAccount(accountId), '停用支付帳戶失敗');
   }
 

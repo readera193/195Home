@@ -8,6 +8,25 @@
       "problemMatcher": []
     },
     {
+      "label": "mysql: up",
+      "type": "shell",
+      "command": "docker compose up -d --wait mysql",
+      "problemMatcher": []
+    },
+    {
+      "label": "dev: app-service + frontend",
+      "dependsOn": ["frontend: dev", "app-service: run (dev profile)"],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
+      "label": "dev: 啟動 MySQL + 前後端",
+      "dependsOn": ["mysql: up", "dev: app-service + frontend"],
+      "dependsOrder": "sequence",
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
       "label": "compose: down (清除資料)",
       "type": "shell",
       "command": "docker compose down -v",
@@ -32,9 +51,11 @@
     {
       "label": "app-service: run (dev profile)",
       "type": "shell",
-      "command": "./mvnw spring-boot:run -Dspring-boot.run.profiles=dev",
+      "command": "./mvnw spring-boot:run '-Dspring-boot.run.profiles=dev'",
+      "windows": { "command": "./mvnw.cmd spring-boot:run '-Dspring-boot.run.profiles=dev'" },
       "options": { "cwd": "${workspaceFolder}/app-service" },
       "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "dev" },
       "problemMatcher": []
     },
     {
@@ -48,7 +69,8 @@
     {
       "label": "notification-service: run (dev profile)",
       "type": "shell",
-      "command": "./mvnw spring-boot:run -Dspring-boot.run.profiles=dev",
+      "command": "./mvnw spring-boot:run '-Dspring-boot.run.profiles=dev'",
+      "windows": { "command": "./mvnw.cmd spring-boot:run '-Dspring-boot.run.profiles=dev'" },
       "options": { "cwd": "${workspaceFolder}/notification-service" },
       "isBackground": true,
       "problemMatcher": []
@@ -59,6 +81,7 @@
       "command": "npm run dev",
       "options": { "cwd": "${workspaceFolder}/frontend" },
       "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "dev" },
       "problemMatcher": []
     },
     {

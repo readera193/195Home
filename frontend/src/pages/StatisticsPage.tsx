@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getMyFamily } from '../services/familyApi';
 import { getMonthlySummary } from '../services/statisticsApi';
+import InfoTip from '../components/InfoTip';
 
 function currentYearMonth(): string {
   const now = new Date();
@@ -58,7 +59,9 @@ export default function StatisticsPage() {
               <thead>
                 <tr>
                   <th>支付帳戶</th>
-                  <th className="num">淨額（收入－支出）</th>
+                  <th className="num">
+                    淨額 <InfoTip text="淨額 = 收入 − 支出。" />
+                  </th>
                 </tr>
               </thead>
               <tbody>

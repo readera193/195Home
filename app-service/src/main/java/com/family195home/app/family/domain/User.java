@@ -5,16 +5,16 @@ import java.time.LocalDateTime;
 public class User {
 
     private Long id;
-    private String email;
-    private String passwordHash;
+    private String lineUserId;
+    private String displayName;
     private LocalDateTime createdAt;
 
     public User() {
     }
 
-    public User(String email, String passwordHash, LocalDateTime createdAt) {
-        this.email = email;
-        this.passwordHash = passwordHash;
+    public User(String lineUserId, String displayName, LocalDateTime createdAt) {
+        this.lineUserId = lineUserId;
+        this.displayName = displayName;
         this.createdAt = createdAt;
     }
 
@@ -26,20 +26,20 @@ public class User {
         this.id = id;
     }
 
-    public String getEmail() {
-        return email;
+    public String getLineUserId() {
+        return lineUserId;
     }
 
-    public void setEmail(String email) {
-        this.email = email;
+    public void setLineUserId(String lineUserId) {
+        this.lineUserId = lineUserId;
     }
 
-    public String getPasswordHash() {
-        return passwordHash;
+    public String getDisplayName() {
+        return displayName;
     }
 
-    public void setPasswordHash(String passwordHash) {
-        this.passwordHash = passwordHash;
+    public void setDisplayName(String displayName) {
+        this.displayName = displayName;
     }
 
     public LocalDateTime getCreatedAt() {

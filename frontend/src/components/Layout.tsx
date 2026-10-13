@@ -3,13 +3,11 @@ import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
 const NAV_ITEMS = [
+  { to: '/expenses', label: '支出紀錄' },
   { to: '/family', label: '家庭群組' },
   { to: '/members', label: '成員列表' },
   { to: '/accounts', label: '支付帳戶' },
-  { to: '/expenses', label: '支出紀錄', end: true },
-  { to: '/expenses/new', label: '新增支出' },
   { to: '/statistics', label: '統計' },
-  { to: '/line-binding', label: 'LINE 綁定' },
 ];
 
 export default function Layout() {
