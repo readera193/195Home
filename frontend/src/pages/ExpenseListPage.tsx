@@ -2,7 +2,16 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getMembers, getMyFamily } from '../services/familyApi';
-import { createExpense, listAccounts, listExpenses } from '../services/expenseApi';
+import {
+  createExpense,
+  deleteExpense,
+  listAccounts,
+  listExpenses,
+  lockExpense,
+  unlockExpense,
+  updateExpense,
+  type ExpenseResponse,
+} from '../services/expenseApi';
 import { getErrorMessage } from '../utils/apiError';
 import InfoTip from '../components/InfoTip';
 
@@ -41,6 +50,102 @@ export default function ExpenseListPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // 編輯／刪除（FR-019、FR-027）：先取得鎖才能操作，取消或完成時釋放
+  const [editing, setEditing] = useState<ExpenseResponse | null>(null);
+  const [editAmount, setEditAmount] = useState('');
+  const [editNote, setEditNote] = useState('');
+  const [editAccountId, setEditAccountId] = useState('');
+  const [editOccurredAt, setEditOccurredAt] = useState('');
+  const [editError, setEditError] = useState<string | null>(null);
+  const [rowError, setRowError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function handleStartEdit(expense: ExpenseResponse) {
+    if (!familyGroupId) return;
+    setRowError(null);
+    try {
+      await lockExpense(expense.expenseId, familyGroupId);
+    } catch (err) {
+      setRowError(getErrorMessage(err, '無法編輯此紀錄'));
+      await queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      return;
+    }
+    setEditing(expense);
+    setEditAmount(String(expense.amount));
+    setEditNote(expense.note);
+    setEditAccountId(String(expense.paymentAccountId));
+    setEditOccurredAt(expense.occurredAt.slice(0, 16));
+    setEditError(null);
+  }
+
+  async function handleCancelEdit() {
+    if (!editing) return;
+    const id = editing.expenseId;
+    setEditing(null);
+    try {
+      await unlockExpense(id);
+    } catch {
+      // 釋放失敗無妨：鎖會於 TTL 後自動失效
+    }
+    await queryClient.invalidateQueries({ queryKey: ['expenses'] });
+  }
+
+  async function handleSaveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!familyGroupId || !editing) return;
+    setEditError(null);
+    if (!/^-?\d+$/.test(editAmount)) {
+      setEditError('金額必須為整數，不支援小數點');
+      return;
+    }
+    if (!editNote.trim()) {
+      setEditError('說明為必填欄位');
+      return;
+    }
+    setSaving(true);
+    try {
+      await updateExpense(editing.expenseId, familyGroupId, {
+        paymentAccountId: Number(editAccountId),
+        amount: Number(editAmount),
+        note: editNote,
+        occurredAt: editOccurredAt || undefined,
+      });
+      setEditing(null);
+      await queryClient.invalidateQueries({ queryKey: ['expenses'] });
+    } catch (err) {
+      setEditError(getErrorMessage(err, '更新支出失敗'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(expense: ExpenseResponse) {
+    if (!familyGroupId) return;
+    setRowError(null);
+    try {
+      await lockExpense(expense.expenseId, familyGroupId);
+    } catch (err) {
+      setRowError(getErrorMessage(err, '無法刪除此紀錄'));
+      await queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      return;
+    }
+    if (!window.confirm(`確定要刪除「${expense.note}」嗎？`)) {
+      try {
+        await unlockExpense(expense.expenseId);
+      } catch {
+        // 同上：鎖會自動逾時
+      }
+      await queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      return;
+    }
+    try {
+      await deleteExpense(expense.expenseId, familyGroupId);
+    } catch (err) {
+      setRowError(getErrorMessage(err, '刪除支出失敗'));
+    }
+    await queryClient.invalidateQueries({ queryKey: ['expenses'] });
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!familyGroupId) return;
@@ -52,7 +157,7 @@ export default function ExpenseListPage() {
       return;
     }
     if (!note.trim()) {
-      setError('備註為必填欄位');
+      setError('說明為必填欄位');
       return;
     }
     if (!formAccountId) {
@@ -200,6 +305,48 @@ export default function ExpenseListPage() {
         </div>
       </div>
 
+      {editing && (
+        <form className="card" onSubmit={handleSaveEdit} aria-label="編輯支出">
+          <h2>編輯支出</h2>
+          {editError && <p role="alert">{editError}</p>}
+          <div className="field">
+            <label htmlFor="editAmount">編輯金額</label>
+            <input id="editAmount" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} required />
+          </div>
+          <div className="field">
+            <label htmlFor="editNote">編輯說明</label>
+            <input id="editNote" value={editNote} onChange={(e) => setEditNote(e.target.value)} required />
+          </div>
+          <div className="field">
+            <label htmlFor="editAccount">編輯支付帳戶</label>
+            <select id="editAccount" value={editAccountId} onChange={(e) => setEditAccountId(e.target.value)} required>
+              {accounts?.map((account) => (
+                <option key={account.accountId} value={account.accountId}>
+                  {account.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="editOccurredAt">編輯日期時間</label>
+            <input
+              id="editOccurredAt"
+              type="datetime-local"
+              value={editOccurredAt}
+              onChange={(e) => setEditOccurredAt(e.target.value)}
+            />
+          </div>
+          <button type="submit" disabled={saving}>
+            儲存
+          </button>{' '}
+          <button type="button" className="btn-secondary" onClick={handleCancelEdit} disabled={saving}>
+            取消
+          </button>
+        </form>
+      )}
+
+      {rowError && <p role="alert">{rowError}</p>}
+
       {isLoading ? (
         <p className="empty">載入中...</p>
       ) : (
@@ -211,6 +358,7 @@ export default function ExpenseListPage() {
                 <th>說明</th>
                 <th className="num">金額</th>
                 <th>支付帳戶</th>
+                <th>操作</th>
               </tr>
             </thead>
             <tbody>
@@ -228,6 +376,29 @@ export default function ExpenseListPage() {
                   </td>
                   <td>
                     <span className="badge">{expense.paymentAccountName}</span>
+                  </td>
+                  <td>
+                    {expense.locked && editing?.expenseId !== expense.expenseId && (
+                      <span className="badge">編輯中</span>
+                    )}{' '}
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => handleStartEdit(expense)}
+                      disabled={!!editing}
+                      aria-label={`編輯 ${expense.note}`}
+                    >
+                      編輯
+                    </button>{' '}
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => handleDelete(expense)}
+                      disabled={!!editing}
+                      aria-label={`刪除 ${expense.note}`}
+                    >
+                      刪除
+                    </button>
                   </td>
                 </tr>
               ))}

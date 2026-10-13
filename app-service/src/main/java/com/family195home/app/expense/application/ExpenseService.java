@@ -47,7 +47,7 @@ public class ExpenseService {
         }
         int intAmount = toIntegerAmount(amount);
         if (note == null || note.isBlank()) {
-            throw new ApiException(ErrorKind.BAD_REQUEST, "NOTE_REQUIRED", "備註為必填欄位");
+            throw new ApiException(ErrorKind.BAD_REQUEST, "NOTE_REQUIRED", "說明為必填欄位");
         }
         if (paymentAccountId == null) {
             throw new ApiException(ErrorKind.BAD_REQUEST, "PAYMENT_ACCOUNT_REQUIRED", "支付帳戶為必填欄位");

@@ -4,6 +4,8 @@ WORKDIR /frontend
 COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ ./
+# LINE Login channel ID 為公開資訊，於建置時內嵌；未提供則登入頁使用開發用假登入
+ARG VITE_LINE_CHANNEL_ID
 RUN npm run build
 
 FROM maven:3.9-eclipse-temurin-17 AS build

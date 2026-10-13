@@ -34,6 +34,8 @@ jobs:
           file: ${{ matrix.service }}/Dockerfile
           push: true
           tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/195home-${{ matrix.service }}:latest
+          build-args: |
+            VITE_LINE_CHANNEL_ID=${{ vars.LINE_LOGIN_CHANNEL_ID }}
 
   # 注意：實際設定 Northflank 專案時，請對照 Northflank API 文件確認觸發重新部署的
   # 端點路徑與所需 secrets（NORTHFLANK_API_TOKEN、NORTHFLANK_PROJECT_ID、

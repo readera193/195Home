@@ -6,7 +6,7 @@
 
 ## Summary
 
-建立一個家庭共享支出記帳平台，讓使用者以 LINE 身分登入（開發階段為假登入），建立/加入單一家庭群組，由群組管理者建立群組層級的支付帳戶，成員並記錄金額可正可負可零的整數支出紀錄（備註必填），家庭成員可共同檢視、依支付帳戶或成員篩選紀錄，並查看依支付帳戶彙總的月結淨額統計；系統另外透過 LINE Bot 於每月最後一天 23:00 主動推播當月支出匯總，並支援成員以「YYYY-MM」訊息主動查詢。
+建立一個家庭共享支出記帳平台，讓使用者以 LINE 身分登入（開發階段為假登入，正式環境為真實 LINE Login），建立/加入單一家庭群組，由群組管理者建立群組層級的支付帳戶，成員並記錄金額可正可負可零的整數支出紀錄（說明必填），家庭成員可共同檢視、依支付帳戶或成員篩選紀錄，並查看依支付帳戶彙總的月結淨額統計；系統另外透過 LINE Bot 於每月最後一天 23:00 主動推播當月支出匯總，並支援成員以「YYYY-MM」訊息主動查詢。
 
 技術方案依 constitution v3.0.1 採 Java 17 + Spring Boot，採 **2 個部署服務**：**app-service**（單一 Spring Boot 應用，內部依業務領域切套件模組——family、expense、statistics，並直接 serve React 前端建置後的靜態檔案）與 **notification-service**（LINE Bot 整合、每月排程推播、關鍵字查詢，維持獨立部署）。資料庫統一使用單一 MySQL 執行個體，切分為 `appdb`（family/expense/statistics 模組共用，但各模組仍各自擁有獨立資料表與 Mapper，不共用表）、`notificationdb` 兩個 schema。服務間唯一的跨進程呼叫為 notification-service 呼叫 app-service 的內部 REST API；app-service 內部模組間一律以 Java service 層方法直接呼叫，不透過 HTTP。全系統以 docker-compose 一鍵啟動本機開發環境（2 個服務 + MySQL），正式環境部署至 Northflank（Sandbox 免費方案：2 個免費 service + 1 個免費 database），CI 透過 GitHub Actions 建置與測試，CD 建置映像檔推送至 GHCR 後觸發 Northflank 兩個 service 部署最新映像檔。
 
@@ -76,7 +76,7 @@ app-service/                       # 單一 Spring Boot 應用：family + expens
 │   │   ├── application/           # Service（用例）+ repository 介面 + LineLoginClient／TokenIssuer（port）
 │   │   ├── domain/                # 純 POJO 資料模型
 │   │   ├── infrastructure/
-│   │   │   ├── line/              # LineLoginClient 的 adapter（目前僅 dev/test 假登入 DevLineLoginClient）
+│   │   │   ├── line/              # LineLoginClient 的 adapter（dev/test 為假登入 DevLineLoginClient，prod 為 LineOAuthLoginClient）
 │   │   │   └── persistence/       # RepositoryImpl（adapter）+ MyBatis Mapper 介面
 │   │   └── presentation/          # Controller
 │   │       └── dto/               # Request / Response

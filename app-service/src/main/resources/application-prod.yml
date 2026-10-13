@@ -9,3 +9,12 @@ management:
   endpoint:
     health:
       show-details: never
+
+# LINE Login channel（須與 notification-service 的 Messaging API channel 屬同一個 Provider）；
+# redirect-uri 須與前端回呼網址（<網站網址>/login/callback）及 LINE Developers Console 設定完全一致
+app:
+  line:
+    login:
+      channel-id: ${LINE_LOGIN_CHANNEL_ID}
+      channel-secret: ${LINE_LOGIN_CHANNEL_SECRET}
+      redirect-uri: ${LINE_LOGIN_REDIRECT_URI}

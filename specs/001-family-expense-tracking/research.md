@@ -36,7 +36,7 @@
 ## 7. 身份驗證與服務間信任機制（FR-024）
 
 - **Decision**:
-  - 平台以 **LINE 身分登入**（FR-024），無密碼：`POST /api/auth/line` 帶入 `code`，由 `family/application/LineLoginClient`（port）換取 `LineProfile(lineUserId, displayName)`；首次登入自動建立 `users` 紀錄，之後登入同步 LINE 暱稱。目前僅有 `DevLineLoginClient`（`@Profile({"dev","test"})`，`code` 即暱稱、`lineUserId = "dev-" + code`）；prod profile 尚無 `LineLoginClient` 實作，真實 LINE Login（OAuth 授權碼換 profile）為後續工作，之後只需新增 adapter 並替換前端登入頁按鈕。真實 LINE Login channel 與 Messaging API channel 須屬同一個 LINE Provider，userId 才一致。
+  - 平台以 **LINE 身分登入**（FR-024），無密碼：`POST /api/auth/line` 帶入 `code`，由 `family/application/LineLoginClient`（port）換取 `LineProfile(lineUserId, displayName)`；首次登入自動建立 `users` 紀錄，之後登入同步 LINE 暱稱。dev/test 為 `DevLineLoginClient`（`@Profile({"dev","test"})`，`code` 即暱稱、`lineUserId = "dev-" + code`）；prod 為 `LineOAuthLoginClient`（`@Profile("prod")`，以授權碼向 LINE 換 access token 再取 profile，失敗回 `401 LINE_LOGIN_FAILED`；channel 設定 `LINE_LOGIN_CHANNEL_ID`／`LINE_LOGIN_CHANNEL_SECRET`／`LINE_LOGIN_REDIRECT_URI` 缺少即啟動失敗）。前端有設定 `VITE_LINE_CHANNEL_ID` 時導向 LINE 授權頁（帶 `state` 防 CSRF），回呼 `/login/callback` 驗證 state 後以授權碼登入；未設定則為假登入表單。真實 LINE Login channel 與 Messaging API channel 須屬同一個 LINE Provider，userId 才一致。
   - 登入成功後由 app-service 核發 **JWT**（HS256，簽章密鑰為 app-service 自身設定），Claim 包含 `sub`(userId)、`displayName`、`iat`、`exp`（有效期 2 小時）。
   - 前端後續請求以 `Authorization: Bearer <JWT>` 帶入；app-service 內建 Spring Security filter **本地驗證**簽章與過期時間，驗證失敗回傳 `401`（Problem Details 格式，`code = UNAUTHORIZED`，見決策 13）。**無獨立 Gateway 進程**——app-service 本身就是驗證與業務邏輯的唯一入口。
   - 分層：登入簽發透過 `family/application/TokenIssuer`（port）抽象，`infrastructure/security/JwtTokenProvider` 為其 adapter，`UserService` 不直接依賴 infrastructure；本地驗證由 Spring Security filter（`JwtAuthFilter`）直接使用 `JwtTokenProvider`。

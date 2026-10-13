@@ -4,9 +4,10 @@ import { loginWithLine } from '../services/userApi';
 import { useAuth } from '../hooks/useAuth';
 import { getErrorMessage } from '../utils/apiError';
 import InfoTip from '../components/InfoTip';
+import { buildAuthorizeUrl, getLineChannelId } from '../utils/lineLogin';
 
-// 開發階段的假 LINE 登入：輸入暱稱即登入（同暱稱視為同一帳號）。
-// 接上真實 LINE Login 後，改為導向 LINE 授權頁並於 callback 以授權碼呼叫 loginWithLine。
+// 有設定 VITE_LINE_CHANNEL_ID 時導向 LINE 授權頁（callback 見 LoginCallbackPage）；
+// 未設定時為開發用假登入：輸入暱稱即登入（同暱稱視為同一帳號）。
 export default function LoginPage() {
   const [nickname, setNickname] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -27,6 +28,20 @@ export default function LoginPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  const channelId = getLineChannelId();
+  if (channelId) {
+    return (
+      <div className="auth-wrap">
+        <div className="auth-card">
+          <h1>登入</h1>
+          <button type="button" className="btn-block" onClick={() => window.location.assign(buildAuthorizeUrl(channelId))}>
+            使用 LINE 登入
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (

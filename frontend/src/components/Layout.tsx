@@ -21,7 +21,7 @@ export default function Layout() {
           </Link>
           <nav className="nav" aria-label="主選單">
             {NAV_ITEMS.map((item) => (
-              <NavLink key={item.to} to={item.to} end={item.end}>
+              <NavLink key={item.to} to={item.to}>
                 {item.label}
               </NavLink>
             ))}

@@ -70,7 +70,7 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 ### `POST /api/auth/line`
 - Request: `{ code: string }`（真實 LINE Login 為授權碼；dev/test 假登入下 code 即暱稱，`lineUserId = "dev-" + code`）
 - Response 200: `{ token: string (JWT), userId: number, displayName: string, expiresAt: string }`；首次登入自動建立帳號，之後登入同步 LINE 暱稱（FR-024）
-- Errors: `400`（`code` 為空）
+- Errors: `400`（`code` 為空）、`401 LINE_LOGIN_FAILED`（授權碼無效／過期或 LINE 服務異常，僅 prod）
 - 說明：`token` 為 HS256 簽章 JWT，Claim 含 `sub`(userId)、`displayName`、`iat`、`exp`（2 小時後過期），由 app-service 自行簽發與驗證。
 
 > 無 `POST /api/users/logout` 端點：JWT 為無狀態設計，登出僅為前端捨棄 token 的客戶端行為，伺服器不做強制註銷（見 research.md 決策 7）。
@@ -147,7 +147,7 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 ### `POST /api/expenses`
 - Header: `Authorization`
 - Request: `{ familyGroupId, paymentAccountId, amount: number, note: string, occurredAt?: string }`（`authorMemberId` 由 JWT 解出的呼叫者身分決定）
-- Response 201: `{ expenseId, amount, note, occurredAt, paymentAccountId, authorMemberId }`
+- Response 201: `{ expenseId, amount, note, occurredAt, paymentAccountId, paymentAccountName, authorMemberId, locked }`
 - Errors: `400 AMOUNT_MUST_BE_INTEGER`、`400 NOTE_REQUIRED`、`400 PAYMENT_ACCOUNT_REQUIRED`、`409 GROUP_DISSOLVED`（FR-016、FR-018）
 - 邏輯：`occurredAt` 未提供時使用伺服器當下時間（FR-005）
 

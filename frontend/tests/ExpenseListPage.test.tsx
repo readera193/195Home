@@ -3,6 +3,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AxiosError, AxiosHeaders } from 'axios';
 import ExpenseListPage from '../src/pages/ExpenseListPage';
 import * as familyApi from '../src/services/familyApi';
 import * as expenseApi from '../src/services/expenseApi';
@@ -114,7 +115,7 @@ describe('ExpenseListPage 新增支出表單', () => {
     await waitFor(() => expect(within(screen.getByLabelText('支付帳戶')).getByRole('option', { name: '現金' })).toBeInTheDocument());
 
     fireEvent.change(screen.getByLabelText(/^金額/), { target: { value: amount } });
-    fireEvent.change(screen.getByLabelText('備註'), { target: { value: '午餐' } });
+    fireEvent.change(screen.getByLabelText('說明', { selector: 'input' }), { target: { value: '午餐' } });
     fireEvent.change(screen.getByLabelText('支付帳戶'), { target: { value: '100' } });
     fireEvent.click(screen.getByRole('button', { name: '新增' }));
   }
@@ -142,5 +143,98 @@ describe('ExpenseListPage 新增支出表單', () => {
         expect.objectContaining({ amount: -350, note: '午餐', paymentAccountId: 100 }),
       );
     });
+  });
+});
+
+describe('ExpenseListPage 編輯／刪除', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(familyApi.getMyFamily).mockResolvedValue({
+      familyGroupId: 10,
+      name: '王家',
+      status: 'ACTIVE',
+      role: 'MEMBER',
+      inviteCode: 'CODE1',
+      familyMemberId: 1,
+    });
+    vi.mocked(familyApi.getMembers).mockResolvedValue([]);
+    vi.mocked(expenseApi.listAccounts).mockResolvedValue([
+      { accountId: 100, familyMemberId: 1, name: '現金', status: 'ACTIVE' },
+    ]);
+    vi.mocked(expenseApi.listExpenses).mockResolvedValue({
+      items: [expense(1, '午餐')],
+      page: 0,
+      size: 20,
+      totalElements: 1,
+      totalPages: 1,
+    });
+  });
+
+  it('編輯：先取得鎖，儲存時呼叫 updateExpense', async () => {
+    vi.mocked(expenseApi.lockExpense).mockResolvedValue({ expenseId: 1 });
+    vi.mocked(expenseApi.updateExpense).mockResolvedValue(expense(1, '晚餐'));
+
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: '編輯 午餐' }));
+
+    await waitFor(() => expect(expenseApi.lockExpense).toHaveBeenCalledWith(1, 10));
+    fireEvent.change(await screen.findByLabelText('編輯說明'), { target: { value: '晚餐' } });
+    fireEvent.click(screen.getByRole('button', { name: '儲存' }));
+
+    await waitFor(() =>
+      expect(expenseApi.updateExpense).toHaveBeenCalledWith(
+        1,
+        10,
+        expect.objectContaining({ note: '晚餐', amount: -100, paymentAccountId: 100 }),
+      ),
+    );
+  });
+
+  it('紀錄被他人編輯中（RECORD_LOCKED）時顯示提示且不開啟編輯表單', async () => {
+    const config = { headers: new AxiosHeaders() };
+    vi.mocked(expenseApi.lockExpense).mockRejectedValue(
+      new AxiosError('Conflict', 'ERR_BAD_REQUEST', config, null, {
+        data: { status: 409, title: 'Conflict', detail: '此紀錄目前正被編輯中，請稍後再試', code: 'RECORD_LOCKED' },
+        status: 409,
+        statusText: '',
+        headers: {},
+        config,
+      }),
+    );
+
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: '編輯 午餐' }));
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('此紀錄目前正被編輯中'));
+    expect(screen.queryByRole('form', { name: '編輯支出' })).not.toBeInTheDocument();
+  });
+
+  it('取消編輯會釋放鎖', async () => {
+    vi.mocked(expenseApi.lockExpense).mockResolvedValue({ expenseId: 1 });
+    vi.mocked(expenseApi.unlockExpense).mockResolvedValue(undefined);
+
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: '編輯 午餐' }));
+    fireEvent.click(await screen.findByRole('button', { name: '取消' }));
+
+    await waitFor(() => expect(expenseApi.unlockExpense).toHaveBeenCalledWith(1));
+  });
+
+  it('刪除：確認後呼叫 deleteExpense；取消確認則釋放鎖', async () => {
+    vi.mocked(expenseApi.lockExpense).mockResolvedValue({ expenseId: 1 });
+    vi.mocked(expenseApi.deleteExpense).mockResolvedValue(undefined);
+    vi.mocked(expenseApi.unlockExpense).mockResolvedValue(undefined);
+
+    renderPage();
+    const confirm = vi.spyOn(window, 'confirm');
+
+    confirm.mockReturnValueOnce(false);
+    fireEvent.click(await screen.findByRole('button', { name: '刪除 午餐' }));
+    await waitFor(() => expect(expenseApi.unlockExpense).toHaveBeenCalledWith(1));
+    expect(expenseApi.deleteExpense).not.toHaveBeenCalled();
+
+    confirm.mockReturnValueOnce(true);
+    fireEvent.click(screen.getByRole('button', { name: '刪除 午餐' }));
+    await waitFor(() => expect(expenseApi.deleteExpense).toHaveBeenCalledWith(1, 10));
   });
 });

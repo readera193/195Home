@@ -94,9 +94,9 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 ## Phase 4: User Story 2 - 建立支付帳戶並記錄支出 (Priority: P1)
 
-**Goal**: 管理者可建立支付帳戶，成員可，並新增/編輯/刪除支出紀錄（含併發編輯鎖定），金額可正可負可零且為整數，備註必填
+**Goal**: 管理者可建立支付帳戶，成員可，並新增/編輯/刪除支出紀錄（含併發編輯鎖定），金額可正可負可零且為整數，說明必填
 
-**Independent Test**: 成員建立一個支付帳戶後，新增一筆支出紀錄，驗證該紀錄正確包含備註、金額、日期與支付帳戶，且未指定日期時預設為當下
+**Independent Test**: 成員建立一個支付帳戶後，新增一筆支出紀錄，驗證該紀錄正確包含說明、金額、日期與支付帳戶，且未指定日期時預設為當下
 
 ### Implementation for User Story 2
 
@@ -104,7 +104,7 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 - [X] T028 [P] [US2] 建立 ExpenseRecord 資料模型（POJO）、repository 介面與 MyBatis Mapper（含 `amount`、`note`、`occurredAt`、`lockedByMemberId`、`lockedAt` 欄位）於 `app-service/src/main/java/com/family195home/app/expense/domain/ExpenseRecord.java`、`application/ExpenseRecordRepository.java`、`infrastructure/persistence/ExpenseRecordRepositoryImpl.java`、`infrastructure/persistence/ExpenseRecordMapper.java`、`resources/mapper/expense/ExpenseRecordMapper.xml`
 - [X] T029 [US2] 實作 PaymentAccountService：建立／改名支付帳戶（限 `ADMIN`，一般成員回傳 `403 NOT_GROUP_ADMIN`，FR-003，群組已解散時拒絕建立並回傳 `409 GROUP_DISSOLVED`，FR-018）、軟停用與刪除邏輯（限 `ADMIN`；`DISABLED` 後不可供新支出選用，且不允許真正刪除已使用過的帳戶，FR-022）於 `app-service/src/main/java/com/family195home/app/expense/application/PaymentAccountService.java`（依賴 T027）
 - [X] T030 [P] [US2] 實作 `POST /api/accounts`、`GET /api/accounts?familyGroupId=&status=`（呼叫 `assertMemberAuthorized` 確認呼叫者屬於 `familyGroupId`，否則回傳 `403`，FR-017）、`PUT /api/accounts/{id}`、`DELETE /api/accounts/{id}`（未使用過才可刪，否則 `409 ACCOUNT_IN_USE`）、`POST /api/accounts/{id}/disable` 端點（皆限 `ADMIN`）於 `app-service/src/main/java/com/family195home/app/expense/presentation/PaymentAccountController.java`（依賴 T021、T029）
-- [X] T031 [US2] 實作 ExpenseService 新增邏輯：金額須為整數且可正可負可零（非整數回傳 `400 AMOUNT_MUST_BE_INTEGER`，FR-016）、備註與支付帳戶必填驗證（`400 NOTE_REQUIRED`/`400 PAYMENT_ACCOUNT_REQUIRED`）、未指定日期時預設伺服器當下時間（FR-005）、群組已解散拒絕新增（`409 GROUP_DISSOLVED`，FR-018）於 `app-service/src/main/java/com/family195home/app/expense/application/ExpenseService.java`（依賴 T028）
+- [X] T031 [US2] 實作 ExpenseService 新增邏輯：金額須為整數且可正可負可零（非整數回傳 `400 AMOUNT_MUST_BE_INTEGER`，FR-016）、說明與支付帳戶必填驗證（`400 NOTE_REQUIRED`/`400 PAYMENT_ACCOUNT_REQUIRED`）、未指定日期時預設伺服器當下時間（FR-005）、群組已解散拒絕新增（`409 GROUP_DISSOLVED`，FR-018）於 `app-service/src/main/java/com/family195home/app/expense/application/ExpenseService.java`（依賴 T028）
 - [X] T032 [US2] 實作併發編輯鎖定邏輯：以條件式 UPDATE（`locked_by_member_id IS NULL OR locked_at < now-5min`）取得鎖、`POST /api/expenses/{id}/lock`（取得失敗回傳 `409 RECORD_LOCKED`）、`POST /api/expenses/{id}/unlock`（FR-027，見 research.md 決策 3）於 `ExpenseService.java`
 - [X] T033 [US2] 實作編輯/刪除邏輯：直接呼叫 T021 建立的 `FamilyService.assertMemberAuthorized(...)` 方法（同進程呼叫，非 HTTP）確認操作者為該群組在職成員（管理者與一般成員權限相同，不限新增者本人，FR-019）、須已持有鎖方可操作（未持有回傳 `403 LOCK_NOT_HELD_BY_CALLER`）、`PUT /api/expenses/{id}`（成功後自動釋放鎖）、`DELETE /api/expenses/{id}` 於 `ExpenseService.java`（依賴 T021、T032）
 - [X] T034 [P] [US2] 實作 `POST /api/expenses` 建立端點於 `app-service/src/main/java/com/family195home/app/expense/presentation/ExpenseController.java`（依賴 T031）
@@ -236,8 +236,8 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 - [X] T090 [P] 新增 `config/SpaFallbackConfig`：前端 BrowserRouter 路由（如 `/login`）直接開啟或重新整理時回傳 `index.html`（`api/`、`actuator/` 路徑除外）
 - [X] T091 [P] 前端共用版面與樣式：`components/Layout.tsx`（導覽列、登出）、`components/InfoTip.tsx`（說明 tooltip）、`styles.css`，各頁面套用；新增支出表單併入 `ExpenseListPage`
 - [X] T092 [P] 本機開發體驗：README 「本機開發」兩種方式（只跑 MySQL＋前後端本機執行／全 Docker）、`.vscode/tasks.json` 一鍵啟動、`~/.195home/*.yml` 選用覆蓋檔、`vite.config.ts` 將 `/api` proxy 到 8080
-- [ ] T093 實作真實 LINE Login：新增 `LineLoginClient` 的 prod adapter（以授權碼向 LINE 換取 profile）、前端登入頁改為導向 LINE 授權頁並於 callback 以授權碼呼叫 `POST /api/auth/line`；目前 prod profile 沒有 `LineLoginClient` 實作，app-service 無法於 prod 啟動（research.md 決策 7）
-- [ ] T094 前端支出編輯／刪除：於 `ExpenseListPage` 提供編輯、刪除操作，串接既有 `lockExpense`／`updateExpense`／`deleteExpense`／`unlockExpense`（`expenseApi.ts` 已封裝），並顯示「紀錄目前正被編輯中」提示（FR-019、FR-027；後端端點已完成）
+- [X] T093 實作真實 LINE Login：新增 `LineLoginClient` 的 prod adapter（以授權碼向 LINE 換取 profile）、前端登入頁改為導向 LINE 授權頁並於 callback 以授權碼呼叫 `POST /api/auth/line`；目前 prod profile 沒有 `LineLoginClient` 實作，app-service 無法於 prod 啟動（research.md 決策 7）
+- [X] T094 前端支出編輯／刪除：於 `ExpenseListPage` 提供編輯、刪除操作，串接既有 `lockExpense`／`updateExpense`／`deleteExpense`／`unlockExpense`（`expenseApi.ts` 已封裝），並顯示「紀錄目前正被編輯中」提示（FR-019、FR-027；後端端點已完成）
 
 ---
 

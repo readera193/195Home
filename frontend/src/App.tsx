@@ -4,6 +4,7 @@ import { AuthProvider } from './hooks/useAuth';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
+import LoginCallbackPage from './pages/LoginCallbackPage';
 import HomePage from './pages/HomePage';
 import FamilyGroupPage from './pages/FamilyGroupPage';
 import MembersPage from './pages/MembersPage';
@@ -17,6 +18,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/login/callback" element={<LoginCallbackPage />} />
           <Route
             element={
               <ProtectedRoute>
