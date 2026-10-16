@@ -50,6 +50,22 @@ class LineWebhookControllerTest {
     }
 
     @Test
+    void determineReply_repliesFormatHintForNonexistentMonth() {
+        String reply = controller.determineReply("2026-13", "line-user-1");
+
+        assertThat(reply).contains("YYYY-MM");
+    }
+
+    @Test
+    void determineReply_repliesFriendlyMessageWhenAppServiceFails() {
+        when(appServiceClient.findByLineUserId("line-user-1")).thenThrow(new RuntimeException("boom"));
+
+        String reply = controller.determineReply("2026-07", "line-user-1");
+
+        assertThat(reply).contains("稍後再試");
+    }
+
+    @Test
     void determineReply_repliesFormatHintForInvalidMessage() {
         // FR-014：不符合 YYYY-MM 格式的訊息回覆格式提示
         String reply = controller.determineReply("hello", "line-user-1");

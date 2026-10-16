@@ -13,6 +13,8 @@ import com.linecorp.bot.model.message.TextMessage;
 import com.linecorp.bot.spring.boot.annotation.EventMapping;
 import com.linecorp.bot.spring.boot.annotation.LineMessageHandler;
 
+import java.time.YearMonth;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -25,6 +27,7 @@ import java.util.regex.Pattern;
 public class LineWebhookController {
 
     private static final Pattern YEAR_MONTH_PATTERN = Pattern.compile("\\d{4}-\\d{2}");
+    private static final String FORMAT_HINT = "請以「YYYY-MM」格式（例如 2026-07）查詢指定月份支出匯總。";
 
     private final AppServiceClient appServiceClient;
     private final LineMessagingClient lineMessagingClient;
@@ -48,7 +51,7 @@ public class LineWebhookController {
             return handleMonthQuery(text, lineUserId);
         }
         // FR-014：不符合 YYYY-MM 格式的訊息一律回覆格式提示，不視為有效查詢
-        return "請以「YYYY-MM」格式（例如 2026-07）查詢指定月份支出匯總。";
+        return FORMAT_HINT;
     }
 
     @EventMapping
@@ -57,6 +60,27 @@ public class LineWebhookController {
     }
 
     private String handleMonthQuery(String month, String lineUserId) {
+        if (!isValidYearMonth(month)) {
+            return FORMAT_HINT;
+        }
+        try {
+            return queryMonthlySummary(month, lineUserId);
+        } catch (RuntimeException e) {
+            // app-service 呼叫失敗時仍回覆可讀訊息，避免使用者收不到任何回應（FR-014）
+            return "目前無法查詢支出匯總，請稍後再試。";
+        }
+    }
+
+    private static boolean isValidYearMonth(String month) {
+        try {
+            YearMonth.parse(month);
+            return true;
+        } catch (DateTimeParseException e) {
+            return false;
+        }
+    }
+
+    private String queryMonthlySummary(String month, String lineUserId) {
         Optional<BindingResult> binding = appServiceClient.findByLineUserId(lineUserId);
         if (binding.isEmpty()) {
             // FR-015：未加入任何家庭的帳號不得取得任何家庭支出資料
