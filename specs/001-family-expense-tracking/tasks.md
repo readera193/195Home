@@ -336,3 +336,18 @@ Task: "前端成員列表頁面於 frontend/src/pages/MembersPage.tsx"
 - 可於任一 Checkpoint 停下並獨立驗證該 Story
 - 避免：模糊任務描述、同檔案衝突、破壞 Story 獨立性的跨 Story 相依
 - app-service 為單一 Spring Boot 專案，family/expense/statistics 三個套件模組間**一律以 Java service 方法直接呼叫**（例如 `T033`、`T043` 依賴 `T021`），不得為模組邊界另外開發 HTTP 端點；唯一保留 HTTP 邊界的是 app-service 對外的公開/內部 API（供前端與 notification-service 呼叫）
+
+---
+
+## Phase 12: Convergence
+
+**Purpose**: 由 `/speckit-converge` 比對 spec／plan／tasks 與現況程式碼後發現的剩餘缺口。
+
+- [X] T095 `LineWebhookController.handleMonthQuery` 補上月份有效性檢查（如 `2026-13` 符合 `\d{4}-\d{2}` 但非合法年月，應回覆格式提示）並攔截 `AppServiceClient` 呼叫失敗，一律回覆使用者可讀訊息而非不回應；於 `LineWebhookControllerTest` 補測試 per US6/AC4, FR-014 (partial)
+- [X] T096 補上 app-service family 模組（`FamilyGroupMapper`、`FamilyMemberMapper`：`selectByGroupId` 排序、`selectActiveByUserId`、`countActiveByGroupId`）與 `PaymentAccountMapper` 的 Mapper 整合測試於 `app-service/src/test/java/com/family195home/app/{family,expense}/infrastructure/persistence/`，目前僅 `ExpenseRecordMapperIntegrationTest` per T071 (partial)
+
+## Phase 13: Convergence
+
+**Purpose**: 由 `/speckit-converge` 再次比對後發現的剩餘缺口。
+
+- [X] T097 明確指定台灣時區：`MonthlyNotificationScheduler` 的 `@Scheduled` 加上 `zone = "Asia/Taipei"`，並將 notification-service、app-service 的容器／JVM 預設時區設為 `Asia/Taipei`（Dockerfile 或 docker-compose `TZ`），使「每月最後一天 23:00」發送時間與自然月邊界、支出預設日期皆以台灣時間計算；補上時區相關測試 per FR-013, SC-005 (partial)
