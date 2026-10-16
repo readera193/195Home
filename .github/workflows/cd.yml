@@ -15,7 +15,13 @@ jobs:
       packages: write
     strategy:
       matrix:
-        service: [app-service, notification-service]
+        include:
+          # app-service 的 Dockerfile 以 repo 根目錄為 context，以便一併建置 frontend/ 靜態檔案；
+          # notification-service 的 Dockerfile 以自身目錄為 context（與 docker-compose.yml 一致）
+          - service: app-service
+            context: .
+          - service: notification-service
+            context: ./notification-service
     steps:
       - uses: actions/checkout@v4
 
@@ -29,8 +35,7 @@ jobs:
       - name: Build and push ${{ matrix.service }} image
         uses: docker/build-push-action@v5
         with:
-          # app-service 的 Dockerfile 以 repo 根目錄為 context，以便一併建置 frontend/ 靜態檔案
-          context: .
+          context: ${{ matrix.context }}
           file: ${{ matrix.service }}/Dockerfile
           push: true
           tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/195home-${{ matrix.service }}:latest
