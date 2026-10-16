@@ -12,6 +12,7 @@ import com.family195home.notification.application.dto.MonthlySummaryView;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.scheduling.annotation.Scheduled;
 
 import java.util.List;
 
@@ -36,6 +37,16 @@ class MonthlyNotificationSchedulerTest {
 
         when(appServiceClient.getMonthlySummary(any(), any())).thenReturn(
                 new MonthlySummaryView(10L, "2026-09", List.of(new AccountSummaryView(1L, "現金", -350)), -350));
+    }
+
+    @Test
+    void sendMonthlySummaries_isScheduledAtLastDay2300InTaipeiTime() throws NoSuchMethodException {
+        // FR-013：容器預設為 UTC，排程必須明確指定台灣時區
+        Scheduled scheduled = MonthlyNotificationScheduler.class
+                .getMethod("sendMonthlySummaries").getAnnotation(Scheduled.class);
+
+        assertThat(scheduled.cron()).isEqualTo("0 0 23 L * ?");
+        assertThat(scheduled.zone()).isEqualTo("Asia/Taipei");
     }
 
     @Test

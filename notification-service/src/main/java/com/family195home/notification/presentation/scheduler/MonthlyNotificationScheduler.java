@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.List;
 
 /**
@@ -43,9 +44,9 @@ public class MonthlyNotificationScheduler {
         this.maxRetries = maxRetries;
     }
 
-    @Scheduled(cron = "0 0 23 L * ?")
+    @Scheduled(cron = "0 0 23 L * ?", zone = "Asia/Taipei")
     public void sendMonthlySummaries() {
-        String yearMonth = YearMonth.now().toString();
+        String yearMonth = YearMonth.now(ZoneId.of("Asia/Taipei")).toString();
         List<LineBindingView> bindings = appServiceClient.findAllBindings();
         // 若某家庭當下無任何已綁定 LINE 的成員，該家庭不會出現在 bindings 中，等同自動略過（見 spec.md Edge Cases）
         for (LineBindingView binding : bindings) {
