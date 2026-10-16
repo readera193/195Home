@@ -1,0 +1,33 @@
+# 以真實 LINE 憑證在本機 Docker 測試 LINE 登入與通知。用法：
+#   docker compose -f docker-compose.yml -f docker-compose.line.yml up -d --build
+#
+# 憑證放在 repo 根目錄的 .env（已被 .gitignore 排除，範例見 line.env.example），
+# docker compose 會自動讀取。缺少任一必要變數時會直接報錯。
+#
+# 與 docker-compose.yml 的差異：
+#   - app-service 改用 prod profile → 啟用真實 LineOAuthLoginClient（取代假登入）
+#   - 前端建置時內嵌 VITE_LINE_CHANNEL_ID → 登入頁導向 LINE 授權頁
+#   - notification-service 使用真實的 Messaging API channel token / secret
+#
+# LINE Webhook 需要公網 HTTPS：先啟動 ngrok（ngrok http --url=<固定網域> 8081），
+# 再把 https://<固定網域>/api/line/webhook 填到 LINE Developers Console 的 Webhook URL。
+#
+# LINE Developers Console 的 Callback URL 須登錄為 LINE_LOGIN_REDIRECT_URI（預設 http://localhost:8080/login/callback）。
+# 請以 http://localhost:8080 開啟網站，前端的回呼網址取自 window.location.origin，須與上述設定完全一致。
+
+services:
+  app-service:
+    build:
+      args:
+        VITE_LINE_CHANNEL_ID: ${LINE_LOGIN_CHANNEL_ID:?請在 .env 設定 LINE_LOGIN_CHANNEL_ID}
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      LINE_LOGIN_CHANNEL_ID: ${LINE_LOGIN_CHANNEL_ID:?請在 .env 設定 LINE_LOGIN_CHANNEL_ID}
+      LINE_LOGIN_CHANNEL_SECRET: ${LINE_LOGIN_CHANNEL_SECRET:?請在 .env 設定 LINE_LOGIN_CHANNEL_SECRET}
+      LINE_LOGIN_REDIRECT_URI: ${LINE_LOGIN_REDIRECT_URI:-http://localhost:8080/login/callback}
+
+  notification-service:
+    # Webhook 以 ngrok 轉發（ngrok 從本機連 127.0.0.1:8081），不需對外開放 8081
+    environment:
+      LINE_CHANNEL_TOKEN: ${LINE_CHANNEL_TOKEN:?請在 .env 設定 LINE_CHANNEL_TOKEN}
+      LINE_CHANNEL_SECRET: ${LINE_CHANNEL_SECRET:?請在 .env 設定 LINE_CHANNEL_SECRET}
