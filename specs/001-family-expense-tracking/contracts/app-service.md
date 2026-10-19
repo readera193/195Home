@@ -2,7 +2,7 @@
 
 單一 Spring Boot 應用，內部依業務領域分為 family、expense、statistics 三個套件模組，資料庫：`appdb`。對外提供兩組介面：
 
-1. **公開 API**：前端（同源，因前端靜態檔案由 app-service 直接 serve）呼叫，需 `Authorization: Bearer <JWT>`（除 `POST /api/auth/line` 外）。
+1. **公開 API**：前端（同源，因前端靜態檔案由 app-service 直接 serve）呼叫，需 `Authorization: Bearer <JWT>`（除 `POST /api/auth/line`、`POST /api/auth/demo`、`GET /api/auth/config` 外）。
 2. **內部 API**：僅供 notification-service 呼叫，因該情境無平台使用者 JWT（發話者是 LINE 帳號），一律以共用密鑰 Header `X-Internal-Token` 驗證呼叫來源（見 research.md 決策 7）。
 
 app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense 模組確認呼叫者角色、statistics 模組取得支出資料）皆為同進程 Java service 方法呼叫，**不透過 HTTP，因此不出現在本合約中**——本合約僅描述跨部署服務邊界（前端 ↔ app-service、notification-service ↔ app-service）的介面。
@@ -39,7 +39,7 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 | HTTP | code | 說明 |
 |------|------|------|
 | 400 | `VALIDATION_ERROR` | 請求本體欄位驗證失敗（`@Valid`），`errors[]` 列出各欄位 |
-| 400 | `INVALID_DATE_FORMAT` | 日期時間（`occurredAt`）或月份（`month`）格式錯誤 |
+| 400 | `INVALID_DATE_FORMAT` | 日期時間（`occurredAt`）、日期（`startDate`／`endDate`）或月份（`month`）格式錯誤 |
 | 401 | `UNAUTHORIZED` | 未帶 token、token 無效或已過期；內部 API 的 `X-Internal-Token` 缺少或錯誤亦同 |
 | 403 | `FORBIDDEN` | 已登入但沒有權限（Spring Security 層級） |
 | 500 | `INTERNAL_ERROR` | 未預期的伺服器錯誤；`detail` 為固定文字，不洩漏內部細節 |
@@ -68,10 +68,19 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 ## 帳號與登入（公開 API）
 
 ### `POST /api/auth/line`
-- Request: `{ code: string }`（真實 LINE Login 為授權碼；dev/test 假登入下 code 即暱稱，`lineUserId = "dev-" + code`）
+- Request: `{ code: string }`（LINE 授權碼）
 - Response 200: `{ token: string (JWT), userId: number, displayName: string, expiresAt: string }`；首次登入自動建立帳號，之後登入同步 LINE 暱稱（FR-024）
-- Errors: `400`（`code` 為空）、`401 LINE_LOGIN_FAILED`（授權碼無效／過期或 LINE 服務異常，僅 prod）
+- Errors: `400`（`code` 為空）、`401 LINE_LOGIN_FAILED`（授權碼無效／過期或 LINE 服務異常）
 - 說明：`token` 為 HS256 簽章 JWT，Claim 含 `sub`(userId)、`displayName`、`iat`、`exp`（2 小時後過期），由 app-service 自行簽發與驗證。
+
+### `POST /api/auth/demo`
+- Request: 無 body
+- Response 200: 同 `POST /api/auth/line`；每次建立全新帳號（`lineUserId = "demo-<uuid>"`，`displayName = "Demo-xxxx"`）
+- Errors: `404 DEMO_LOGIN_DISABLED`（未設定 `DEMO_LOGIN_ENABLED=true`）
+- 說明：登入同時建立範例家庭群組（`Demo-xxxx 的家`，帳號為管理者）、3 個支付帳戶、13 筆範例支出；供展示環境免 LINE 體驗；Demo 帳號不會收到 LINE 月結推播。
+
+### `GET /api/auth/config`
+- Response 200: `{ demoLoginEnabled: boolean }`，前端據此決定是否顯示 Demo 體驗按鈕
 
 > 無 `POST /api/users/logout` 端點：JWT 為無狀態設計，登出僅為前端捨棄 token 的客戶端行為，伺服器不做強制註銷（見 research.md 決策 7）。
 
@@ -151,11 +160,11 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 - Errors: `400 AMOUNT_MUST_BE_INTEGER`、`400 NOTE_REQUIRED`、`400 PAYMENT_ACCOUNT_REQUIRED`、`409 GROUP_DISSOLVED`（FR-016、FR-018）
 - 邏輯：`occurredAt` 未提供時使用伺服器當下時間（FR-005）
 
-### `GET /api/expenses?familyGroupId=&paymentAccountId=&authorMemberId=&month=YYYY-MM&page=&size=`
+### `GET /api/expenses?familyGroupId=&paymentAccountId=&authorMemberId=&startDate=YYYY-MM-DD&endDate=YYYY-MM-DD&page=&size=`
 - Header: `Authorization`（呼叫者須為該群組在職成員，否則 `403 NOT_GROUP_MEMBER`，FR-017）
 - Response 200（分頁，見「共通約定 → 分頁」；`paymentAccountName` 於伺服器端每次請求僅查詢一次帳戶清單後對應，不隨筆數增加查詢次數）: `{ items: [{ expenseId, amount, note, occurredAt, paymentAccountId, paymentAccountName, authorMemberId, locked: boolean }], page, size, totalElements, totalPages }`
-- 篩選條件可單獨或同時套用 `paymentAccountId`、`authorMemberId`（FR-008、FR-009、FR-010）；`month` 省略時不限月份
-- Errors: `400 INVALID_PAGE_PARAMS`、`400 INVALID_DATE_FORMAT`（`month` 格式錯誤）
+- 篩選條件可單獨或同時套用 `paymentAccountId`、`authorMemberId`（FR-008、FR-009、FR-010）；`startDate`／`endDate`（含頭含尾，各自可省略；省略則不限該側）可依日期區間篩選，前端預設帶入本月第一天與最後一天
+- Errors: `400 INVALID_PAGE_PARAMS`、`400 INVALID_DATE_RANGE`（`startDate` 晚於 `endDate`）、`400 INVALID_DATE_FORMAT`（日期格式錯誤）
 - 說明：statistics 模組彙總整月資料時走同進程的不分頁查詢，不受 `size` 上限影響（SC-004）
 
 ### `POST /api/expenses/{expenseId}/lock?familyGroupId=`

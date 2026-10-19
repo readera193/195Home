@@ -7,7 +7,6 @@ import LoginPage from './pages/LoginPage';
 import LoginCallbackPage from './pages/LoginCallbackPage';
 import HomePage from './pages/HomePage';
 import FamilyGroupPage from './pages/FamilyGroupPage';
-import MembersPage from './pages/MembersPage';
 import PaymentAccountsPage from './pages/PaymentAccountsPage';
 import ExpenseListPage from './pages/ExpenseListPage';
 import StatisticsPage from './pages/StatisticsPage';
@@ -28,7 +27,7 @@ export default function App() {
           >
             <Route path="/" element={<HomePage />} />
             <Route path="/family" element={<FamilyGroupPage />} />
-            <Route path="/members" element={<MembersPage />} />
+            <Route path="/members" element={<Navigate to="/family" replace />} />
             <Route path="/accounts" element={<PaymentAccountsPage />} />
             <Route path="/expenses/new" element={<Navigate to="/expenses" replace />} />
             <Route path="/expenses" element={<ExpenseListPage />} />

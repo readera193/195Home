@@ -36,7 +36,8 @@ public class SecurityConfig {
                         .authenticationEntryPoint(authHandlers)
                         .accessDeniedHandler(authHandlers))
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers(HttpMethod.POST, "/api/auth/line").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/line", "/api/auth/demo").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/auth/config").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers("/api/**").authenticated()
                         // 前端靜態檔案（打包進 src/main/resources/static），同源無需驗證

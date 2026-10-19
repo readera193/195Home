@@ -112,6 +112,7 @@ describe('ExpenseListPage 新增支出表單', () => {
   });
 
   async function fillAndSubmit(amount: string) {
+    fireEvent.click(await screen.findByRole('button', { name: '新增支出' }));
     await waitFor(() => expect(within(screen.getByLabelText('支付帳戶')).getByRole('option', { name: '現金' })).toBeInTheDocument());
 
     fireEvent.change(screen.getByLabelText(/^金額/), { target: { value: amount } });
@@ -144,6 +145,54 @@ describe('ExpenseListPage 新增支出表單', () => {
       );
     });
   });
+});
+
+describe('ExpenseListPage 日期篩選', () => {
+  it('預設為本月第一天到最後一天，變更後以新的起訖日期重新查詢', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date(2026, 1, 10) });
+    try {
+      await runDateFilterTest();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  async function runDateFilterTest() {
+    vi.resetAllMocks();
+    vi.mocked(familyApi.getMyFamily).mockResolvedValue({
+      familyGroupId: 10,
+      name: '王家',
+      status: 'ACTIVE',
+      role: 'MEMBER',
+      inviteCode: 'CODE1',
+      familyMemberId: 1,
+    });
+    vi.mocked(familyApi.getMembers).mockResolvedValue([]);
+    vi.mocked(expenseApi.listAccounts).mockResolvedValue([]);
+    vi.mocked(expenseApi.listExpenses).mockResolvedValue({
+      items: [],
+      page: 0,
+      size: 20,
+      totalElements: 0,
+      totalPages: 0,
+    });
+
+    renderPage();
+    await waitFor(() =>
+      expect(expenseApi.listExpenses).toHaveBeenLastCalledWith(
+        expect.objectContaining({ startDate: '2026-02-01', endDate: '2026-02-28' }),
+      ),
+    );
+
+    fireEvent.change(screen.getByLabelText('起始日期'), { target: { value: '2026-02-05' } });
+    fireEvent.change(screen.getByLabelText('結束日期'), { target: { value: '2026-02-20' } });
+
+    await waitFor(() =>
+      expect(expenseApi.listExpenses).toHaveBeenLastCalledWith(
+        expect.objectContaining({ startDate: '2026-02-05', endDate: '2026-02-20', page: 0 }),
+      ),
+    );
+  }
 });
 
 describe('ExpenseListPage 編輯／刪除', () => {

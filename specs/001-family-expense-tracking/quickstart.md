@@ -28,9 +28,9 @@ docker compose up -d --build
 
 ### US1：建立家庭群組並邀請成員
 
-1. 以 LINE 登入帳號 A：`POST /api/auth/line {code: "A"}`（dev 假登入，code 即暱稱，首次登入自動建立帳號）→ 取得 token
+1. 以 Demo 體驗登入帳號 A：`POST /api/auth/demo`（dev 預設開啟，每次建立隨機帳號）→ 取得 token
 2. 以帳號 A 建立群組：`POST /api/families {name: "王家"}` → 取得 `inviteCode`
-3. 以同樣方式登入帳號 B：`POST /api/auth/line {code: "B"}`
+3. 以同樣方式登入帳號 B：再呼叫一次 `POST /api/auth/demo`
 4. 以帳號 B 加入群組：`POST /api/families/join {inviteCode}`
 5. **預期結果**：`GET /api/families/{id}/members` 回傳含 A（ADMIN）與 B（MEMBER）兩筆在職成員
 6. 驗證唯一群組限制：帳號 A 再次呼叫 `POST /api/families` → 預期 `409 ALREADY_IN_A_GROUP`，回應為 Problem Details（`Content-Type: application/problem+json`，含 `status`、`detail`、`code`）
@@ -61,7 +61,7 @@ docker compose up -d --build
 
 ### US5：每月自動 LINE 通知（需真實 LINE 帳號）
 
-> LINE 身分即登入身分，無需綁定步驟；但 dev 假登入帳號的 `lineUserId`（`dev-` 開頭）不是真實 LINE ID，無法實測推播（推播會失敗並寫入 `NotificationLog(status=FAILED)`）。實測需待真實 LINE Login 串接完成。
+> LINE 身分即登入身分，無需綁定步驟；但 Demo 帳號的 `lineUserId`（`demo-` 開頭）不是真實 LINE ID，月結推播會自動略過；實測推播須以真實 LINE Login 登入（見 docker-compose.yml 與 line.env.example）。
 
 1. 成員以真實 LINE 登入並加入家庭群組
 2. 手動觸發排程（測試環境可暫時調整 cron）

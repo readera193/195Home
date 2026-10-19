@@ -7,7 +7,6 @@ import com.family195home.app.shared.ErrorKind;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Profile;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
@@ -15,9 +14,8 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
-/** 正式環境的 LINE Login（OAuth 2.1）：以授權碼換 access token，再取得使用者 profile。 */
+/** LINE Login（OAuth 2.1）：以授權碼換 access token，再取得使用者 profile。 */
 @Component
-@Profile("prod")
 public class LineOAuthLoginClient implements LineLoginClient {
 
     private static final String TOKEN_URL = "https://api.line.me/oauth2/v2.1/token";

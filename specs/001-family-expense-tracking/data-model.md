@@ -13,7 +13,7 @@ schema 定義對應 `app-service/src/main/resources/db/migration/`（Flyway migr
 | 欄位 | 型別 | 說明 |
 |------|------|------|
 | id | BIGINT PK | |
-| lineUserId | VARCHAR(64) UNIQUE NOT NULL | LINE userId，即登入身分，全系統唯一（FR-020、FR-024）；dev 假登入為 `"dev-" + 暱稱` |
+| lineUserId | VARCHAR(64) UNIQUE NOT NULL | LINE userId，即登入身分，全系統唯一（FR-020、FR-024）；Demo 體驗帳號為 `"demo-" + UUID` |
 | displayName | VARCHAR(255) NOT NULL | LINE 暱稱；每次登入時同步更新 |
 | createdAt | DATETIME(6) NOT NULL | |
 

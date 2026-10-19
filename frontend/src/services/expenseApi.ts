@@ -66,7 +66,9 @@ export interface ListExpensesParams {
   familyGroupId: number;
   paymentAccountId?: number;
   authorMemberId?: number;
-  month?: string;
+  /** 起訖日期（YYYY-MM-DD，含頭含尾），皆可省略。 */
+  startDate?: string;
+  endDate?: string;
   page?: number;
   size?: number;
 }

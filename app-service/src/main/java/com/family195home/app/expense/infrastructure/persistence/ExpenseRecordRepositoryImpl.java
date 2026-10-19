@@ -4,6 +4,7 @@ import com.family195home.app.expense.application.ExpenseRecordRepository;
 import com.family195home.app.expense.domain.ExpenseRecord;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
@@ -55,16 +56,28 @@ public class ExpenseRecordRepositoryImpl implements ExpenseRecordRepository {
 
     @Override
     public List<ExpenseRecord> findPageByFilter(
-            Long familyGroupId, Long paymentAccountId, Long authorMemberId, String month, int offset, int limit) {
-        MonthRange range = MonthRange.parse(month);
+            Long familyGroupId, Long paymentAccountId, Long authorMemberId,
+            LocalDate startDate, LocalDate endDate, int offset, int limit) {
         return mapper.selectPageByFilter(
-                familyGroupId, paymentAccountId, authorMemberId, range.start(), range.endExclusive(), offset, limit);
+                familyGroupId, paymentAccountId, authorMemberId,
+                startOf(startDate), endExclusiveOf(endDate), offset, limit);
     }
 
     @Override
-    public long countByFilter(Long familyGroupId, Long paymentAccountId, Long authorMemberId, String month) {
-        MonthRange range = MonthRange.parse(month);
-        return mapper.countByFilter(familyGroupId, paymentAccountId, authorMemberId, range.start(), range.endExclusive());
+    public long countByFilter(
+            Long familyGroupId, Long paymentAccountId, Long authorMemberId, LocalDate startDate, LocalDate endDate) {
+        return mapper.countByFilter(
+                familyGroupId, paymentAccountId, authorMemberId, startOf(startDate), endExclusiveOf(endDate));
+    }
+
+    /** 起日當天 00:00；為 null 時不限下界。 */
+    private static LocalDateTime startOf(LocalDate startDate) {
+        return startDate == null ? null : startDate.atStartOfDay();
+    }
+
+    /** 迄日隔天 00:00（不含）；為 null 時不限上界。 */
+    private static LocalDateTime endExclusiveOf(LocalDate endDate) {
+        return endDate == null ? null : endDate.plusDays(1).atStartOfDay();
     }
 
     /** "YYYY-MM" 轉成 [月初, 下月初) 區間；month 為空時不限定月份（兩端皆 null）。 */

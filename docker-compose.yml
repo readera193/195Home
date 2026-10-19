@@ -1,3 +1,11 @@
+# 本機 Docker 環境。LINE 為選用：在 .env（範本 line.env.example）填入 LINE 憑證後，
+# 登入頁會同時出現「使用 LINE 登入」與「Demo 體驗」；未填則只有 Demo 體驗。
+# 修改 .env 後須重新建置前端才會生效：docker compose up -d --build
+#
+# 實測 LINE 登入：LINE Developers Console 的 Callback URL 須登錄為 LINE_LOGIN_REDIRECT_URI
+# （預設 http://localhost:8080/login/callback），請以 http://localhost:8080 開啟網站（不可用 127.0.0.1）。
+# 實測 LINE Webhook：需公網 HTTPS，先啟動 ngrok（ngrok http --url=<固定網域> 8081），
+# 再把 https://<固定網域>/api/line/webhook 填到 LINE Developers Console 的 Webhook URL。
 services:
   mysql:
     image: mysql:8.4
@@ -22,6 +30,9 @@ services:
     build:
       context: .
       dockerfile: app-service/Dockerfile
+      args:
+        # LINE Login channel ID 為公開資訊，建置時內嵌到前端；為空則不顯示 LINE 登入按鈕
+        VITE_LINE_CHANNEL_ID: ${LINE_LOGIN_CHANNEL_ID:-}
     restart: unless-stopped
     depends_on:
       mysql:
@@ -35,6 +46,10 @@ services:
       DB_PASSWORD: app
       JWT_SECRET: dev-only-secret-key-change-me-please-32bytes+
       INTERNAL_TOKEN: dev-only-internal-token-change-me
+      DEMO_LOGIN_ENABLED: ${DEMO_LOGIN_ENABLED:-true}
+      LINE_LOGIN_CHANNEL_ID: ${LINE_LOGIN_CHANNEL_ID:-}
+      LINE_LOGIN_CHANNEL_SECRET: ${LINE_LOGIN_CHANNEL_SECRET:-}
+      LINE_LOGIN_REDIRECT_URI: ${LINE_LOGIN_REDIRECT_URI:-http://localhost:8080/login/callback}
     ports:
       - "8080:8080"
     healthcheck:

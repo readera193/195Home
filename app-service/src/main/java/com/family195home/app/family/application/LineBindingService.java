@@ -33,6 +33,8 @@ public class LineBindingService {
     @Transactional(readOnly = true)
     public List<BoundMember> findAllBoundMembers() {
         return userRepository.findAll().stream()
+                // Demo 帳號沒有真實 LINE ID，推播只會失敗
+                .filter(user -> !user.getLineUserId().startsWith(UserService.DEMO_LINE_USER_ID_PREFIX))
                 .flatMap(user -> familyMemberRepository.findActiveByUserId(user.getId())
                         .map(member -> new BoundMember(member.getId(), member.getFamilyGroupId(), user.getLineUserId()))
                         .stream())

@@ -1,26 +1,31 @@
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { loginWithLine } from '../services/userApi';
+import { getAuthConfig, loginAsDemo } from '../services/userApi';
 import { useAuth } from '../hooks/useAuth';
 import { getErrorMessage } from '../utils/apiError';
-import InfoTip from '../components/InfoTip';
 import { buildAuthorizeUrl, getLineChannelId } from '../utils/lineLogin';
 
-// 有設定 VITE_LINE_CHANNEL_ID 時導向 LINE 授權頁（callback 見 LoginCallbackPage）；
-// 未設定時為開發用假登入：輸入暱稱即登入（同暱稱視為同一帳號）。
+// 兩種登入並行：LINE 登入（有設定 VITE_LINE_CHANNEL_ID 才顯示，callback 見 LoginCallbackPage）、
+// Demo 體驗（後端 DEMO_LOGIN_ENABLED 開啟才顯示，一鍵建立隨機帳號）。
 export default function LoginPage() {
-  const [nickname, setNickname] = useState('');
+  const [demoEnabled, setDemoEnabled] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const auth = useAuth();
   const navigate = useNavigate();
+  const channelId = getLineChannelId();
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  useEffect(() => {
+    getAuthConfig()
+      .then((config) => setDemoEnabled(config.demoLoginEnabled))
+      .catch(() => setDemoEnabled(false));
+  }, []);
+
+  async function handleDemo() {
     setError(null);
     setSubmitting(true);
     try {
-      const response = await loginWithLine(nickname.trim());
+      const response = await loginAsDemo();
       auth.login(response.token);
       navigate('/');
     } catch (err) {
@@ -30,37 +35,28 @@ export default function LoginPage() {
     }
   }
 
-  const channelId = getLineChannelId();
-  if (channelId) {
-    return (
-      <div className="auth-wrap">
-        <div className="auth-card">
-          <h1>登入</h1>
-          <button type="button" className="btn-block" onClick={() => window.location.assign(buildAuthorizeUrl(channelId))}>
-            使用 LINE 登入
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="auth-wrap">
       <div className="auth-card">
         <h1>登入</h1>
-        <form onSubmit={handleSubmit}>
-          <div className="field">
-            <div className="label-row">
-              <label htmlFor="nickname">LINE 暱稱</label>
-              <InfoTip text="開發用：輸入暱稱即可登入，相同暱稱視為同一帳號。" />
-            </div>
-            <input id="nickname" value={nickname} onChange={(e) => setNickname(e.target.value)} required />
-          </div>
-          {error && <p role="alert">{error}</p>}
-          <button type="submit" className="btn-block" disabled={submitting || !nickname.trim()}>
-            使用 LINE 登入
-          </button>
-        </form>
+        <div className="auth-actions">
+          {channelId && (
+            <button
+              type="button"
+              className="btn-block btn-line"
+              onClick={() => window.location.assign(buildAuthorizeUrl(channelId))}
+            >
+              使用 LINE 登入
+            </button>
+          )}
+          {demoEnabled && (
+            <button type="button" className="btn-block" disabled={submitting} onClick={handleDemo}>
+              Demo 體驗（免登入）
+            </button>
+          )}
+        </div>
+        {!channelId && !demoEnabled && <p>目前沒有可用的登入方式</p>}
+        {error && <p role="alert">{error}</p>}
       </div>
     </div>
   );

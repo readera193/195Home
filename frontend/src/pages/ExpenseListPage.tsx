@@ -17,6 +17,14 @@ import InfoTip from '../components/InfoTip';
 
 const PAGE_SIZE = 20;
 
+/** 本月第一天（offset=0）或最後一天（offset=1），格式 YYYY-MM-DD（本地時區）。 */
+function monthBoundary(offset: 0 | 1): string {
+  const now = new Date();
+  const d = offset === 0 ? new Date(now.getFullYear(), now.getMonth(), 1) : new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 export default function ExpenseListPage() {
   const { data: myFamily } = useQuery({ queryKey: ['myFamily'], queryFn: getMyFamily });
   const familyGroupId = myFamily?.familyGroupId ?? undefined;
@@ -41,8 +49,11 @@ export default function ExpenseListPage() {
 
   const [paymentAccountId, setPaymentAccountId] = useState('');
   const [authorMemberId, setAuthorMemberId] = useState('');
+  const [startDate, setStartDate] = useState(() => monthBoundary(0));
+  const [endDate, setEndDate] = useState(() => monthBoundary(1));
   const [page, setPage] = useState(0);
 
+  const [showCreate, setShowCreate] = useState(false);
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [formAccountId, setFormAccountId] = useState('');
@@ -178,6 +189,7 @@ export default function ExpenseListPage() {
       setNote('');
       setOccurredAt('');
       setPage(0);
+      setShowCreate(false);
       await queryClient.invalidateQueries({ queryKey: ['expenses'] });
     } catch (err) {
       setError(getErrorMessage(err, '新增支出失敗'));
@@ -187,12 +199,14 @@ export default function ExpenseListPage() {
   }
 
   const { data: expensePage, isLoading } = useQuery({
-    queryKey: ['expenses', familyGroupId, paymentAccountId, authorMemberId, page],
+    queryKey: ['expenses', familyGroupId, paymentAccountId, authorMemberId, startDate, endDate, page],
     queryFn: () =>
       listExpenses({
         familyGroupId: familyGroupId!,
         paymentAccountId: paymentAccountId ? Number(paymentAccountId) : undefined,
         authorMemberId: authorMemberId ? Number(authorMemberId) : undefined,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
         page,
         size: PAGE_SIZE,
       }),
@@ -217,7 +231,22 @@ export default function ExpenseListPage() {
         <h1>支出紀錄</h1>
       </div>
 
-      <form className="card" onSubmit={handleSubmit}>
+      <div className="toolbar">
+        <button type="button" onClick={() => setShowCreate(true)}>
+          新增支出
+        </button>
+      </div>
+
+      {showCreate && (
+      <div className="modal-backdrop" onClick={() => setShowCreate(false)}>
+      <form
+        className="card modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="新增支出"
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={handleSubmit}
+      >
         <h2>新增支出</h2>
         {error && <p role="alert">{error}</p>}
         <div className="field">
@@ -262,7 +291,17 @@ export default function ExpenseListPage() {
         <button type="submit" className="btn-block" disabled={submitting}>
           新增
         </button>
+        <button
+          type="button"
+          className="btn-secondary btn-block"
+          onClick={() => setShowCreate(false)}
+          disabled={submitting}
+        >
+          取消
+        </button>
       </form>
+      </div>
+      )}
 
       <div className="card filters">
         <div className="field">
@@ -302,6 +341,34 @@ export default function ExpenseListPage() {
               </option>
             ))}
           </select>
+        </div>
+
+        <div className="field">
+          <label htmlFor="filterStartDate">起始日期</label>
+          <input
+            id="filterStartDate"
+            type="date"
+            value={startDate}
+            max={endDate || undefined}
+            onChange={(e) => {
+              setStartDate(e.target.value);
+              setPage(0);
+            }}
+          />
+        </div>
+
+        <div className="field">
+          <label htmlFor="filterEndDate">結束日期</label>
+          <input
+            id="filterEndDate"
+            type="date"
+            value={endDate}
+            min={startDate || undefined}
+            onChange={(e) => {
+              setEndDate(e.target.value);
+              setPage(0);
+            }}
+          />
         </div>
       </div>
 
@@ -351,7 +418,7 @@ export default function ExpenseListPage() {
         <p className="empty">載入中...</p>
       ) : (
         <div className="table-wrap">
-          <table>
+          <table className="expense-table">
             <thead>
               <tr>
                 <th>日期</th>
@@ -364,20 +431,20 @@ export default function ExpenseListPage() {
             <tbody>
               {expenses?.map((expense) => (
                 <tr key={expense.expenseId}>
-                  <td>
+                  <td className="col-date">
                     <div>{new Date(expense.occurredAt).toLocaleDateString('zh-TW')}</div>
                     <div>
                       {new Date(expense.occurredAt).toLocaleTimeString('zh-TW', { hourCycle: 'h23', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                     </div>
                   </td>
-                  <td>{expense.note}</td>
-                  <td className={`num ${expense.amount > 0 ? 'positive' : expense.amount < 0 ? 'negative' : ''}`}>
+                  <td className="col-note">{expense.note}</td>
+                  <td className={`num col-amount ${expense.amount > 0 ? 'positive' : expense.amount < 0 ? 'negative' : ''}`}>
                     {expense.amount}
                   </td>
-                  <td>
+                  <td className="col-account">
                     <span className="badge">{expense.paymentAccountName}</span>
                   </td>
-                  <td>
+                  <td className="col-actions">
                     {expense.locked && editing?.expenseId !== expense.expenseId && (
                       <span className="badge">編輯中</span>
                     )}{' '}

@@ -4,6 +4,11 @@ app:
     secret: test-only-secret-key-for-unit-tests-32bytes+
   internal:
     token: test-only-internal-token
+  line:
+    login:
+      channel-id: ""
+      channel-secret: ""
+      redirect-uri: ""
 spring:
   datasource:
     username: test

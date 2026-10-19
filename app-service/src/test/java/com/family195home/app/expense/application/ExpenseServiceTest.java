@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -208,10 +209,12 @@ class ExpenseServiceTest {
     void listPage_passesOffsetAndComputesTotalPages() {
         // FR-007、SC-003：第 2 頁（page=1）、每頁 20 筆 → offset 20
         ExpenseRecord record = new ExpenseRecord();
-        when(expenseRecordRepository.countByFilter(10L, null, null, "2026-09")).thenReturn(45L);
-        when(expenseRecordRepository.findPageByFilter(10L, null, null, "2026-09", 20, 20)).thenReturn(List.of(record));
+        LocalDate start = LocalDate.of(2026, 9, 1);
+        LocalDate end = LocalDate.of(2026, 9, 30);
+        when(expenseRecordRepository.countByFilter(10L, null, null, start, end)).thenReturn(45L);
+        when(expenseRecordRepository.findPageByFilter(10L, null, null, start, end, 20, 20)).thenReturn(List.of(record));
 
-        PagedResult<ExpenseRecord> result = expenseService.listPage(10L, null, null, "2026-09", 1, 20);
+        PagedResult<ExpenseRecord> result = expenseService.listPage(10L, null, null, start, end, 1, 20);
 
         assertThat(result.items()).containsExactly(record);
         assertThat(result.page()).isEqualTo(1);
@@ -222,16 +225,23 @@ class ExpenseServiceTest {
 
     @Test
     void listPage_rejectsInvalidPageParams() {
-        assertThatThrownBy(() -> expenseService.listPage(10L, null, null, null, -1, 20))
+        assertThatThrownBy(() -> expenseService.listPage(10L, null, null, null, null, -1, 20))
                 .isInstanceOfSatisfying(ApiException.class, e -> {
                     assertThat(e.getKind()).isEqualTo(ErrorKind.BAD_REQUEST);
                     assertThat(e.getCode()).isEqualTo("INVALID_PAGE_PARAMS");
                 });
-        assertThatThrownBy(() -> expenseService.listPage(10L, null, null, null, 0, 0))
+        assertThatThrownBy(() -> expenseService.listPage(10L, null, null, null, null, 0, 0))
                 .isInstanceOf(ApiException.class);
-        assertThatThrownBy(() -> expenseService.listPage(10L, null, null, null, 0, ExpenseService.MAX_PAGE_SIZE + 1))
+        assertThatThrownBy(() -> expenseService.listPage(10L, null, null, null, null, 0, ExpenseService.MAX_PAGE_SIZE + 1))
                 .isInstanceOf(ApiException.class);
         verifyNoInteractions(ignoreStubs(expenseRecordRepository));
+    }
+
+    @Test
+    void listPage_rejectsStartDateAfterEndDate() {
+        assertThatThrownBy(() -> expenseService.listPage(
+                10L, null, null, LocalDate.of(2026, 9, 30), LocalDate.of(2026, 9, 1), 0, 20))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("INVALID_DATE_RANGE"));
     }
 
     private ExpenseRecord lockedRecord(Long lockedByMemberId, LocalDateTime lockedAt) {

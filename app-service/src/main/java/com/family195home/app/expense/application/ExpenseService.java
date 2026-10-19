@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -70,14 +71,19 @@ public class ExpenseService {
     // FR-007~FR-010、SC-003：分頁列表；page 從 0 起算，size 上限 MAX_PAGE_SIZE
     @Transactional(readOnly = true)
     public PagedResult<ExpenseRecord> listPage(
-            Long familyGroupId, Long paymentAccountId, Long authorMemberId, String month, int page, int size) {
+            Long familyGroupId, Long paymentAccountId, Long authorMemberId,
+            LocalDate startDate, LocalDate endDate, int page, int size) {
         if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
             throw new ApiException(ErrorKind.BAD_REQUEST, "INVALID_PAGE_PARAMS",
                     "page 須 >= 0，size 須介於 1 到 " + MAX_PAGE_SIZE);
         }
-        long total = expenseRecordRepository.countByFilter(familyGroupId, paymentAccountId, authorMemberId, month);
+        if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+            throw new ApiException(ErrorKind.BAD_REQUEST, "INVALID_DATE_RANGE", "起始日期不可晚於結束日期");
+        }
+        long total = expenseRecordRepository.countByFilter(
+                familyGroupId, paymentAccountId, authorMemberId, startDate, endDate);
         List<ExpenseRecord> items = expenseRecordRepository.findPageByFilter(
-                familyGroupId, paymentAccountId, authorMemberId, month, page * size, size);
+                familyGroupId, paymentAccountId, authorMemberId, startDate, endDate, page * size, size);
         return PagedResult.of(items, page, size, total);
     }
 

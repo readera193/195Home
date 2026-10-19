@@ -2,6 +2,7 @@ package com.family195home.app.expense.application;
 
 import com.family195home.app.expense.domain.ExpenseRecord;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -22,12 +23,17 @@ public interface ExpenseRecordRepository {
      */
     List<ExpenseRecord> findByFilter(Long familyGroupId, Long paymentAccountId, Long authorMemberId, String month);
 
-    /** 同 {@link #findByFilter}，加上分頁（依 occurred_at、id 由新到舊）；offset 為略過筆數。 */
+    /**
+     * 同 {@link #findByFilter}，改以起訖日期（含頭含尾，皆可為 null）篩選並分頁（依 occurred_at、id 由新到舊）；
+     * offset 為略過筆數。
+     */
     List<ExpenseRecord> findPageByFilter(
-            Long familyGroupId, Long paymentAccountId, Long authorMemberId, String month, int offset, int limit);
+            Long familyGroupId, Long paymentAccountId, Long authorMemberId,
+            LocalDate startDate, LocalDate endDate, int offset, int limit);
 
     /** 符合篩選條件的總筆數，供分頁計算總頁數。 */
-    long countByFilter(Long familyGroupId, Long paymentAccountId, Long authorMemberId, String month);
+    long countByFilter(
+            Long familyGroupId, Long paymentAccountId, Long authorMemberId, LocalDate startDate, LocalDate endDate);
 
     /**
      * 條件式 UPDATE 取得鎖：僅當目前未鎖定或鎖已逾時才會成功，回傳影響列數（見 research.md 決策 3）。

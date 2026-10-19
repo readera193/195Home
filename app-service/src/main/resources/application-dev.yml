@@ -13,6 +13,14 @@ app:
     secret: ${JWT_SECRET:dev-only-secret-key-change-me-please-32bytes+}
   internal:
     token: ${INTERNAL_TOKEN:dev-only-internal-token-change-me}
+  demo-login:
+    enabled: ${DEMO_LOGIN_ENABLED:true}
+  # 本機預設不啟用 LINE Login（以 Demo 體驗登入）；在 .env 填入 LINE_LOGIN_* 即可啟用（見 docker-compose.yml）
+  line:
+    login:
+      channel-id: ${LINE_LOGIN_CHANNEL_ID:}
+      channel-secret: ${LINE_LOGIN_CHANNEL_SECRET:}
+      redirect-uri: ${LINE_LOGIN_REDIRECT_URI:}
 
 logging:
   level:

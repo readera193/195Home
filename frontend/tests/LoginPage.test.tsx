@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AxiosError, AxiosHeaders } from 'axios';
 import LoginPage from '../src/pages/LoginPage';
@@ -22,15 +22,52 @@ function renderLoginPage() {
 describe('LoginPage', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.unstubAllEnvs();
+    localStorage.clear();
   });
 
-  it('顯示錯誤訊息，當登入失敗時', async () => {
+  it('後端未開啟 Demo 且未設定 LINE 時不顯示任何登入按鈕', async () => {
+    vi.mocked(userApi.getAuthConfig).mockResolvedValue({ demoLoginEnabled: false });
+
+    renderLoginPage();
+
+    await waitFor(() => expect(userApi.getAuthConfig).toHaveBeenCalled());
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.getByText('目前沒有可用的登入方式')).toBeInTheDocument();
+  });
+
+  it('設定 VITE_LINE_CHANNEL_ID 時顯示 LINE 登入按鈕', async () => {
+    vi.stubEnv('VITE_LINE_CHANNEL_ID', '12345');
+    vi.mocked(userApi.getAuthConfig).mockResolvedValue({ demoLoginEnabled: false });
+
+    renderLoginPage();
+
+    expect(await screen.findByRole('button', { name: '使用 LINE 登入' })).toBeInTheDocument();
+  });
+
+  it('Demo 開啟時點擊按鈕即以 loginAsDemo 登入並儲存 token', async () => {
+    vi.mocked(userApi.getAuthConfig).mockResolvedValue({ demoLoginEnabled: true });
+    vi.mocked(userApi.loginAsDemo).mockResolvedValue({
+      token: 'jwt-token',
+      userId: 1,
+      displayName: 'Demo-ab12',
+      expiresAt: '2026-01-01T00:00:00Z',
+    });
+
+    renderLoginPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Demo 體驗（免登入）' }));
+
+    await waitFor(() => expect(localStorage.getItem('family195home_token')).toBe('jwt-token'));
+  });
+
+  it('Demo 登入失敗時顯示錯誤訊息', async () => {
+    vi.mocked(userApi.getAuthConfig).mockResolvedValue({ demoLoginEnabled: true });
     // 後端錯誤格式為 RFC 9457 Problem Details：訊息在 detail，錯誤代碼在 code
     const config = { headers: new AxiosHeaders() };
-    vi.mocked(userApi.loginWithLine).mockRejectedValue(
+    vi.mocked(userApi.loginAsDemo).mockRejectedValue(
       new AxiosError('Request failed', 'ERR_BAD_REQUEST', config, null, {
-        data: { status: 400, title: 'Bad Request', detail: '登入失敗', code: 'LOGIN_FAILED' },
-        status: 400,
+        data: { status: 404, title: 'Not Found', detail: 'Demo 體驗未開啟', code: 'DEMO_LOGIN_DISABLED' },
+        status: 404,
         statusText: '',
         headers: {},
         config,
@@ -38,30 +75,8 @@ describe('LoginPage', () => {
     );
 
     renderLoginPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Demo 體驗（免登入）' }));
 
-    fireEvent.change(screen.getByLabelText('LINE 暱稱'), { target: { value: '小明' } });
-    fireEvent.click(screen.getByRole('button', { name: '使用 LINE 登入' }));
-
-    await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('登入失敗');
-    });
-  });
-
-  it('登入成功時以輸入的暱稱呼叫 loginWithLine', async () => {
-    vi.mocked(userApi.loginWithLine).mockResolvedValue({
-      token: 'jwt-token',
-      userId: 1,
-      displayName: '小明',
-      expiresAt: '2026-01-01T00:00:00Z',
-    });
-
-    renderLoginPage();
-
-    fireEvent.change(screen.getByLabelText('LINE 暱稱'), { target: { value: ' 小明 ' } });
-    fireEvent.click(screen.getByRole('button', { name: '使用 LINE 登入' }));
-
-    await waitFor(() => {
-      expect(userApi.loginWithLine).toHaveBeenCalledWith('小明');
-    });
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Demo 體驗未開啟'));
   });
 });

@@ -58,10 +58,10 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 - [X] T009 [P] 建立 User 資料模型（POJO，`lineUserId` 唯一、`displayName`）、repository 介面與 MyBatis Mapper 於 `app-service/src/main/java/com/family195home/app/family/domain/User.java`、`application/UserRepository.java`、`infrastructure/persistence/UserRepositoryImpl.java`、`infrastructure/persistence/UserMapper.java`、`resources/mapper/family/UserMapper.xml`（對應 `appdb`）
 - [X] T010 [P] 實作 JWT 簽發/驗證工具類別（HS256、Claim 含 `sub`(userId)/`displayName`/`iat`/`exp`，2 小時過期）於 `app-service/src/main/java/com/family195home/app/infrastructure/security/JwtTokenProvider.java`；簽發能力以 `family/application/TokenIssuer`（port）對外提供，`JwtTokenProvider` 為其 adapter，`UserService` 僅依賴 `TokenIssuer`
-- [X] T011 實作 `POST /api/auth/line` 登入 API：`family/application/LineLoginClient`（port）換取 `LineProfile`，`UserService.loginWithLine` 首次登入自動建立帳號、之後同步 LINE 暱稱並簽發 JWT（FR-024）；dev/test 以 `infrastructure/line/DevLineLoginClient` 假登入（`code` 即暱稱）；Controller 於 `app-service/src/main/java/com/family195home/app/family/presentation/UserController.java`（依賴 T009、T010）
+- [X] T011 實作 `POST /api/auth/line` 登入 API：`family/application/LineLoginClient`（port）換取 `LineProfile`，`UserService.loginWithLine` 首次登入自動建立帳號、之後同步 LINE 暱稱並簽發 JWT（FR-024）；Controller 於 `app-service/src/main/java/com/family195home/app/family/presentation/UserController.java`（依賴 T009、T010）
 - [X] T012 [P] 於 `app-service/src/main/java/com/family195home/app/infrastructure/security/JwtAuthFilter.java` 實作 Spring Security filter chain：對 `/api/**`（排除 `POST /api/auth/line`、`/api/internal/**`、`/actuator/health`、靜態資源）以簽章密鑰本地驗證 JWT 與過期時間，失敗回傳 `401`（同進程完成驗證，無獨立 Gateway 進程，見 research.md 決策 7）
 - [X] T013 [P] 於 `app-service/src/main/java/com/family195home/app/infrastructure/security/InternalTokenFilter.java` 實作 `X-Internal-Token` 驗證 filter，套用於 `/api/internal/**`，僅允許持有共用密鑰的呼叫者存取（僅供 notification-service 呼叫，見 contracts/app-service.md）
-- [X] T014 [P] 前端建立 LINE 登入頁（dev 為輸入暱稱的假登入）與 Axios 攔截器（自動帶入 `Authorization: Bearer <JWT>`、401 導回登入頁）於 `frontend/src/pages/LoginPage.tsx`、`frontend/src/services/apiClient.ts`、`frontend/src/services/userApi.ts`
+- [X] T014 [P] 前端建立登入頁（LINE 登入與 Demo 體驗按鈕，見 T098）與 Axios 攔截器（自動帶入 `Authorization: Bearer <JWT>`、401 導回登入頁）於 `frontend/src/pages/LoginPage.tsx`、`frontend/src/services/apiClient.ts`、`frontend/src/services/userApi.ts`
 - [X] T015 [P] 前端建立路由骨架與受保護路由（React Router，未登入導向登入頁）於 `frontend/src/App.tsx`
 
 **Checkpoint**: LINE 登入、JWT 簽發與本地驗證、內部 API 驗證機制就緒，可開始平行進行各 User Story 開發
@@ -85,7 +85,7 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 - [X] T022 [P] [US1] 實作 `POST /api/families`、`POST /api/families/join`、`GET /api/families/{id}/members?includeLeft=`（已離開成員標示保留於清單，FR-021；呼叫 `assertMemberAuthorized` 確認呼叫者本身即為該 `{id}` 家庭群組成員，否則回傳 `403`，FR-017）、`POST .../{memberId}/leave`、`POST .../{memberId}/kick`、`POST .../{memberId}/restore-eligibility` 端點於 `app-service/src/main/java/com/family195home/app/family/presentation/FamilyController.java`（依賴 T018、T019、T020、T021）
 - [X] T023 [P] [US1] 單元測試：群組名稱唯一性、單一在職群組限制（FR-026）、唯一成員離開解散群組（FR-018）、管理者自動轉移（FR-029）、kick 權限判斷與狀態變為 `REMOVED`（FR-028）、被移出成員以邀請碼加入被拒絕且管理者恢復資格後方可重新加入（FR-030）、已離開成員以邀請碼重新加入後狀態恢復為 `ACTIVE` 且沿用原 FamilyMember id（FR-025）、`assertMemberAuthorized` 各角色情境於 `app-service/src/test/java/com/family195home/app/family/application/FamilyServiceTest.java`
 - [X] T024 [P] [US1] 前端建立家庭群組頁面（建立群組表單、顯示邀請碼/邀請連結、輸入邀請碼加入）於 `frontend/src/pages/FamilyGroupPage.tsx`
-- [X] T025 [P] [US1] 前端成員列表頁面（顯示在職/已離開/已移出成員、管理者可移出成員與恢復被移出成員的加入資格、本人可離開群組）於 `frontend/src/pages/MembersPage.tsx`
+- [X] T025 [P] [US1] 前端成員列表（已併入家庭群組頁，見 T098；顯示在職/已離開/已移出成員、管理者可移出成員與恢復被移出成員的加入資格、本人可離開群組）於 `frontend/src/pages/FamilyGroupPage.tsx`
 - [X] T026 [US1] 前端封裝家庭群組相關 API 呼叫於 `frontend/src/services/familyApi.ts`（依賴 T014 的 apiClient）
 
 **Checkpoint**: User Story 1 應可獨立完整運作與測試
@@ -232,7 +232,7 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 **Purpose**: 帳號改為 LINE 身分登入（FR-024）、前端共用版面與 SPA 路由支援；對應 research.md 決策 7、9。
 
-- [X] T089 以 LINE 登入取代 Email + 密碼與綁定碼流程：新增 Flyway `V2__line_login.sql`（移除 `line_binding_codes`、`line_bindings` 與 `users.email`／`password_hash`，新增 `users.line_user_id`／`display_name`）、`LineLoginClient`／`LineProfile` port、`DevLineLoginClient`（dev/test 假登入）、`POST /api/auth/line`；移除 `PasswordEncoderConfig`、註冊頁、綁定頁與相關 DTO／Mapper
+- [X] T089 以 LINE 登入取代 Email + 密碼與綁定碼流程：新增 Flyway `V2__line_login.sql`（移除 `line_binding_codes`、`line_bindings` 與 `users.email`／`password_hash`，新增 `users.line_user_id`／`display_name`）、`LineLoginClient`／`LineProfile` port、`POST /api/auth/line`（原 `DevLineLoginClient` 假登入已於 T098 移除）；移除 `PasswordEncoderConfig`、註冊頁、綁定頁與相關 DTO／Mapper
 - [X] T090 [P] 新增 `config/SpaFallbackConfig`：前端 BrowserRouter 路由（如 `/login`）直接開啟或重新整理時回傳 `index.html`（`api/`、`actuator/` 路徑除外）
 - [X] T091 [P] 前端共用版面與樣式：`components/Layout.tsx`（導覽列、登出）、`components/InfoTip.tsx`（說明 tooltip）、`styles.css`，各頁面套用；新增支出表單併入 `ExpenseListPage`
 - [X] T092 [P] 本機開發體驗：README 「本機開發」兩種方式（只跑 MySQL＋前後端本機執行／全 Docker）、`.vscode/tasks.json` 一鍵啟動、`~/.195home/*.yml` 選用覆蓋檔、`vite.config.ts` 將 `/api` proxy 到 8080
@@ -286,7 +286,7 @@ Task: "建立 FamilyMember entity 與 repository 於 app-service/.../app/family/
 # Service/Controller 邏輯完成後，平行進行：
 Task: "單元測試：群組名稱唯一性、單一在職群組限制等於 FamilyServiceTest.java"
 Task: "前端家庭群組頁面於 frontend/src/pages/FamilyGroupPage.tsx"
-Task: "前端成員列表頁面於 frontend/src/pages/MembersPage.tsx"
+Task: "前端成員列表頁面於 frontend/src/pages/FamilyGroupPage.tsx"
 ```
 
 ---
@@ -351,3 +351,6 @@ Task: "前端成員列表頁面於 frontend/src/pages/MembersPage.tsx"
 **Purpose**: 由 `/speckit-converge` 再次比對後發現的剩餘缺口。
 
 - [X] T097 明確指定台灣時區：`MonthlyNotificationScheduler` 的 `@Scheduled` 加上 `zone = "Asia/Taipei"`，並將 notification-service、app-service 的容器／JVM 預設時區設為 `Asia/Taipei`（Dockerfile 或 docker-compose `TZ`），使「每月最後一天 23:00」發送時間與自然月邊界、支出預設日期皆以台灣時間計算；補上時區相關測試 per FR-013, SC-005 (partial)
+- [X] T098 以 Demo 體驗登入取代 dev 假登入：新增 `POST /api/auth/demo`（`UserService.loginAsDemo`、`demo/DemoLoginService` 建立群組、3 個支付帳戶與 13 筆範例支出）與 `GET /api/auth/config`，由 `app.demo-login.enabled`（`DEMO_LOGIN_ENABLED`）控制；移除 `DevLineLoginClient`，`LineOAuthLoginClient` 不再限 prod；`LineBindingService` 推播略過 `demo-` 帳號；前端登入頁並行顯示 LINE 登入／Demo 體驗；合併 `docker-compose.line.yml` 進 `docker-compose.yml`；成員列表併入 `FamilyGroupPage` 並移除 `MembersPage` per FR-024
+- [X] T099 支出列表改為起訖日期區間篩選：`GET /api/expenses` 以 `startDate`／`endDate` 取代 `month`（新增 `INVALID_DATE_RANGE`），前端預設本月並改為「新增支出」彈窗 per FR-007
+- [X] T100 前端導覽圖示化（新增 `components/Icon.tsx`，Layout／HomePage 改用 SVG 圖示）；Testcontainers 升級至 1.21.4，並於 app-service、notification-service 測試資源加入 `docker-java.properties`（`api.version=1.44`，相容 Docker Engine 29）

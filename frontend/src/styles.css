@@ -108,27 +108,32 @@ a:hover {
   font-size: 1.05rem;
   color: var(--text);
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 .brand:hover {
   text-decoration: none;
   color: var(--primary);
 }
+.topbar-logout {
+  margin-left: auto;
+}
+/* 桌面：頂部導覽，icon + 文字 */
 .nav {
   flex: 1;
   display: flex;
   gap: 4px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.nav::-webkit-scrollbar {
-  display: none;
 }
 .nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 6px 12px;
   border-radius: var(--radius-sm);
-  color: var(--text-muted);
   font-weight: 500;
   white-space: nowrap;
+  color: var(--text-muted);
 }
 .nav a:hover {
   background: var(--surface-alt);
@@ -252,6 +257,34 @@ select:focus {
   margin-bottom: 0;
 }
 
+.toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
+
+/* ===== Modal ===== */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 100;
+}
+.modal {
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  margin-bottom: 0;
+}
+.modal .btn-block + .btn-block {
+  margin-top: 10px;
+}
+
 /* ===== Buttons ===== */
 button {
   font: inherit;
@@ -277,6 +310,22 @@ button:disabled {
 }
 .btn-block {
   width: 100%;
+}
+/* LINE 官方品牌綠；白字對比度足夠，深色模式沿用 */
+.btn-line {
+  background: #06c755;
+  color: #fff;
+}
+.btn-line:hover:not(:disabled) {
+  background: #05a648;
+}
+.btn-line:focus-visible {
+  outline-color: rgba(6, 199, 85, 0.35);
+}
+.auth-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 .btn-secondary {
   background: var(--surface);
@@ -447,7 +496,7 @@ tbody tr:hover {
   justify-content: center;
   width: 44px;
   height: 44px;
-  font-size: 1.4rem;
+  color: var(--primary);
   background: var(--primary-soft);
   border-radius: 10px;
   margin-bottom: 12px;
@@ -517,7 +566,7 @@ tbody tr:hover {
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  padding: 14px 4px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--border);
 }
 .list-item:last-child {
@@ -535,15 +584,138 @@ tbody tr:hover {
     flex-wrap: wrap;
     padding: 8px 16px;
   }
-  .nav {
-    order: 3;
-    flex-basis: 100%;
-  }
   .container {
-    padding: 20px 16px 40px;
+    padding: 20px 16px 88px;
   }
   h1 {
     font-size: 1.35rem;
+  }
+  /* 成員列表：縮小間距並允許成員名稱換行，避免操作欄被擠出畫面 */
+  .member-table th,
+  .member-table td {
+    padding: 10px 8px;
+  }
+  .member-table th:first-child,
+  .member-table td:first-child {
+    padding-left: 12px;
+    white-space: normal;
+    word-break: break-word;
+  }
+  .member-table th:last-child,
+  .member-table td:last-child {
+    padding-right: 12px;
+  }
+}
+
+/* 手機：篩選區改兩欄、支出表格改卡片式，避免橫向捲動而看不到帳戶與操作 */
+@media (max-width: 640px) {
+  .filters {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 14px;
+  }
+  .filters .field {
+    min-width: 0;
+  }
+  .filters label {
+    font-size: 0.8rem;
+  }
+  .filters input,
+  .filters select {
+    padding: 8px;
+    font-size: 0.9rem;
+  }
+
+  .expense-table thead {
+    display: none;
+  }
+  .expense-table,
+  .expense-table tbody {
+    display: block;
+  }
+  .expense-table tr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      'note amount'
+      'date account'
+      'actions actions';
+    gap: 4px 12px;
+    align-items: center;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .expense-table tbody tr:last-child {
+    border-bottom: none;
+  }
+  .expense-table td {
+    display: block;
+    padding: 0;
+    border: none;
+    white-space: normal;
+  }
+  .expense-table .col-note {
+    grid-area: note;
+    font-weight: 600;
+    word-break: break-word;
+  }
+  .expense-table .col-amount {
+    grid-area: amount;
+    font-size: 1.05rem;
+  }
+  .expense-table .col-date {
+    grid-area: date;
+    display: flex;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+  .expense-table .col-account {
+    grid-area: account;
+    justify-self: end;
+  }
+  .expense-table .col-actions {
+    grid-area: actions;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 6px;
+  }
+  .expense-table .col-actions button {
+    padding: 5px 12px;
+    font-size: 0.85rem;
+  }
+}
+
+/* 手機：導覽移到底部，只留 icon，四等分 */
+@media (max-width: 767px) {
+  .nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10;
+    gap: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .nav a {
+    flex: 1 1 0;
+    justify-content: center;
+    padding: 12px 0;
+    border-radius: 0;
+  }
+  .nav a svg {
+    width: 26px;
+    height: 26px;
+  }
+  .nav-label {
+    display: none;
+  }
+  .container {
+    padding-bottom: 88px;
   }
 }
 

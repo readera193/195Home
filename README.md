@@ -80,7 +80,9 @@ SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
 cd frontend && npm install && npm run dev
 ```
 
-> **登入方式**：平台以 LINE 身分登入（不使用帳號密碼）。開發階段（dev/test profile）為假登入——在登入頁輸入暱稱即可登入，同暱稱視為同一帳號；正式環境（prod profile）使用真實 LINE Login（OAuth）：登入頁導向 LINE 授權頁，回到 `/login/callback` 後以授權碼呼叫 `POST /api/auth/line`，後端由 `LineOAuthLoginClient` 換取 profile；前端建置時設定 `VITE_LINE_CHANNEL_ID` 即啟用（本機要測試時可在 `frontend/.env.local` 設定，並於 LINE Developers Console 登錄 `http://localhost:5173/login/callback`，後端另需 `LINE_LOGIN_*` 設定）。因此 dev 階段無法實測 LINE 月結推播／關鍵字查詢（假帳號的 `lineUserId` 不是真實 LINE ID）。
+> **登入方式**：兩種並行，無帳號密碼。
+> - **Demo 體驗**：登入頁的「Demo 體驗（免登入）」按鈕，後端 `POST /api/auth/demo` 一鍵建立隨機帳號（`Demo-xxxx`，每次都是全新帳號、互不干擾），並自動建立家庭群組、3 個支付帳戶與 13 筆橫跨本月／上月的範例支出，登入即有內容可看（見 `DemoLoginService`）。由環境變數 `DEMO_LOGIN_ENABLED` 控制（dev profile 預設開啟，其他環境預設關閉），前端透過 `GET /api/auth/config` 決定是否顯示按鈕。Demo 帳號沒有真實 LINE ID，月結推播會自動略過。展示環境請勿放入真實資料。
+> - **LINE 登入**：前端建置時設定 `VITE_LINE_CHANNEL_ID` 才會顯示「使用 LINE 登入」按鈕，導向 LINE 授權頁，回到 `/login/callback` 後以授權碼呼叫 `POST /api/auth/line`，後端由 `LineOAuthLoginClient` 換取 profile；後端需 `LINE_LOGIN_CHANNEL_ID`／`LINE_LOGIN_CHANNEL_SECRET`／`LINE_LOGIN_REDIRECT_URI`（prod 缺少即啟動失敗）。本機 Docker：複製 `line.env.example` 為 `.env` 並填入 LINE 憑證，再 `docker compose up -d --build`（同一個 `docker-compose.yml`，未填則只有 Demo 按鈕）；不用 Docker 時可在 `frontend/.env.local` 設定 `VITE_LINE_CHANNEL_ID` 並於 LINE Developers Console 登錄 `http://localhost:5173/login/callback`。
 
 說明：
 
@@ -164,7 +166,7 @@ cd frontend && npm ci && npm run lint && npm test
 
 1. 於 Northflank 建立專案，開通 1 個免費 MySQL database，建立 `appdb`、`notificationdb` 兩個 schema
 2. 建立 2 個 Northflank service：`app-service`、`notification-service`，各自設定對應的映像檔來源（GHCR）
-3. 設定各服務所需環境變數：資料庫連線資訊、`JWT_SECRET`、`INTERNAL_TOKEN`、LINE Login 的 `LINE_LOGIN_CHANNEL_ID`、`LINE_LOGIN_CHANNEL_SECRET`、`LINE_LOGIN_REDIRECT_URI`（須為 `<網站網址>/login/callback`，並登錄於 LINE Developers Console 的 Callback URL）、`LINE_CHANNEL_TOKEN`、`LINE_CHANNEL_SECRET`、`APP_SERVICE_BASE_URL`（notification-service 指向 app-service 的 Northflank 內部網域）
+3. 設定各服務所需環境變數：資料庫連線資訊、`JWT_SECRET`、`INTERNAL_TOKEN`、LINE Login 的 `LINE_LOGIN_CHANNEL_ID`、`LINE_LOGIN_CHANNEL_SECRET`、`LINE_LOGIN_REDIRECT_URI`（須為 `<網站網址>/login/callback`，並登錄於 LINE Developers Console 的 Callback URL）、`DEMO_LOGIN_ENABLED=true`（要開放 Demo 體驗時）、`LINE_CHANNEL_TOKEN`、`LINE_CHANNEL_SECRET`、`APP_SERVICE_BASE_URL`（notification-service 指向 app-service 的 Northflank 內部網域）
 4. 於 GitHub repo 設定 Actions variable `LINE_LOGIN_CHANNEL_ID`（公開資訊，建置前端時內嵌為 `VITE_LINE_CHANNEL_ID`）。`.github/workflows/cd.yml` 於 push 到 `main` 分支時建置映像檔、推送至 GHCR，並觸發 Northflank 兩個 service 重新部署（實際觸發方式請對照 Northflank API/CLI 文件核實）
 
 詳見 [quickstart.md](specs/001-family-expense-tracking/quickstart.md)。

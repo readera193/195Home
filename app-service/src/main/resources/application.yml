@@ -37,5 +37,8 @@ app:
     expiration-minutes: 120
   internal:
     token: ${INTERNAL_TOKEN}
+  # Demo 體驗登入（免 LINE、一鍵建立隨機帳號）：僅供展示環境，預設關閉
+  demo-login:
+    enabled: ${DEMO_LOGIN_ENABLED:false}
   expense-lock:
     ttl-minutes: 5

@@ -3,6 +3,7 @@ package com.family195home.app.family.application;
 import com.family195home.app.family.domain.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -12,6 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -63,5 +65,27 @@ class UserServiceTest {
         assertThat(result.displayName()).isEqualTo("新暱稱");
         verify(userRepository).updateDisplayName(7L, "新暱稱");
         verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void loginAsDemo_createsRandomDemoUserEachTime() {
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> {
+            User saved = inv.getArgument(0);
+            saved.setId(9L);
+            return saved;
+        });
+        when(tokenIssuer.issue(any(), any())).thenReturn(new TokenIssuer.IssuedToken("jwt", Instant.now()));
+
+        UserService.LoginResult first = userService.loginAsDemo();
+        userService.loginAsDemo();
+
+        assertThat(first.displayName()).startsWith("Demo-");
+        assertThat(first.token()).isEqualTo("jwt");
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository, times(2)).save(captor.capture());
+        assertThat(captor.getAllValues()).allSatisfy(u ->
+                assertThat(u.getLineUserId()).startsWith(UserService.DEMO_LINE_USER_ID_PREFIX));
+        assertThat(captor.getAllValues().get(0).getLineUserId())
+                .isNotEqualTo(captor.getAllValues().get(1).getLineUserId());
     }
 }

@@ -68,6 +68,16 @@ class LineBindingServiceTest {
         assertThat(result).containsExactly(new LineBindingService.BoundMember(1L, 20L, "line-a"));
     }
 
+    @Test
+    void findAllBoundMembers_skipsDemoUsers() {
+        when(userRepository.findAll()).thenReturn(List.of(user(10L, "line-a"), user(11L, "demo-1234")));
+        when(familyMemberRepository.findActiveByUserId(10L)).thenReturn(Optional.of(member(1L, 20L, 10L)));
+        when(familyMemberRepository.findActiveByUserId(11L)).thenReturn(Optional.of(member(2L, 20L, 11L)));
+
+        assertThat(lineBindingService.findAllBoundMembers())
+                .containsExactly(new LineBindingService.BoundMember(1L, 20L, "line-a"));
+    }
+
     private static User user(Long id, String lineUserId) {
         User user = new User(lineUserId, "name", LocalDateTime.now());
         user.setId(id);

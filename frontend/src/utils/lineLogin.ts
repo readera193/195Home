@@ -6,7 +6,7 @@ export function getRedirectUri(): string {
   return `${window.location.origin}/login/callback`;
 }
 
-/** 有設定 VITE_LINE_CHANNEL_ID 才啟用真實 LINE Login，否則使用開發用假登入。 */
+/** 有設定 VITE_LINE_CHANNEL_ID 才顯示 LINE 登入按鈕。 */
 export function getLineChannelId(): string | undefined {
   return import.meta.env.VITE_LINE_CHANNEL_ID || undefined;
 }

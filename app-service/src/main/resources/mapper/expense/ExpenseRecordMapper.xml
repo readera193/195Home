@@ -51,7 +51,10 @@
             AND author_member_id = #{authorMemberId}
         </if>
         <if test="monthStart != null">
-            AND occurred_at &gt;= #{monthStart} AND occurred_at &lt; #{monthEndExclusive}
+            AND occurred_at &gt;= #{monthStart}
+        </if>
+        <if test="monthEndExclusive != null">
+            AND occurred_at &lt; #{monthEndExclusive}
         </if>
     </sql>
 

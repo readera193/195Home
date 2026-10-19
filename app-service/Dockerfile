@@ -4,7 +4,7 @@ WORKDIR /frontend
 COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ ./
-# LINE Login channel ID 為公開資訊，於建置時內嵌；未提供則登入頁使用開發用假登入
+# LINE Login channel ID 為公開資訊，於建置時內嵌；未提供則登入頁不顯示 LINE 登入按鈕（Demo 體驗不受影響）
 ARG VITE_LINE_CHANNEL_ID
 RUN npm run build
 

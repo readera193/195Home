@@ -4,19 +4,15 @@
 ### 所有錯誤皆為 RFC 9457 Problem Details（application/problem+json）：status / title / detail / code。
 
 @baseUrl = http://localhost:8080
-@nickname = demo
 
-### 1. 以 LINE 登入（dev/test 為假登入：code 即暱稱；首次登入自動建立帳號，取得 JWT 後續請求自動帶入）
+### 1. Demo 體驗登入（需 DEMO_LOGIN_ENABLED=true，dev profile 預設開啟；每次建立隨機帳號並取得 JWT）
 # @name login
-POST {{baseUrl}}/api/auth/line
-Content-Type: application/json
-
-{ "code": "{{nickname}}" }
+POST {{baseUrl}}/api/auth/demo
 
 ###
 @token = {{login.response.body.token}}
 
-### 2. 錯誤格式範例：code 為空 → 400
+### 2. 錯誤格式範例：LINE 登入 code 為空 → 400
 POST {{baseUrl}}/api/auth/line
 Content-Type: application/json
 

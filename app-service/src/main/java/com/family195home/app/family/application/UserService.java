@@ -6,9 +6,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Service
 public class UserService {
+
+    /** Demo 體驗帳號的 line_user_id 前綴；不是真實 LINE ID，LINE 推播須略過。 */
+    public static final String DEMO_LINE_USER_ID_PREFIX = "demo-";
 
     private final UserRepository userRepository;
     private final LineLoginClient lineLoginClient;
@@ -34,6 +38,16 @@ public class UserService {
                 })
                 .orElseGet(() -> userRepository.save(
                         new User(profile.lineUserId(), profile.displayName(), LocalDateTime.now())));
+        TokenIssuer.IssuedToken generated = tokenIssuer.issue(user.getId(), user.getDisplayName());
+        return new LoginResult(generated.token(), user.getId(), user.getDisplayName(), generated.expiresAt());
+    }
+
+    // Demo 體驗：每次建立全新的隨機帳號（互不干擾），無需任何輸入
+    @Transactional
+    public LoginResult loginAsDemo() {
+        String suffix = UUID.randomUUID().toString();
+        User user = userRepository.save(new User(
+                DEMO_LINE_USER_ID_PREFIX + suffix, "Demo-" + suffix.substring(0, 4), LocalDateTime.now()));
         TokenIssuer.IssuedToken generated = tokenIssuer.issue(user.getId(), user.getDisplayName());
         return new LoginResult(generated.token(), user.getId(), user.getDisplayName(), generated.expiresAt());
     }
