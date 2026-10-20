@@ -17,7 +17,6 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -28,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class FamilyMapperIntegrationTest {
 
     @Container
+    @SuppressWarnings("resource")
     static MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.4")
             .withDatabaseName("appdb")
             .withUsername("app")

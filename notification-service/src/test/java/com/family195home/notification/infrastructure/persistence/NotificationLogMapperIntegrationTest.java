@@ -32,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class NotificationLogMapperIntegrationTest {
 
     @Container
+    @SuppressWarnings("resource")
     static MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.4")
             .withDatabaseName("notificationdb")
             .withUsername("notification")

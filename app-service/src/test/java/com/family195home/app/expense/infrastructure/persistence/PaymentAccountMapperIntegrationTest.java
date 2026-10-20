@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PaymentAccountMapperIntegrationTest {
 
     @Container
+    @SuppressWarnings("resource")
     static MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.4")
             .withDatabaseName("appdb")
             .withUsername("app")

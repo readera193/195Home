@@ -12,7 +12,7 @@
 
 ## Technical Context
 
-**Language/Version**: Java 17（app-service、notification-service，Spring Boot 3.2+）；TypeScript 5.x + React 18（前端，建置後併入 app-service）
+**Language/Version**: Java 17（app-service、notification-service，Spring Boot 3.5.x）；TypeScript 5.x + React 18（前端，建置後併入 app-service）
 
 **Primary Dependencies**: Spring Boot Web / Validation、MyBatis（`mybatis-spring-boot-starter`，資料庫存取層採 repository 介面 + RepositoryImpl adapter + MyBatis Mapper 分層）、Flyway（`flyway-mysql`，schema migration）、Spring Security + `jjwt`（JWT 簽發與本地驗證，於 app-service 內完成，無獨立 Gateway 進程；無密碼，以 LINE 身分登入）、Spring Boot Actuator（健康檢查）、MySQL Connector/J（`mysql-connector-j`）、line-bot-sdk-java（LINE Messaging API 官方 SDK，僅 notification-service 使用）；前端：React Router、Axios、TanStack Query (React Query)、ESLint 9（typescript-eslint）。錯誤回應格式採 Spring 6 內建的 RFC 9457 Problem Details（`ProblemDetail`），業務錯誤以 Exception 丟出，不引入 `Result<T>`（見 research.md 決策 13）。後端兩個服務皆附 Maven Wrapper（`mvnw`）。**不使用** Spring Cloud Gateway、Spring Cloud Config Server（見 constitution v3.0.1 技術範疇與邊界）。
 
