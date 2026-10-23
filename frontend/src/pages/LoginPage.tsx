@@ -3,13 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { getAuthConfig, loginAsDemo } from '../services/userApi';
 import { useAuth } from '../hooks/useAuth';
 import { getErrorMessage } from '../utils/apiError';
+import { notifyError } from '../utils/notify';
 import { buildAuthorizeUrl, getLineChannelId } from '../utils/lineLogin';
 
 // 兩種登入並行：LINE 登入（有設定 VITE_LINE_CHANNEL_ID 才顯示，callback 見 LoginCallbackPage）、
 // Demo 體驗（後端 DEMO_LOGIN_ENABLED 開啟才顯示，一鍵建立隨機帳號）。
 export default function LoginPage() {
   const [demoEnabled, setDemoEnabled] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const auth = useAuth();
   const navigate = useNavigate();
@@ -22,14 +22,13 @@ export default function LoginPage() {
   }, []);
 
   async function handleDemo() {
-    setError(null);
     setSubmitting(true);
     try {
       const response = await loginAsDemo();
       auth.login(response.token);
       navigate('/');
     } catch (err) {
-      setError(getErrorMessage(err, '登入失敗，請稍後再試'));
+      notifyError(getErrorMessage(err, '登入失敗，請稍後再試'));
     } finally {
       setSubmitting(false);
     }
@@ -56,7 +55,6 @@ export default function LoginPage() {
           )}
         </div>
         {!channelId && !demoEnabled && <p>目前沒有可用的登入方式</p>}
-        {error && <p role="alert">{error}</p>}
       </div>
     </div>
   );

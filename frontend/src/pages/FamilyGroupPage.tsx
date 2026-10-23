@@ -10,6 +10,7 @@ import {
   restoreMemberEligibility,
 } from '../services/familyApi';
 import { getErrorMessage } from '../utils/apiError';
+import { confirmDialog, notifyError } from '../utils/notify';
 import InfoTip from '../components/InfoTip';
 
 export default function FamilyGroupPage() {
@@ -25,33 +26,30 @@ export default function FamilyGroupPage() {
 
   const [groupName, setGroupName] = useState('');
   const [inviteCode, setInviteCode] = useState('');
-  const [error, setError] = useState<string | null>(null);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
     try {
       await createFamilyGroup(groupName);
       queryClient.invalidateQueries({ queryKey: ['myFamily'] });
     } catch (err) {
-      setError(getErrorMessage(err, '建立群組失敗'));
+      notifyError(getErrorMessage(err, '建立群組失敗'));
     }
   }
 
   async function handleJoin(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
     try {
       await joinFamilyGroup(inviteCode);
       queryClient.invalidateQueries({ queryKey: ['myFamily'] });
     } catch (err) {
-      setError(getErrorMessage(err, '加入群組失敗'));
+      notifyError(getErrorMessage(err, '加入群組失敗'));
     }
   }
 
   async function handleKick(memberId: number) {
     if (!familyGroupId) return;
-    if (!window.confirm('確定要將此成員移出群組嗎？被移出的成員無法再用邀請碼加入，除非管理者復原其資格。')) return;
+    if (!(await confirmDialog({ title: '確定要將此成員移出群組嗎？', text: '被移出的成員無法再用邀請碼加入，除非管理者復原其資格。', confirmText: '移出', danger: true }))) return;
     await kickMember(familyGroupId, memberId);
     queryClient.invalidateQueries({ queryKey: ['members', familyGroupId] });
   }
@@ -61,7 +59,7 @@ export default function FamilyGroupPage() {
    *
    * 呼叫 restore-eligibility 端點，將該成員狀態由「已移出」(REMOVED) 改回「已離開」(LEFT)。
    * 這個動作不會讓成員直接回到群組，只是解除「不可用邀請碼加入」的限制；
-   * 該成員之後仍須自行輸入群組邀請碼，才會回到「在職」。
+   * 該成員之後仍須自行輸入群組邀請碼，才會回到「正常」。
    * 僅管理者可操作（畫面上只對管理者顯示按鈕，後端亦會驗證，非管理者回傳 403）。
    * 完成後重新載入成員列表，使該成員的狀態顯示為「已離開」。
    */
@@ -73,7 +71,7 @@ export default function FamilyGroupPage() {
 
   async function handleLeave(memberId: number) {
     if (!familyGroupId) return;
-    if (!window.confirm('確定要離開此群組嗎？若您是最後一位在職成員，群組將自動解散。')) return;
+    if (!(await confirmDialog({ title: '確定要離開此群組嗎？', text: '若您是最後一位成員，群組將自動解散。', confirmText: '離開', danger: true }))) return;
     await leaveGroup(familyGroupId, memberId);
     queryClient.invalidateQueries({ queryKey: ['myFamily'] });
     queryClient.invalidateQueries({ queryKey: ['members', familyGroupId] });
@@ -86,7 +84,7 @@ export default function FamilyGroupPage() {
   if (myFamily?.familyGroupId) {
     const isAdmin = myFamily.role === 'ADMIN';
     return (
-      <div>
+      <div className="container-narrow page-medium">
         <div className="page-header">
           <h1>我的家庭群組</h1>
         </div>
@@ -140,7 +138,7 @@ export default function FamilyGroupPage() {
                               : ''
                         }`}
                       >
-                        {member.status === 'ACTIVE' ? '在職' : member.status === 'REMOVED' ? '已移出' : '已離開'}
+                        {member.status === 'ACTIVE' ? '正常' : member.status === 'REMOVED' ? '已移出' : '已離開'}
                       </span>
                     </td>
                     <td>
@@ -176,11 +174,10 @@ export default function FamilyGroupPage() {
   }
 
   return (
-    <div className="container-narrow">
+    <div className="container-narrow page-compact">
       <div className="page-header">
         <h1>建立或加入家庭群組</h1>
       </div>
-      {error && <p role="alert">{error}</p>}
 
       <section className="card">
         <h2>建立新群組</h2>

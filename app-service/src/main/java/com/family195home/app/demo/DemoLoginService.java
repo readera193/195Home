@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Demo 體驗登入：建立隨機帳號後，一併建立家庭群組、支付帳戶與範例支出，讓使用者登入即有內容可看。
+ * Demo 體驗登入：建立隨機帳號後，一併建立家庭群組、示範成員、支付帳戶與範例支出，讓使用者登入即有內容可看。
  * 放在獨立的 demo 套件，由它協調 family 與 expense 兩個模組，避免兩者互相依賴。
  */
 @Service
@@ -28,6 +28,9 @@ public class DemoLoginService {
     private static final String[] ACCOUNT_NAMES = {"現金", "中信", "國泰", "三信", "富邦"};
 
     private static final int MAX_PER_DAY = 5;
+
+    // 登入者為管理者，另加入這幾位示範成員，範例支出會隨機分配給所有成員
+    private static final String[] MEMBER_NAMES = {"爸爸", "媽媽", "小明", "小美"};
 
     // 範例支出樣板；支出為負數、收入（退款、獎金）為正數。
     // 涵蓋上月與本月，統計頁才有資料可比較
@@ -90,9 +93,14 @@ public class DemoLoginService {
         UserService.LoginResult result = userService.loginAsDemo();
         Long userId = result.userId();
 
-        // 群組名稱須全系統唯一，沿用 Demo 帳號的隨機後綴
-        FamilyGroup group = familyService.createGroup(userId, result.displayName() + " 的家");
-        FamilyMember member = familyService.getMyMembership(userId).orElseThrow();
+        // 群組名稱須全系統唯一，以 Demo 帳號的 userId 區分
+        FamilyGroup group = familyService.createGroup(userId, "使用者的家 #" + userId);
+        FamilyMember[] members = new FamilyMember[MEMBER_NAMES.length + 1];
+        members[0] = familyService.getMyMembership(userId).orElseThrow();
+        for (int i = 0; i < MEMBER_NAMES.length; i++) {
+            Long memberUserId = userService.createDemoMember(MEMBER_NAMES[i]).getId();
+            members[i + 1] = familyService.joinGroup(memberUserId, group.getInviteCode());
+        }
 
         PaymentAccount[] accounts = new PaymentAccount[ACCOUNT_NAMES.length];
         for (int i = 0; i < ACCOUNT_NAMES.length; i++) {
@@ -107,7 +115,8 @@ public class DemoLoginService {
             int count = random.nextInt(MAX_PER_DAY + 1);
             for (int i = 0; i < count; i++) {
                 SampleExpense sample = SAMPLES[random.nextInt(SAMPLES.length)];
-                createExpense(group, member, accounts, sample, randomTimeOn(now, day));
+                FamilyMember author = members[random.nextInt(members.length)];
+                createExpense(group, author, accounts, sample, randomTimeOn(now, day));
             }
         }
         return result;

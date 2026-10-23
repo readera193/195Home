@@ -13,6 +13,7 @@ import {
   type ExpenseResponse,
 } from '../services/expenseApi';
 import { getErrorMessage } from '../utils/apiError';
+import { confirmDialog, notifyError } from '../utils/notify';
 import InfoTip from '../components/InfoTip';
 
 const PAGE_SIZE = 20;
@@ -58,7 +59,6 @@ export default function ExpenseListPage() {
   const [note, setNote] = useState('');
   const [formAccountId, setFormAccountId] = useState('');
   const [occurredAt, setOccurredAt] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   // 編輯／刪除（FR-019、FR-027）：先取得鎖才能操作，取消或完成時釋放
@@ -67,17 +67,14 @@ export default function ExpenseListPage() {
   const [editNote, setEditNote] = useState('');
   const [editAccountId, setEditAccountId] = useState('');
   const [editOccurredAt, setEditOccurredAt] = useState('');
-  const [editError, setEditError] = useState<string | null>(null);
-  const [rowError, setRowError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function handleStartEdit(expense: ExpenseResponse) {
     if (!familyGroupId) return;
-    setRowError(null);
     try {
       await lockExpense(expense.expenseId, familyGroupId);
     } catch (err) {
-      setRowError(getErrorMessage(err, '無法編輯此紀錄'));
+      notifyError(getErrorMessage(err, '無法編輯此紀錄'));
       await queryClient.invalidateQueries({ queryKey: ['expenses'] });
       return;
     }
@@ -86,7 +83,6 @@ export default function ExpenseListPage() {
     setEditNote(expense.note);
     setEditAccountId(String(expense.paymentAccountId));
     setEditOccurredAt(expense.occurredAt.slice(0, 16));
-    setEditError(null);
   }
 
   async function handleCancelEdit() {
@@ -104,13 +100,12 @@ export default function ExpenseListPage() {
   async function handleSaveEdit(e: React.FormEvent) {
     e.preventDefault();
     if (!familyGroupId || !editing) return;
-    setEditError(null);
     if (!/^-?\d+$/.test(editAmount)) {
-      setEditError('金額必須為整數，不支援小數點');
+      notifyError('金額必須為整數，不支援小數點');
       return;
     }
     if (!editNote.trim()) {
-      setEditError('說明為必填欄位');
+      notifyError('說明為必填欄位');
       return;
     }
     setSaving(true);
@@ -124,7 +119,7 @@ export default function ExpenseListPage() {
       setEditing(null);
       await queryClient.invalidateQueries({ queryKey: ['expenses'] });
     } catch (err) {
-      setEditError(getErrorMessage(err, '更新支出失敗'));
+      notifyError(getErrorMessage(err, '更新支出失敗'));
     } finally {
       setSaving(false);
     }
@@ -132,15 +127,14 @@ export default function ExpenseListPage() {
 
   async function handleDelete(expense: ExpenseResponse) {
     if (!familyGroupId) return;
-    setRowError(null);
     try {
       await lockExpense(expense.expenseId, familyGroupId);
     } catch (err) {
-      setRowError(getErrorMessage(err, '無法刪除此紀錄'));
+      notifyError(getErrorMessage(err, '無法刪除此紀錄'));
       await queryClient.invalidateQueries({ queryKey: ['expenses'] });
       return;
     }
-    if (!window.confirm(`確定要刪除「${expense.note}」嗎？`)) {
+    if (!(await confirmDialog({ title: `確定要刪除「${expense.note}」嗎？`, confirmText: '刪除', danger: true }))) {
       try {
         await unlockExpense(expense.expenseId);
       } catch {
@@ -152,7 +146,7 @@ export default function ExpenseListPage() {
     try {
       await deleteExpense(expense.expenseId, familyGroupId);
     } catch (err) {
-      setRowError(getErrorMessage(err, '刪除支出失敗'));
+      notifyError(getErrorMessage(err, '刪除支出失敗'));
     }
     await queryClient.invalidateQueries({ queryKey: ['expenses'] });
   }
@@ -160,19 +154,18 @@ export default function ExpenseListPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!familyGroupId) return;
-    setError(null);
 
     // FR-016：前端整數驗證（後端仍會再次驗證）
     if (!/^-?\d+$/.test(amount)) {
-      setError('金額必須為整數，不支援小數點');
+      notifyError('金額必須為整數，不支援小數點');
       return;
     }
     if (!note.trim()) {
-      setError('說明為必填欄位');
+      notifyError('說明為必填欄位');
       return;
     }
     if (!formAccountId) {
-      setError('請選擇支付帳戶');
+      notifyError('請選擇支付帳戶');
       return;
     }
 
@@ -192,7 +185,7 @@ export default function ExpenseListPage() {
       setShowCreate(false);
       await queryClient.invalidateQueries({ queryKey: ['expenses'] });
     } catch (err) {
-      setError(getErrorMessage(err, '新增支出失敗'));
+      notifyError(getErrorMessage(err, '新增支出失敗'));
     } finally {
       setSubmitting(false);
     }
@@ -245,7 +238,6 @@ export default function ExpenseListPage() {
         onSubmit={handleSubmit}
       >
         <h2>新增支出</h2>
-        {error && <p role="alert">{error}</p>}
         <div className="field">
           <div className="label-row">
             <label htmlFor="amount">金額</label>
@@ -372,7 +364,6 @@ export default function ExpenseListPage() {
       {editing && (
         <form className="card" onSubmit={handleSaveEdit} aria-label="編輯支出">
           <h2>編輯支出</h2>
-          {editError && <p role="alert">{editError}</p>}
           <div className="field">
             <label htmlFor="editAmount">編輯金額</label>
             <input id="editAmount" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} required />
@@ -408,8 +399,6 @@ export default function ExpenseListPage() {
           </button>
         </form>
       )}
-
-      {rowError && <p role="alert">{rowError}</p>}
 
       {isLoading ? (
         <p className="empty">載入中...</p>

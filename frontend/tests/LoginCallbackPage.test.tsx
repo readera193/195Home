@@ -1,12 +1,16 @@
 import React from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import LoginCallbackPage from '../src/pages/LoginCallbackPage';
 import * as userApi from '../src/services/userApi';
+import * as notify from '../src/utils/notify';
 import { AuthProvider } from '../src/hooks/useAuth';
 
 vi.mock('../src/services/userApi');
+vi.mock('../src/utils/notify', () => ({
+  notifyError: vi.fn(() => Promise.resolve()),
+}));
 
 function renderCallback(query: string) {
   return render(
@@ -21,6 +25,7 @@ function renderCallback(query: string) {
 describe('LoginCallbackPage', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(notify.notifyError).mockResolvedValue({} as never);
     sessionStorage.clear();
     localStorage.clear();
   });
@@ -45,14 +50,14 @@ describe('LoginCallbackPage', () => {
 
     renderCallback('?code=the-code&state=evil');
 
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('state 不符'));
+    await waitFor(() => expect(notify.notifyError).toHaveBeenCalledWith(expect.stringContaining('state 不符')));
     expect(userApi.loginWithLine).not.toHaveBeenCalled();
   });
 
   it('使用者取消授權（error 參數）時顯示錯誤', async () => {
     renderCallback('?error=access_denied&state=abc');
 
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('已取消'));
+    await waitFor(() => expect(notify.notifyError).toHaveBeenCalledWith(expect.stringContaining('已取消')));
     expect(userApi.loginWithLine).not.toHaveBeenCalled();
   });
 });

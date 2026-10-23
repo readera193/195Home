@@ -11,6 +11,7 @@ import {
   renameAccount,
 } from '../services/expenseApi';
 import { getErrorMessage } from '../utils/apiError';
+import { confirmDialog, notifyError, promptText } from '../utils/notify';
 
 export default function PaymentAccountsPage() {
   const queryClient = useQueryClient();
@@ -27,45 +28,40 @@ export default function PaymentAccountsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [showDisabled, setShowDisabled] = useState(false);
   const visibleAccounts = showDisabled ? accounts : accounts?.filter((account) => account.status === 'ACTIVE');
-  const [error, setError] = useState<string | null>(null);
 
   function openCreate() {
-    setError(null);
     setName('');
     setShowCreate(true);
   }
 
   function closeCreate() {
     setShowCreate(false);
-    setError(null);
   }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!familyGroupId) return;
-    setError(null);
     try {
       await createAccount(familyGroupId, name);
       setName('');
       setShowCreate(false);
       queryClient.invalidateQueries({ queryKey: ['accounts', familyGroupId] });
     } catch (err) {
-      setError(getErrorMessage(err, '建立支付帳戶失敗'));
+      notifyError(getErrorMessage(err, '建立支付帳戶失敗'));
     }
   }
 
   async function runAdminAction(action: () => Promise<unknown>, fallbackMessage: string) {
-    setError(null);
     try {
       await action();
       queryClient.invalidateQueries({ queryKey: ['accounts', familyGroupId] });
     } catch (err) {
-      setError(getErrorMessage(err, fallbackMessage));
+      notifyError(getErrorMessage(err, fallbackMessage));
     }
   }
 
-  function handleDisable(accountId: number) {
-    if (!window.confirm('確定要停用此支付帳戶嗎？停用後將無法用於新的支出。')) return;
+  async function handleDisable(accountId: number) {
+    if (!(await confirmDialog({ title: '確定要停用此支付帳戶嗎？', text: '停用後將無法用於新的支出。', confirmText: '停用' }))) return;
     return runAdminAction(() => disableAccount(accountId), '停用支付帳戶失敗');
   }
 
@@ -73,14 +69,14 @@ export default function PaymentAccountsPage() {
     return runAdminAction(() => enableAccount(accountId), '啟用支付帳戶失敗');
   }
 
-  function handleRename(accountId: number, currentName: string) {
-    const newName = window.prompt('新的帳戶名稱', currentName)?.trim();
+  async function handleRename(accountId: number, currentName: string) {
+    const newName = (await promptText('新的帳戶名稱', currentName))?.trim();
     if (!newName || newName === currentName) return;
     return runAdminAction(() => renameAccount(accountId, newName), '修改支付帳戶失敗');
   }
 
-  function handleDelete(accountId: number) {
-    if (!window.confirm('確定要刪除此支付帳戶嗎？（僅限從未被使用過的帳戶）')) return;
+  async function handleDelete(accountId: number) {
+    if (!(await confirmDialog({ title: '確定要刪除此支付帳戶嗎？', text: '僅限從未被使用過的帳戶。', confirmText: '刪除', danger: true }))) return;
     return runAdminAction(() => deleteAccount(accountId), '刪除支付帳戶失敗');
   }
 
@@ -97,7 +93,7 @@ export default function PaymentAccountsPage() {
   const isAdmin = myFamily?.role === 'ADMIN';
 
   return (
-    <div className="container-narrow">
+    <div className="container-narrow page-compact">
       <div className="page-header page-header--row">
         <h1>支付帳戶</h1>
         {isAdmin && (
@@ -106,7 +102,6 @@ export default function PaymentAccountsPage() {
           </button>
         )}
       </div>
-      {error && !showCreate && <p role="alert">{error}</p>}
       {!isAdmin && <p className="notice notice-info">僅群組管理者可管理支付帳戶</p>}
 
       {showCreate && (
@@ -120,7 +115,6 @@ export default function PaymentAccountsPage() {
             onSubmit={handleCreate}
           >
             <h2>新增帳戶</h2>
-            {error && <p role="alert">{error}</p>}
             <div className="field">
               <label htmlFor="accountName">帳戶名稱</label>
               <input id="accountName" value={name} onChange={(e) => setName(e.target.value)} required autoFocus />

@@ -1,7 +1,7 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 
 /** 說明 icon：點擊後顯示 tooltip，點擊外部或按 Esc 關閉。 */
-export default function InfoTip({ text }: { text: string }) {
+export default function InfoTip({ text, align = 'left' }: { text: string; align?: 'left' | 'right' }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
   const tipId = useId();
@@ -35,7 +35,7 @@ export default function InfoTip({ text }: { text: string }) {
         i
       </button>
       {open && (
-        <span role="tooltip" id={tipId} className="info-tip-bubble">
+        <span role="tooltip" id={tipId} className={`info-tip-bubble${align === 'right' ? ' info-tip-bubble-right' : ''}`}>
           {text}
         </span>
       )}

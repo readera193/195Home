@@ -9,6 +9,11 @@ import * as expenseApi from '../src/services/expenseApi';
 
 vi.mock('../src/services/familyApi');
 vi.mock('../src/services/expenseApi');
+vi.mock('../src/utils/notify', () => ({
+  notifyError: vi.fn(() => Promise.resolve()),
+  confirmDialog: vi.fn(() => Promise.resolve(true)),
+  promptText: vi.fn(() => Promise.resolve(undefined)),
+}));
 
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });

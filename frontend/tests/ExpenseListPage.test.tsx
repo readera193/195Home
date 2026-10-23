@@ -7,9 +7,15 @@ import { AxiosError, AxiosHeaders } from 'axios';
 import ExpenseListPage from '../src/pages/ExpenseListPage';
 import * as familyApi from '../src/services/familyApi';
 import * as expenseApi from '../src/services/expenseApi';
+import * as notify from '../src/utils/notify';
 
 vi.mock('../src/services/familyApi');
 vi.mock('../src/services/expenseApi');
+vi.mock('../src/utils/notify', () => ({
+  notifyError: vi.fn(() => Promise.resolve()),
+  confirmDialog: vi.fn(() => Promise.resolve(true)),
+  promptText: vi.fn(() => Promise.resolve(undefined)),
+}));
 
 function expense(id: number, note: string): expenseApi.ExpenseResponse {
   return {
@@ -129,7 +135,7 @@ describe('ExpenseListPage 新增支出表單', () => {
     await fillAndSubmit('100.5');
 
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('金額必須為整數');
+      expect(notify.notifyError).toHaveBeenCalledWith(expect.stringContaining('金額必須為整數'));
     });
     expect(expenseApi.createExpense).not.toHaveBeenCalled();
   });
@@ -256,7 +262,7 @@ describe('ExpenseListPage 編輯／刪除', () => {
     renderPage();
     fireEvent.click(await screen.findByRole('button', { name: '編輯 午餐' }));
 
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('此紀錄目前正被編輯中'));
+    await waitFor(() => expect(notify.notifyError).toHaveBeenCalledWith(expect.stringContaining('此紀錄目前正被編輯中')));
     expect(screen.queryByRole('form', { name: '編輯支出' })).not.toBeInTheDocument();
   });
 
@@ -277,14 +283,14 @@ describe('ExpenseListPage 編輯／刪除', () => {
     vi.mocked(expenseApi.unlockExpense).mockResolvedValue(undefined);
 
     renderPage();
-    const confirm = vi.spyOn(window, 'confirm');
+    const confirm = vi.mocked(notify.confirmDialog);
 
-    confirm.mockReturnValueOnce(false);
+    confirm.mockResolvedValueOnce(false);
     fireEvent.click(await screen.findByRole('button', { name: '刪除 午餐' }));
     await waitFor(() => expect(expenseApi.unlockExpense).toHaveBeenCalledWith(1));
     expect(expenseApi.deleteExpense).not.toHaveBeenCalled();
 
-    confirm.mockReturnValueOnce(true);
+    confirm.mockResolvedValueOnce(true);
     fireEvent.click(screen.getByRole('button', { name: '刪除 午餐' }));
     await waitFor(() => expect(expenseApi.deleteExpense).toHaveBeenCalledWith(1, 10));
   });

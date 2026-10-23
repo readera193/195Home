@@ -52,7 +52,7 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 | 403 | `NOT_GROUP_ADMIN` | 該操作限群組管理者 |
 | 403 | `NOT_SELF` | 該操作限成員本人（離開群組） |
 | 404 | `GROUP_NOT_FOUND` / `ACCOUNT_NOT_FOUND` / `EXPENSE_NOT_FOUND` / `MEMBER_NOT_FOUND` | 資源不存在 |
-| 409 | `MEMBER_NOT_ACTIVE` | 目標成員目前不是在職狀態（離開／移出時） |
+| 409 | `MEMBER_NOT_ACTIVE` | 目標成員目前不是「正常」狀態（離開／移出時） |
 | 500 | `NO_ELIGIBLE_ADMIN` | 管理者離開時找不到可接任者（資料異常，正常流程不會發生） |
 
 ### 分頁
@@ -75,9 +75,9 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 
 ### `POST /api/auth/demo`
 - Request: 無 body
-- Response 200: 同 `POST /api/auth/line`；每次建立全新帳號（`lineUserId = "demo-<uuid>"`，`displayName = "Demo-xxxx"`）
+- Response 200: 同 `POST /api/auth/line`；每次建立全新帳號（`lineUserId = "demo-<uuid>"`，`displayName = "使用者"`）
 - Errors: `404 DEMO_LOGIN_DISABLED`（未設定 `DEMO_LOGIN_ENABLED=true`）
-- 說明：登入同時建立範例家庭群組（`Demo-xxxx 的家`，帳號為管理者）、3 個支付帳戶、13 筆範例支出；供展示環境免 LINE 體驗；Demo 帳號不會收到 LINE 月結推播。
+- 說明：登入同時建立範例家庭群組（`使用者的家 #<userId>`，帳號為管理者，另有爸爸、媽媽、小明、小美 4 位示範成員）、5 個支付帳戶、範例支出（隨機分配給各成員）；供展示環境免 LINE 體驗；Demo 帳號不會收到 LINE 月結推播。
 
 ### `GET /api/auth/config`
 - Response 200: `{ demoLoginEnabled: boolean }`，前端據此決定是否顯示 Demo 體驗按鈕

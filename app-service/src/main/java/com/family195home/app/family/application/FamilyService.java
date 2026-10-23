@@ -142,7 +142,7 @@ public class FamilyService implements FamilyAccess {
                 .filter(m -> m.getFamilyGroupId().equals(familyGroupId))
                 .orElseThrow(() -> new ApiException(ErrorKind.NOT_FOUND, "MEMBER_NOT_FOUND", "找不到成員"));
         if (!member.isActive()) {
-            throw new ApiException(ErrorKind.CONFLICT, "MEMBER_NOT_ACTIVE", "此成員目前不是在職狀態");
+            throw new ApiException(ErrorKind.CONFLICT, "MEMBER_NOT_ACTIVE", "此成員目前不是「正常」狀態");
         }
         return member;
     }

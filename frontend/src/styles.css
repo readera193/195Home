@@ -423,6 +423,20 @@ tbody tr:last-child td {
 tbody tr:hover {
   background: var(--surface-alt);
 }
+/* 支出紀錄(日期、支付帳戶、操作)與成員列表(角色、狀態、操作)的表頭與內容置中 */
+.expense-table th:nth-child(1),
+.expense-table th:nth-child(4),
+.expense-table th:nth-child(5),
+.expense-table .col-date,
+.expense-table .col-account,
+.expense-table .col-actions,
+.member-table th:nth-child(n + 2),
+.member-table td:nth-child(n + 2) {
+  text-align: center;
+}
+.member-table td .actions {
+  justify-content: center;
+}
 .num {
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -786,6 +800,27 @@ tbody tr:hover {
   text-align: left;
   white-space: normal;
   box-shadow: var(--shadow);
+}
+/* icon 位於容器右緣時，氣泡改向左展開，避免被 overflow 裁切 */
+.info-tip-bubble-right {
+  left: auto;
+  right: -8px;
+}
+
+/* 內容較少的頁面（月結統計、支付帳戶）：整頁限縮寬度，讓卡片、表格、列表等寬 */
+.stats-page,
+.page-compact {
+  max-width: 560px;
+  margin-inline: auto;
+}
+/* 欄位較多的頁面（家庭群組成員表） */
+.page-medium {
+  max-width: 680px;
+  margin-inline: auto;
+}
+/* min-height 讓 tooltip 在資料列少時也不被裁切 */
+.stats-table {
+  min-height: 150px;
 }
 
 .checkbox-label {

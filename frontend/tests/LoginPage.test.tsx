@@ -5,9 +5,13 @@ import { MemoryRouter } from 'react-router-dom';
 import { AxiosError, AxiosHeaders } from 'axios';
 import LoginPage from '../src/pages/LoginPage';
 import * as userApi from '../src/services/userApi';
+import * as notify from '../src/utils/notify';
 import { AuthProvider } from '../src/hooks/useAuth';
 
 vi.mock('../src/services/userApi');
+vi.mock('../src/utils/notify', () => ({
+  notifyError: vi.fn(() => Promise.resolve()),
+}));
 
 function renderLoginPage() {
   return render(
@@ -77,6 +81,6 @@ describe('LoginPage', () => {
     renderLoginPage();
     fireEvent.click(await screen.findByRole('button', { name: 'Demo 體驗（免登入）' }));
 
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Demo 體驗未開啟'));
+    await waitFor(() => expect(notify.notifyError).toHaveBeenCalledWith(expect.stringContaining('Demo 體驗未開啟')));
   });
 });

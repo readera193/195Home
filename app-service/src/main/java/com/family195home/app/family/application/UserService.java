@@ -14,6 +14,9 @@ public class UserService {
     /** Demo 體驗帳號的 line_user_id 前綴；不是真實 LINE ID，LINE 推播須略過。 */
     public static final String DEMO_LINE_USER_ID_PREFIX = "demo-";
 
+    /** Demo 體驗帳號的顯示名稱（所有 Demo 帳號相同，唯一性由 line_user_id 保證）。 */
+    public static final String DEMO_DISPLAY_NAME = "使用者";
+
     private final UserRepository userRepository;
     private final LineLoginClient lineLoginClient;
     private final TokenIssuer tokenIssuer;
@@ -47,9 +50,16 @@ public class UserService {
     public LoginResult loginAsDemo() {
         String suffix = UUID.randomUUID().toString();
         User user = userRepository.save(new User(
-                DEMO_LINE_USER_ID_PREFIX + suffix, "Demo-" + suffix.substring(0, 4), LocalDateTime.now()));
+                DEMO_LINE_USER_ID_PREFIX + suffix, DEMO_DISPLAY_NAME, LocalDateTime.now()));
         TokenIssuer.IssuedToken generated = tokenIssuer.issue(user.getId(), user.getDisplayName());
         return new LoginResult(generated.token(), user.getId(), user.getDisplayName(), generated.expiresAt());
+    }
+
+    // Demo 體驗：建立不會登入的虛擬成員帳號，供 Demo 群組加入示範成員（line_user_id 帶 demo- 前綴，LINE 推播會略過）
+    @Transactional
+    public User createDemoMember(String displayName) {
+        return userRepository.save(new User(
+                DEMO_LINE_USER_ID_PREFIX + UUID.randomUUID(), displayName, LocalDateTime.now()));
     }
 
     public record LoginResult(String token, Long userId, String displayName, Instant expiresAt) {

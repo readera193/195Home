@@ -79,7 +79,7 @@ class UserServiceTest {
         UserService.LoginResult first = userService.loginAsDemo();
         userService.loginAsDemo();
 
-        assertThat(first.displayName()).startsWith("Demo-");
+        assertThat(first.displayName()).isEqualTo(UserService.DEMO_DISPLAY_NAME);
         assertThat(first.token()).isEqualTo("jwt");
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
         verify(userRepository, times(2)).save(captor.capture());

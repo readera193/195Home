@@ -38,7 +38,7 @@ export default function StatisticsPage() {
   const total = summary?.totalNetAmount ?? 0;
 
   return (
-    <div className="container-narrow">
+    <div className="container-narrow stats-page">
       <div className="page-header">
         <h1>月結統計</h1>
       </div>
@@ -54,13 +54,13 @@ export default function StatisticsPage() {
         <p className="empty">載入中...</p>
       ) : (
         <>
-          <div className="table-wrap">
+          <div className="table-wrap stats-table">
             <table>
               <thead>
                 <tr>
                   <th>支付帳戶</th>
                   <th className="num">
-                    淨額 <InfoTip text="淨額 = 收入 − 支出。" />
+                    淨額 <InfoTip text="淨額 = 收入 − 支出。" align="right" />
                   </th>
                 </tr>
               </thead>
