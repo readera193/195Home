@@ -201,6 +201,15 @@ a:hover {
 .page-header h1 {
   margin-bottom: 4px;
 }
+.page-header--row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.page-header--row h1 {
+  margin-bottom: 0;
+}
 .page-desc {
   color: var(--text-muted);
   margin: 0;
@@ -255,12 +264,6 @@ select:focus {
   flex: 1;
   min-width: 180px;
   margin-bottom: 0;
-}
-
-.toolbar {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 16px;
 }
 
 /* ===== Modal ===== */
@@ -686,6 +689,20 @@ tbody tr:hover {
     padding: 5px 12px;
     font-size: 0.85rem;
   }
+
+  /* 分頁列：縮小文字與間距，按鈕文字不換行 */
+  .pagination {
+    gap: 8px;
+    font-size: 0.8rem;
+  }
+  .pagination button {
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+  .pagination span {
+    text-align: center;
+  }
 }
 
 /* 手機：導覽移到底部，只留 icon，四等分 */
@@ -769,4 +786,17 @@ tbody tr:hover {
   text-align: left;
   white-space: normal;
   box-shadow: var(--shadow);
+}
+
+.checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.checkbox-label input {
+  width: auto;
+  padding: 0;
 }

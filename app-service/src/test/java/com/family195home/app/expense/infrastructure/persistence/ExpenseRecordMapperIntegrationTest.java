@@ -78,6 +78,13 @@ class ExpenseRecordMapperIntegrationTest {
                 group.getId(), account.getId(), null, now.withDayOfMonth(1).toLocalDate().atStartOfDay(), now.plusMonths(1));
         assertThat(found).extracting(ExpenseRecord::getId).contains(record.getId());
 
+        // 已被使用的支付帳戶 id（FR-022）：有支出的帳戶出現，未使用的不出現
+        PaymentAccount unused = new PaymentAccount(1L, group.getId(), "未使用", PaymentAccountStatus.ACTIVE, LocalDateTime.now());
+        paymentAccountMapper.insert(unused);
+        assertThat(expenseRecordMapper.selectUsedPaymentAccountIds(group.getId()))
+                .contains(account.getId())
+                .doesNotContain(unused.getId());
+
         // 併發鎖定：第一次取得鎖成功
         int firstLock = expenseRecordMapper.tryLock(record.getId(), 1L, now, now.minusMinutes(5));
         assertThat(firstLock).isEqualTo(1);

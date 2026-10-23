@@ -134,7 +134,7 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 
 ### `GET /api/accounts?familyGroupId=&status=ACTIVE|DISABLED|ALL`
 - Header: `Authorization`
-- Response 200: `[{ accountId, familyMemberId, name, status }]`
+- Response 200: `[{ accountId, familyMemberId, name, status, deletable }]`（`deletable`：該帳戶從未被任何支出紀錄使用，可真正刪除，FR-022；前端僅在 `deletable` 為 true 時顯示「刪除」）
 
 ### `PUT /api/accounts/{accountId}`
 - Header: `Authorization`（限該群組 ADMIN）
@@ -150,6 +150,11 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 ### `POST /api/accounts/{accountId}/disable`
 - Header: `Authorization`（限該群組 ADMIN，否則 `403 NOT_GROUP_ADMIN`）
 - Response 200: `{ accountId, status: "DISABLED" }`（FR-022，僅軟停用，不可真正刪除）
+
+### `POST /api/accounts/{accountId}/enable`
+- Header: `Authorization`（限該群組 ADMIN，否則 `403 NOT_GROUP_ADMIN`）
+- Response 200: `{ accountId, status: "ACTIVE" }`（FR-022，重新啟用已停用帳戶；已是 `ACTIVE` 時冪等回傳 200）
+- Errors: `403 NOT_GROUP_ADMIN`、`409 GROUP_DISSOLVED`（群組已解散，FR-018）
 
 ## 支出紀錄（公開 API）
 

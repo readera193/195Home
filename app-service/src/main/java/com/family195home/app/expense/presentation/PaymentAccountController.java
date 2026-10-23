@@ -15,6 +15,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/accounts")
@@ -33,7 +34,7 @@ public class PaymentAccountController {
             @AuthenticationPrincipal AuthenticatedUser caller, @Valid @RequestBody CreateAccountRequest request) {
         // FR-003：限群組管理者；建立者身分由呼叫者自身決定，不接受前端傳入
         PaymentAccount account = paymentAccountService.create(request.familyGroupId(), caller.userId(), request.name());
-        return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(account));
+        return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(account, true));
     }
 
     @GetMapping
@@ -46,8 +47,9 @@ public class PaymentAccountController {
         PaymentAccountStatus statusFilter = (status == null || status.isBlank() || "ALL".equalsIgnoreCase(status))
                 ? null
                 : PaymentAccountStatus.valueOf(status.toUpperCase());
+        Set<Long> usedIds = paymentAccountService.findUsedAccountIds(familyGroupId);
         List<PaymentAccountResponse> accounts = paymentAccountService.list(familyGroupId, statusFilter).stream()
-                .map(this::toResponse)
+                .map(account -> toResponse(account, !usedIds.contains(account.getId())))
                 .toList();
         return ResponseEntity.ok(accounts);
     }
@@ -73,7 +75,19 @@ public class PaymentAccountController {
         return ResponseEntity.ok(toResponse(account));
     }
 
+    @PostMapping("/{accountId}/enable")
+    public ResponseEntity<PaymentAccountResponse> enable(
+            @AuthenticationPrincipal AuthenticatedUser caller, @PathVariable Long accountId) {
+        PaymentAccount account = paymentAccountService.enable(accountId, caller.userId());
+        return ResponseEntity.ok(toResponse(account));
+    }
+
     private PaymentAccountResponse toResponse(PaymentAccount account) {
-        return new PaymentAccountResponse(account.getId(), account.getFamilyMemberId(), account.getName(), account.getStatus().name());
+        return toResponse(account, paymentAccountService.isDeletable(account));
+    }
+
+    private PaymentAccountResponse toResponse(PaymentAccount account, boolean deletable) {
+        return new PaymentAccountResponse(
+                account.getId(), account.getFamilyMemberId(), account.getName(), account.getStatus().name(), deletable);
     }
 }

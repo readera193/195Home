@@ -10,9 +10,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 /**
- * 支付帳戶為群組層級，新增／改名／停用／刪除一律限該群組管理者（FR-003、FR-022）。
+ * 支付帳戶為群組層級，新增／改名／停用／啟用／刪除一律限該群組管理者（FR-003、FR-022）。
  */
 @Service
 public class PaymentAccountService {
@@ -51,6 +52,17 @@ public class PaymentAccountService {
         return paymentAccountRepository.findByGroupId(familyGroupId, status);
     }
 
+    // FR-022：從未被支出紀錄使用的帳戶才可真正刪除
+    @Transactional(readOnly = true)
+    public Set<Long> findUsedAccountIds(Long familyGroupId) {
+        return expenseRecordRepository.findUsedPaymentAccountIds(familyGroupId);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isDeletable(PaymentAccount account) {
+        return !expenseRecordRepository.existsByPaymentAccountId(account.getId());
+    }
+
     // FR-003（限 ADMIN）
     public PaymentAccount rename(Long accountId, Long callerUserId, String name) {
         PaymentAccount account = requireAccountAsAdmin(accountId, callerUserId);
@@ -64,6 +76,19 @@ public class PaymentAccountService {
         PaymentAccount account = requireAccountAsAdmin(accountId, callerUserId);
         account.setStatus(PaymentAccountStatus.DISABLED);
         paymentAccountRepository.update(account);
+        return account;
+    }
+
+    // FR-022（限 ADMIN）：重新啟用已停用帳戶；群組已解散拒絕（FR-018），已啟用者冪等
+    public PaymentAccount enable(Long accountId, Long callerUserId) {
+        PaymentAccount account = requireAccountAsAdmin(accountId, callerUserId);
+        if (familyAccess.groupState(account.getFamilyGroupId()) == FamilyAccess.GroupState.DISSOLVED) {
+            throw new ApiException(ErrorKind.CONFLICT, "GROUP_DISSOLVED", "此家庭群組已解散，無法啟用支付帳戶");
+        }
+        if (account.getStatus() != PaymentAccountStatus.ACTIVE) {
+            account.setStatus(PaymentAccountStatus.ACTIVE);
+            paymentAccountRepository.update(account);
+        }
         return account;
     }
 

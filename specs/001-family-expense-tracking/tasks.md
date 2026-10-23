@@ -214,7 +214,7 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 - [X] T075 notification-service 對齊錯誤契約：`ErrorBody` 改讀 Problem Details 的 `code`／`detail`（忽略其餘欄位），錯誤解析抽為 `AppServiceClient.parseError` 並補測試 `AppServiceClientErrorParsingTest.java`；`spring.mvc.problemdetails.enabled=true` 使框架層錯誤格式一致
 - [X] T076 前端錯誤處理對齊：新增 `frontend/src/utils/apiError.ts`（`getErrorMessage`／`getErrorCode`）取代各頁面 `err.response?.data?.message`，移除 `catch (err: any)`；補測試 `frontend/tests/apiError.test.ts`、更新 `LoginPage.test.tsx`
 - [X] T077 支出列表分頁（後端）：新增 `shared/PagedResult`、`ExpenseService.listPage`（`page`／`size` 驗證，上限 100，違規 `400 INVALID_PAGE_PARAMS`）、`ExpenseRecordRepository.findPageByFilter`／`countByFilter`、`ExpenseRecordMapper.xml`（共用 `filterWhere`、`ORDER BY occurred_at DESC, id DESC`、`LIMIT/OFFSET`）、`ExpenseController` 回傳分頁結構；statistics 仍走不分頁的 `list`（research.md 決策 14）
-- [X] T078 支出列表分頁（前端）：`expenseApi.listExpenses` 回傳 `PagedResponse`，`ExpenseListPage.tsx` 加上上一頁／下一頁與頁數資訊（切換篩選回第一頁），測試 `frontend/tests/ExpenseListPage.test.tsx`
+- [X] T078 支出列表分頁（前端）：`expenseApi.listExpenses` 回傳 `PagedResponse`，`ExpenseListPage.tsx` 加上上一頁／下一頁與頁數資訊（切換篩選回第一頁；分頁列載入後一律顯示，僅一頁或無資料時按鈕停用、頁數顯示 1 / 1），測試 `frontend/tests/ExpenseListPage.test.tsx`
 - [X] T079 設定依 profile 拆分：兩個服務各自 `application.yml`（無機密預設值）＋ `application-dev.yml`／`application-prod.yml`＋測試 `application-test.yml`；Dockerfile 預設 `SPRING_PROFILES_ACTIVE=prod`、`docker-compose.yml` 覆寫為 `dev`；整合測試加 `@ActiveProfiles("test")`（research.md 決策 5）
 - [X] T080 [P] 整合測試補分頁 SQL：`ExpenseRecordMapperIntegrationTest` 新增 `pageQuery_ordersNewestFirstWithStableTieBreakAndCountsAll`（Testcontainers，需 Docker）
 - [X] T081 [P] 兩個服務加入 Maven Wrapper（`mvnw`、`mvnw.cmd`、`.mvn/wrapper/`，Maven 3.9.9，only-script 型）與根目錄 `.gitattributes`（`mvnw` 固定 LF）；CI 改用 `./mvnw -B verify`，使 T007、quickstart 描述的 `./mvnw` 指令成真
@@ -351,6 +351,20 @@ Task: "前端成員列表頁面於 frontend/src/pages/FamilyGroupPage.tsx"
 **Purpose**: 由 `/speckit-converge` 再次比對後發現的剩餘缺口。
 
 - [X] T097 明確指定台灣時區：`MonthlyNotificationScheduler` 的 `@Scheduled` 加上 `zone = "Asia/Taipei"`，並將 notification-service、app-service 的容器／JVM 預設時區設為 `Asia/Taipei`（Dockerfile 或 docker-compose `TZ`），使「每月最後一天 23:00」發送時間與自然月邊界、支出預設日期皆以台灣時間計算；補上時區相關測試 per FR-013, SC-005 (partial)
-- [X] T098 以 Demo 體驗登入取代 dev 假登入：新增 `POST /api/auth/demo`（`UserService.loginAsDemo`、`demo/DemoLoginService` 建立群組、3 個支付帳戶與 13 筆範例支出）與 `GET /api/auth/config`，由 `app.demo-login.enabled`（`DEMO_LOGIN_ENABLED`）控制；移除 `DevLineLoginClient`，`LineOAuthLoginClient` 不再限 prod；`LineBindingService` 推播略過 `demo-` 帳號；前端登入頁並行顯示 LINE 登入／Demo 體驗；合併 `docker-compose.line.yml` 進 `docker-compose.yml`；成員列表併入 `FamilyGroupPage` 並移除 `MembersPage` per FR-024
+- [X] T098 以 Demo 體驗登入取代 dev 假登入：新增 `POST /api/auth/demo`（`UserService.loginAsDemo`、`demo/DemoLoginService` 建立群組、5 個支付帳戶（現金、中信、國泰、三信、富邦）與範例支出（上月 1 日到今天，每天隨機 0–5 筆））與 `GET /api/auth/config`，由 `app.demo-login.enabled`（`DEMO_LOGIN_ENABLED`）控制；移除 `DevLineLoginClient`，`LineOAuthLoginClient` 不再限 prod；`LineBindingService` 推播略過 `demo-` 帳號；前端登入頁並行顯示 LINE 登入／Demo 體驗；合併 `docker-compose.line.yml` 進 `docker-compose.yml`；成員列表併入 `FamilyGroupPage` 並移除 `MembersPage` per FR-024
 - [X] T099 支出列表改為起訖日期區間篩選：`GET /api/expenses` 以 `startDate`／`endDate` 取代 `month`（新增 `INVALID_DATE_RANGE`），前端預設本月並改為「新增支出」彈窗 per FR-007
 - [X] T100 前端導覽圖示化（新增 `components/Icon.tsx`，Layout／HomePage 改用 SVG 圖示）；Testcontainers 升級至 1.21.4，並於 app-service、notification-service 測試資源加入 `docker-java.properties`（`api.version=1.44`，相容 Docker Engine 29）
+
+## Phase 14: Convergence
+
+**Purpose**: 由 `/speckit-converge` 再次比對後發現的剩餘缺口（支付帳戶可重新啟用，2026-10-20 第十輪 Clarification）。
+
+- [X] T101 後端新增重新啟用支付帳戶：`PaymentAccountService.enable`（限 `ADMIN`，一般成員回傳 `403 NOT_GROUP_ADMIN`；群組已解散回傳 `409 GROUP_DISSOLVED`；已是 `ACTIVE` 時冪等成功）與 `POST /api/accounts/{accountId}/enable`（`PaymentAccountController`），於 `PaymentAccountServiceTest` 與 Controller 測試補上對應案例 per FR-022 (missing)
+- [X] T102 前端支付帳戶頁：`expenseApi.ts` 新增 `enableAccount`，`PaymentAccountsPage.tsx` 對「已停用」帳戶顯示「啟用」按鈕（僅管理者可見，成功後重新載入清單），補上前端測試 per FR-022 (missing)
+
+## Phase 15: Convergence
+
+**Purpose**: 由 `/speckit-converge` 再次比對後發現的剩餘缺口（支付帳戶管理頁操作互斥與已停用帳戶顯示開關，2026-10-20 第十輪 Clarification）。
+
+- [X] T103 後端 `GET /api/accounts` 回應新增 `deletable`（帳戶從未被任何支出紀錄使用）：於 `PaymentAccountResponse`、`PaymentAccountController`（必要時 `PaymentAccountService`／repository 批次查詢，避免 N+1）計算並回傳，補測試 per US2/AC7, FR-022 (missing)
+- [X] T104 前端支付帳戶頁：「刪除」僅在 `deletable` 為 true 時顯示、「停用／啟用」依狀態互斥；新增「顯示已停用帳戶」開關（預設關閉，僅前端過濾）；`expenseApi.ts` 的 `PaymentAccountResponse` 補 `deletable`，更新 `frontend/tests/PaymentAccountsPage.test.tsx` per US2/AC6, US2/AC7 (missing)

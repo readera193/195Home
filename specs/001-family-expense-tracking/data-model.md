@@ -77,9 +77,11 @@ schema 定義對應 `app-service/src/main/resources/db/migration/`（Flyway migr
 | status | VARCHAR(20) NOT NULL | `ACTIVE` \| `DISABLED` |
 | createdAt | DATETIME(6) NOT NULL | |
 
-**驗證規則**：建立、改名、停用、刪除 MUST 限該群組 `ADMIN`（FR-003、FR-022）；從未被支出紀錄使用的帳戶可真正刪除，已使用者僅能軟停用。`DISABLED` 帳戶不可供新增支出紀錄選用，但既有支出紀錄仍完整顯示原帳戶名稱；已有支出紀錄關聯的帳戶 MUST NOT 真正刪除，僅能軟停用（FR-022）。
+**驗證規則**：建立、改名、停用、啟用、刪除 MUST 限該群組 `ADMIN`（FR-003、FR-022）；從未被支出紀錄使用的帳戶可真正刪除，已使用者僅能軟停用。`DISABLED` 帳戶不可供新增支出紀錄選用，但既有支出紀錄仍完整顯示原帳戶名稱；已有支出紀錄關聯的帳戶 MUST NOT 真正刪除，僅能軟停用（FR-022）。
 
-**狀態轉換**：`ACTIVE` → `DISABLED`（不可逆，僅軟停用）。
+**衍生欄位**：API 回應的 `deletable` = 該帳戶從未被任何支出紀錄使用（不儲存於資料表，查詢時計算）。
+
+**狀態轉換**：`ACTIVE` ⇄ `DISABLED`（軟停用，可由 `ADMIN` 重新啟用；群組已解散時拒絕啟用；對已 `ACTIVE` 的帳戶重複啟用為冪等）。
 
 #### ExpenseRecord（支出紀錄）
 

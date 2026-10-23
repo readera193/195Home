@@ -50,4 +50,6 @@ public interface ExpenseRecordMapper {
     void releaseLock(@Param("id") Long id);
 
     int countByPaymentAccountId(@Param("paymentAccountId") Long paymentAccountId);
+
+    List<Long> selectUsedPaymentAccountIds(@Param("familyGroupId") Long familyGroupId);
 }

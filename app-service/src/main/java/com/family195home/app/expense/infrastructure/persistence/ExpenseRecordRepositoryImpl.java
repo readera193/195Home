@@ -8,8 +8,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Repository
 public class ExpenseRecordRepositoryImpl implements ExpenseRecordRepository {
@@ -36,6 +38,11 @@ public class ExpenseRecordRepositoryImpl implements ExpenseRecordRepository {
     @Override
     public boolean existsByPaymentAccountId(Long paymentAccountId) {
         return mapper.countByPaymentAccountId(paymentAccountId) > 0;
+    }
+
+    @Override
+    public Set<Long> findUsedPaymentAccountIds(Long familyGroupId) {
+        return new HashSet<>(mapper.selectUsedPaymentAccountIds(familyGroupId));
     }
 
     @Override

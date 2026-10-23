@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
@@ -19,6 +20,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.atMost;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -50,8 +52,13 @@ class DemoLoginServiceTest {
         UserService.LoginResult result = new DemoLoginService(userService, familyService, accountService, expenseService).login();
 
         assertThat(result.token()).isEqualTo("jwt");
-        verify(accountService, times(3)).create(eq(20L), eq(7L), any());
-        verify(expenseService, atLeast(10)).create(
+        verify(accountService, times(5)).create(eq(20L), eq(7L), any());
+        // 上月 1 日到今天，每天 0–5 筆
+        LocalDate today = LocalDate.now();
+        int days = today.minusMonths(1).lengthOfMonth() + today.getDayOfMonth();
+        verify(expenseService, atLeast(1)).create(
+                eq(20L), eq(30L), anyLong(), any(BigDecimal.class), any(String.class), any(LocalDateTime.class));
+        verify(expenseService, atMost(days * 5)).create(
                 eq(20L), eq(30L), anyLong(), any(BigDecimal.class), any(String.class), any(LocalDateTime.class));
     }
 }

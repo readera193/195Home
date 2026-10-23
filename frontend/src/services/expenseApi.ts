@@ -5,6 +5,7 @@ export interface PaymentAccountResponse {
   familyMemberId: number;
   name: string;
   status: 'ACTIVE' | 'DISABLED';
+  deletable: boolean;
 }
 
 export interface ExpenseResponse {
@@ -31,6 +32,10 @@ export function listAccounts(
 
 export function disableAccount(accountId: number): Promise<PaymentAccountResponse> {
   return apiClient.post(`/accounts/${accountId}/disable`).then((res) => res.data);
+}
+
+export function enableAccount(accountId: number): Promise<PaymentAccountResponse> {
+  return apiClient.post(`/accounts/${accountId}/enable`).then((res) => res.data);
 }
 
 export function renameAccount(accountId: number, name: string): Promise<PaymentAccountResponse> {

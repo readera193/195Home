@@ -34,6 +34,10 @@
         SELECT COUNT(*) FROM expense_records WHERE payment_account_id = #{paymentAccountId}
     </select>
 
+    <select id="selectUsedPaymentAccountIds" resultType="long">
+        SELECT DISTINCT payment_account_id FROM expense_records WHERE family_group_id = #{familyGroupId}
+    </select>
+
     <delete id="deleteById">
         DELETE FROM expense_records WHERE id = #{id}
     </delete>

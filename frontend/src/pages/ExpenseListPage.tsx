@@ -227,11 +227,8 @@ export default function ExpenseListPage() {
 
   return (
     <div>
-      <div className="page-header">
+      <div className="page-header page-header--row">
         <h1>支出紀錄</h1>
-      </div>
-
-      <div className="toolbar">
         <button type="button" onClick={() => setShowCreate(true)}>
           新增支出
         </button>
@@ -474,7 +471,7 @@ export default function ExpenseListPage() {
         </div>
       )}
 
-      {totalPages > 1 && (
+      {expensePage && (
         <nav className="pagination" aria-label="分頁">
           <button
             type="button"
@@ -485,7 +482,7 @@ export default function ExpenseListPage() {
             上一頁
           </button>
           <span>
-            第 {page + 1} / {totalPages} 頁（共 {expensePage?.totalElements} 筆）
+            第 {page + 1} / {Math.max(totalPages, 1)} 頁（共 {expensePage.totalElements} 筆）
           </span>
           <button
             type="button"

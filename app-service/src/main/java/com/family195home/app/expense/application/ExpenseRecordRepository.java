@@ -6,6 +6,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface ExpenseRecordRepository {
 
@@ -44,4 +45,7 @@ public interface ExpenseRecordRepository {
 
     /** 該支付帳戶是否已被任何支出紀錄使用（FR-022）。 */
     boolean existsByPaymentAccountId(Long paymentAccountId);
+
+    /** 該群組內已被任何支出紀錄使用的支付帳戶 id（FR-022，供判斷可否刪除）。 */
+    Set<Long> findUsedPaymentAccountIds(Long familyGroupId);
 }

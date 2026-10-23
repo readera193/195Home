@@ -50,7 +50,7 @@ describe('ExpenseListPage 分頁', () => {
     vi.mocked(expenseApi.listAccounts).mockResolvedValue([]);
   });
 
-  it('只有一頁時不顯示分頁控制', async () => {
+  it('只有一頁時仍顯示分頁控制，且上一頁／下一頁皆停用', async () => {
     vi.mocked(expenseApi.listExpenses).mockResolvedValue({
       items: [expense(1, '午餐')],
       page: 0,
@@ -62,7 +62,9 @@ describe('ExpenseListPage 分頁', () => {
     renderPage();
 
     await waitFor(() => expect(screen.getByText('午餐')).toBeInTheDocument());
-    expect(screen.queryByRole('navigation', { name: '分頁' })).not.toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: '分頁' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '上一頁' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '下一頁' })).toBeDisabled();
   });
 
   it('按「下一頁」會以 page=1 重新查詢', async () => {

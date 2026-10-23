@@ -81,7 +81,7 @@ cd frontend && npm install && npm run dev
 ```
 
 > **登入方式**：兩種並行，無帳號密碼。
-> - **Demo 體驗**：登入頁的「Demo 體驗（免登入）」按鈕，後端 `POST /api/auth/demo` 一鍵建立隨機帳號（`Demo-xxxx`，每次都是全新帳號、互不干擾），並自動建立家庭群組、3 個支付帳戶與 13 筆橫跨本月／上月的範例支出，登入即有內容可看（見 `DemoLoginService`）。由環境變數 `DEMO_LOGIN_ENABLED` 控制（dev profile 預設開啟，其他環境預設關閉），前端透過 `GET /api/auth/config` 決定是否顯示按鈕。Demo 帳號沒有真實 LINE ID，月結推播會自動略過。展示環境請勿放入真實資料。
+> - **Demo 體驗**：登入頁的「Demo 體驗（免登入）」按鈕，後端 `POST /api/auth/demo` 一鍵建立隨機帳號（`Demo-xxxx`，每次都是全新帳號、互不干擾），並自動建立家庭群組、5 個支付帳戶（現金、中信、國泰、三信、富邦）與範例支出（從上個月 1 日到今天，每天隨機 0–5 筆，通常超過一頁可看到分頁），登入即有內容可看（見 `DemoLoginService`）。由環境變數 `DEMO_LOGIN_ENABLED` 控制（dev profile 預設開啟，其他環境預設關閉），前端透過 `GET /api/auth/config` 決定是否顯示按鈕。Demo 帳號沒有真實 LINE ID，月結推播會自動略過。展示環境請勿放入真實資料。
 > - **LINE 登入**：前端建置時設定 `VITE_LINE_CHANNEL_ID` 才會顯示「使用 LINE 登入」按鈕，導向 LINE 授權頁，回到 `/login/callback` 後以授權碼呼叫 `POST /api/auth/line`，後端由 `LineOAuthLoginClient` 換取 profile；後端需 `LINE_LOGIN_CHANNEL_ID`／`LINE_LOGIN_CHANNEL_SECRET`／`LINE_LOGIN_REDIRECT_URI`（prod 缺少即啟動失敗）。本機 Docker：複製 `line.env.example` 為 `.env` 並填入 LINE 憑證，再 `docker compose up -d --build`（同一個 `docker-compose.yml`，未填則只有 Demo 按鈕）；不用 Docker 時可在 `frontend/.env.local` 設定 `VITE_LINE_CHANNEL_ID` 並於 LINE Developers Console 登錄 `http://localhost:5173/login/callback`。
 
 說明：

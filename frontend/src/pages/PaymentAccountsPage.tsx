@@ -2,7 +2,14 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getMyFamily } from '../services/familyApi';
-import { createAccount, deleteAccount, disableAccount, listAccounts, renameAccount } from '../services/expenseApi';
+import {
+  createAccount,
+  deleteAccount,
+  disableAccount,
+  enableAccount,
+  listAccounts,
+  renameAccount,
+} from '../services/expenseApi';
 import { getErrorMessage } from '../utils/apiError';
 
 export default function PaymentAccountsPage() {
@@ -17,7 +24,21 @@ export default function PaymentAccountsPage() {
   });
 
   const [name, setName] = useState('');
+  const [showCreate, setShowCreate] = useState(false);
+  const [showDisabled, setShowDisabled] = useState(false);
+  const visibleAccounts = showDisabled ? accounts : accounts?.filter((account) => account.status === 'ACTIVE');
   const [error, setError] = useState<string | null>(null);
+
+  function openCreate() {
+    setError(null);
+    setName('');
+    setShowCreate(true);
+  }
+
+  function closeCreate() {
+    setShowCreate(false);
+    setError(null);
+  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -26,6 +47,7 @@ export default function PaymentAccountsPage() {
     try {
       await createAccount(familyGroupId, name);
       setName('');
+      setShowCreate(false);
       queryClient.invalidateQueries({ queryKey: ['accounts', familyGroupId] });
     } catch (err) {
       setError(getErrorMessage(err, '建立支付帳戶失敗'));
@@ -45,6 +67,10 @@ export default function PaymentAccountsPage() {
   function handleDisable(accountId: number) {
     if (!window.confirm('確定要停用此支付帳戶嗎？停用後將無法用於新的支出。')) return;
     return runAdminAction(() => disableAccount(accountId), '停用支付帳戶失敗');
+  }
+
+  function handleEnable(accountId: number) {
+    return runAdminAction(() => enableAccount(accountId), '啟用支付帳戶失敗');
   }
 
   function handleRename(accountId: number, currentName: string) {
@@ -72,27 +98,53 @@ export default function PaymentAccountsPage() {
 
   return (
     <div className="container-narrow">
-      <div className="page-header">
+      <div className="page-header page-header--row">
         <h1>支付帳戶</h1>
+        {isAdmin && (
+          <button type="button" onClick={openCreate}>
+            新增帳戶
+          </button>
+        )}
       </div>
-      {error && <p role="alert">{error}</p>}
-      {isAdmin ? (
-        <form className="card inline-form" onSubmit={handleCreate}>
-          <div className="field">
-            <label htmlFor="accountName">帳戶名稱</label>
-            <input id="accountName" value={name} onChange={(e) => setName(e.target.value)} required />
-          </div>
-          <button type="submit">建立</button>
-        </form>
-      ) : (
-        <p className="notice notice-info">僅群組管理者可管理支付帳戶</p>
+      {error && !showCreate && <p role="alert">{error}</p>}
+      {!isAdmin && <p className="notice notice-info">僅群組管理者可管理支付帳戶</p>}
+
+      {showCreate && (
+        <div className="modal-backdrop" onClick={closeCreate}>
+          <form
+            className="card modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="新增帳戶"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={handleCreate}
+          >
+            <h2>新增帳戶</h2>
+            {error && <p role="alert">{error}</p>}
+            <div className="field">
+              <label htmlFor="accountName">帳戶名稱</label>
+              <input id="accountName" value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
+            </div>
+            <button type="submit" className="btn-block">
+              新增
+            </button>
+            <button type="button" className="btn-secondary btn-block" onClick={closeCreate}>
+              取消
+            </button>
+          </form>
+        </div>
       )}
+
+      <label className="checkbox-label">
+        <input type="checkbox" checked={showDisabled} onChange={(e) => setShowDisabled(e.target.checked)} />
+        顯示已停用帳戶
+      </label>
 
       {isLoading ? (
         <p className="empty">載入中...</p>
       ) : (
         <ul className="card list">
-          {accounts?.map((account) => (
+          {visibleAccounts?.map((account) => (
             <li key={account.accountId} className="list-item">
               <span className="list-item-main">
                 {account.name}
@@ -105,14 +157,20 @@ export default function PaymentAccountsPage() {
                   <button className="btn-secondary btn-sm" onClick={() => handleRename(account.accountId, account.name)}>
                     改名
                   </button>
-                  {account.status === 'ACTIVE' && (
+                  {account.status === 'ACTIVE' ? (
                     <button className="btn-secondary btn-sm" onClick={() => handleDisable(account.accountId)}>
                       停用
                     </button>
+                  ) : (
+                    <button className="btn-secondary btn-sm" onClick={() => handleEnable(account.accountId)}>
+                      啟用
+                    </button>
                   )}
-                  <button className="btn-danger btn-sm" onClick={() => handleDelete(account.accountId)}>
-                    刪除
-                  </button>
+                  {account.deletable && (
+                    <button className="btn-danger btn-sm" onClick={() => handleDelete(account.accountId)}>
+                      刪除
+                    </button>
+                  )}
                 </span>
               )}
             </li>

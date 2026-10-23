@@ -20,6 +20,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 class PaymentAccountServiceTest {
+        
 
     private PaymentAccountRepository paymentAccountRepository;
     private ExpenseRecordRepository expenseRecordRepository;
@@ -115,6 +116,69 @@ class PaymentAccountServiceTest {
     }
 
     @Test
+    void enable_byAdmin_reactivatesDisabledAccount() {
+        // FR-022
+        PaymentAccount account = stubAccount(3L, 10L);
+        account.setStatus(PaymentAccountStatus.DISABLED);
+        when(familyAccess.requireAdmin(10L, 5L))
+                .thenReturn(new FamilyAccess.MemberRef(member(1L, MemberRole.ADMIN).getId()));
+        when(familyAccess.groupState(10L)).thenReturn(FamilyAccess.GroupState.ACTIVE);
+
+        PaymentAccount result = service.enable(3L, 5L);
+
+        assertThat(result.getStatus()).isEqualTo(PaymentAccountStatus.ACTIVE);
+        verify(paymentAccountRepository).update(result);
+    }
+
+    @Test
+    void enable_alreadyActive_isIdempotent() {
+        stubAccount(3L, 10L);
+        when(familyAccess.requireAdmin(10L, 5L))
+                .thenReturn(new FamilyAccess.MemberRef(member(1L, MemberRole.ADMIN).getId()));
+        when(familyAccess.groupState(10L)).thenReturn(FamilyAccess.GroupState.ACTIVE);
+
+        PaymentAccount result = service.enable(3L, 5L);
+
+        assertThat(result.getStatus()).isEqualTo(PaymentAccountStatus.ACTIVE);
+        verify(paymentAccountRepository, never()).update(any());
+    }
+
+    @Test
+    void enable_rejectsRegularMember() {
+        stubAccount(3L, 10L);
+        when(familyAccess.requireAdmin(10L, 5L))
+                .thenThrow(new ApiException(ErrorKind.FORBIDDEN, "NOT_GROUP_ADMIN", "僅群組管理者可執行此操作"));
+
+        assertThatThrownBy(() -> service.enable(3L, 5L))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("NOT_GROUP_ADMIN"));
+        verify(paymentAccountRepository, never()).update(any());
+    }
+
+    @Test
+    void enable_rejectsDissolvedGroup() {
+        // FR-018
+        PaymentAccount account = stubAccount(3L, 10L);
+        account.setStatus(PaymentAccountStatus.DISABLED);
+        when(familyAccess.requireAdmin(10L, 5L))
+                .thenReturn(new FamilyAccess.MemberRef(member(1L, MemberRole.ADMIN).getId()));
+        when(familyAccess.groupState(10L)).thenReturn(FamilyAccess.GroupState.DISSOLVED);
+
+        assertThatThrownBy(() -> service.enable(3L, 5L))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("GROUP_DISSOLVED"));
+        verify(paymentAccountRepository, never()).update(any());
+    }
+
+    @Test
+    void isDeletable_reflectsWhetherAccountIsUsed() {
+        // FR-022
+        PaymentAccount account = stubAccount(3L, 10L);
+        when(expenseRecordRepository.existsByPaymentAccountId(3L)).thenReturn(false, true);
+
+        assertThat(service.isDeletable(account)).isTrue();
+        assertThat(service.isDeletable(account)).isFalse();
+    }
+
+    @Test
     void delete_unusedAccount_isDeleted() {
         // FR-022：從未被使用的帳戶可真正刪除
         stubAccount(3L, 10L);
@@ -140,10 +204,11 @@ class PaymentAccountServiceTest {
         verify(paymentAccountRepository, never()).delete(any());
     }
 
-    private void stubAccount(Long accountId, Long groupId) {
+    private PaymentAccount stubAccount(Long accountId, Long groupId) {
         PaymentAccount account = new PaymentAccount(1L, groupId, "現金", PaymentAccountStatus.ACTIVE, LocalDateTime.now());
         account.setId(accountId);
         when(paymentAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+        return account;
     }
 
     private FamilyMember member(Long id, MemberRole role) {

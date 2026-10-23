@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -21,26 +22,51 @@ import java.util.concurrent.ThreadLocalRandom;
 @Service
 public class DemoLoginService {
 
-    private record SampleExpense(int accountIndex, int daysAgo, int amount, String note) {
+    private record SampleExpense(int accountIndex, int amount, String note) {
     }
 
-    private static final String[] ACCOUNT_NAMES = {"現金", "信用卡", "悠遊卡"};
+    private static final String[] ACCOUNT_NAMES = {"現金", "中信", "國泰", "三信", "富邦"};
 
-    // 涵蓋本月與上月，統計頁才有資料可比較；支出為負數、收入（退款）為正數
+    private static final int MAX_PER_DAY = 5;
+
+    // 範例支出樣板；支出為負數、收入（退款、獎金）為正數。
+    // 涵蓋上月與本月，統計頁才有資料可比較
     private static final SampleExpense[] SAMPLES = {
-            new SampleExpense(0, 0, -85, "早餐"),
-            new SampleExpense(2, 1, -30, "捷運"),
-            new SampleExpense(1, 2, -1280, "超市採買"),
-            new SampleExpense(0, 4, -220, "午餐"),
-            new SampleExpense(1, 6, -3600, "水電瓦斯"),
-            new SampleExpense(2, 8, -45, "公車"),
-            new SampleExpense(1, 11, -899, "網路訂閱"),
-            new SampleExpense(0, 14, -450, "家庭聚餐"),
-            new SampleExpense(1, 18, 300, "商品退款"),
-            new SampleExpense(0, 25, -160, "市場買菜"),
-            new SampleExpense(1, 33, -2400, "衣物"),
-            new SampleExpense(2, 38, -120, "交通儲值"),
-            new SampleExpense(0, 42, -380, "晚餐"),
+            new SampleExpense(0, -85, "早餐"),
+            new SampleExpense(2, -30, "捷運"),
+            new SampleExpense(1, -165, "咖啡"),
+            new SampleExpense(1, -1280, "超市採買"),
+            new SampleExpense(3, -520, "加油"),
+            new SampleExpense(0, -220, "午餐"),
+            new SampleExpense(4, -350, "電影票"),
+            new SampleExpense(1, -3600, "水電瓦斯"),
+            new SampleExpense(0, -75, "手搖飲"),
+            new SampleExpense(2, -45, "公車"),
+            new SampleExpense(3, -680, "藥局"),
+            new SampleExpense(1, -899, "網路訂閱"),
+            new SampleExpense(4, -1500, "孩子才藝費"),
+            new SampleExpense(0, -450, "家庭聚餐"),
+            new SampleExpense(2, -60, "停車費"),
+            new SampleExpense(3, 5000, "年終獎金"),
+            new SampleExpense(1, 300, "商品退款"),
+            new SampleExpense(4, -2100, "家電維修"),
+            new SampleExpense(0, -95, "宵夜"),
+            new SampleExpense(0, -160, "市場買菜"),
+            new SampleExpense(2, -240, "計程車"),
+            new SampleExpense(3, -1180, "寵物飼料"),
+            new SampleExpense(1, -3200, "電信費"),
+            new SampleExpense(1, -2400, "衣物"),
+            new SampleExpense(4, -780, "書籍"),
+            new SampleExpense(2, -120, "交通儲值"),
+            new SampleExpense(0, -310, "早午餐"),
+            new SampleExpense(3, -1450, "牙醫掛號"),
+            new SampleExpense(0, -380, "晚餐"),
+            new SampleExpense(4, -960, "日用品"),
+            new SampleExpense(1, -540, "洗車"),
+            new SampleExpense(0, -130, "水果"),
+            new SampleExpense(2, -88, "便利商店"),
+            new SampleExpense(3, -1999, "運動鞋"),
+            new SampleExpense(4, -260, "下午茶"),
     };
 
     private final UserService userService;
@@ -74,24 +100,36 @@ public class DemoLoginService {
         }
 
         LocalDateTime now = LocalDateTime.now();
-        for (SampleExpense sample : SAMPLES) {
-            expenseService.create(
-                    group.getId(),
-                    member.getId(),
-                    accounts[sample.accountIndex()].getId(),
-                    BigDecimal.valueOf(sample.amount()),
-                    sample.note(),
-                    randomTimeOn(now, sample.daysAgo()));
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        LocalDate today = now.toLocalDate();
+        // 從上個月 1 日到今天（不產生未來日期），每天隨機 0–MAX_PER_DAY 筆
+        for (LocalDate day = today.minusMonths(1).withDayOfMonth(1); !day.isAfter(today); day = day.plusDays(1)) {
+            int count = random.nextInt(MAX_PER_DAY + 1);
+            for (int i = 0; i < count; i++) {
+                SampleExpense sample = SAMPLES[random.nextInt(SAMPLES.length)];
+                createExpense(group, member, accounts, sample, randomTimeOn(now, day));
+            }
         }
         return result;
     }
 
+    private void createExpense(
+            FamilyGroup group, FamilyMember member, PaymentAccount[] accounts, SampleExpense sample, LocalDateTime occurredAt) {
+        expenseService.create(
+                group.getId(),
+                member.getId(),
+                accounts[sample.accountIndex()].getId(),
+                BigDecimal.valueOf(sample.amount()),
+                sample.note(),
+                occurredAt);
+    }
+
     // 隨機時間：當天不得晚於現在（避免未來時間），其餘日子落在 07:00–22:59
-    private static LocalDateTime randomTimeOn(LocalDateTime now, int daysAgo) {
+    private static LocalDateTime randomTimeOn(LocalDateTime now, LocalDate day) {
         ThreadLocalRandom random = ThreadLocalRandom.current();
-        int secondOfDay = daysAgo == 0
+        int secondOfDay = day.equals(now.toLocalDate())
                 ? random.nextInt(Math.max(1, now.toLocalTime().toSecondOfDay()))
                 : random.nextInt(7 * 3600, 23 * 3600);
-        return now.toLocalDate().minusDays(daysAgo).atStartOfDay().plusSeconds(secondOfDay).withNano(0);
+        return day.atStartOfDay().plusSeconds(secondOfDay).withNano(0);
     }
 }
