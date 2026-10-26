@@ -68,6 +68,21 @@ class UserServiceTest {
     }
 
     @Test
+    void loginWithLine_doesNotOverwriteCustomizedDisplayName() {
+        User existing = new User("line-1", "自訂名", LocalDateTime.now());
+        existing.setId(7L);
+        existing.setDisplayNameCustomized(true);
+        when(lineLoginClient.fetchProfile("code")).thenReturn(new LineProfile("line-1", "LINE 暱稱"));
+        when(userRepository.findByLineUserId("line-1")).thenReturn(Optional.of(existing));
+        when(tokenIssuer.issue(7L, "自訂名")).thenReturn(new TokenIssuer.IssuedToken("jwt", Instant.now()));
+
+        UserService.LoginResult result = userService.loginWithLine("code");
+
+        assertThat(result.displayName()).isEqualTo("自訂名");
+        verify(userRepository, never()).updateDisplayName(any(), any());
+    }
+
+    @Test
     void loginAsDemo_createsRandomDemoUserEachTime() {
         when(userRepository.save(any(User.class))).thenAnswer(inv -> {
             User saved = inv.getArgument(0);

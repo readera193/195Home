@@ -69,7 +69,7 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 
 ### `POST /api/auth/line`
 - Request: `{ code: string }`（LINE 授權碼）
-- Response 200: `{ token: string (JWT), userId: number, displayName: string, expiresAt: string }`；首次登入自動建立帳號，之後登入同步 LINE 暱稱（FR-024）
+- Response 200: `{ token: string (JWT), userId: number, displayName: string, expiresAt: string }`；首次登入自動建立帳號，之後登入同步 LINE 暱稱（FR-024；已自訂顯示名稱者不覆蓋，FR-031）
 - Errors: `400`（`code` 為空）、`401 LINE_LOGIN_FAILED`（授權碼無效／過期或 LINE 服務異常）
 - 說明：`token` 為 HS256 簽章 JWT，Claim 含 `sub`(userId)、`displayName`、`iat`、`exp`（2 小時後過期），由 app-service 自行簽發與驗證。
 
@@ -111,14 +111,29 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 
 ### `POST /api/families/{familyGroupId}/members/{memberId}/leave`
 - Header: `Authorization`（限本人）
+- Request: `{ newAdminMemberId?: number }`（ADMIN 且尚有其他在職成員時必填）
 - Response 200: `{ status: "LEFT", groupStatus: "ACTIVE" | "DISSOLVED", newAdminMemberId?: number }`
-- Errors: `403 NOT_SELF`、`409 MEMBER_NOT_ACTIVE`
-- 邏輯：若為唯一在職成員 → 群組 `DISSOLVED`（FR-018）；若為 ADMIN 且尚有其他在職成員 → 自動轉移 ADMIN（FR-029）
+- Errors: `403 NOT_SELF`、`409 MEMBER_NOT_ACTIVE`、`400 NEW_ADMIN_REQUIRED`、`400 CANNOT_TRANSFER_TO_SELF`
+- 邏輯：若為唯一在職成員 → 群組 `DISSOLVED`（FR-018）；若為 ADMIN 且尚有其他在職成員 → 必須指定 `newAdminMemberId` 並轉移 ADMIN（FR-029）；離開者 `role` 重設為 `MEMBER`（FR-033）
+
+### `POST /api/families/{familyGroupId}/transfer-admin`
+- Header: `Authorization`（限該群組 ADMIN）
+- Request: `{ newAdminMemberId: number }`
+- Response 200: 新管理者的成員資料（同 members 單筆結構，`role: "ADMIN"`）
+- Errors: `403 NOT_GROUP_ADMIN`、`400 CANNOT_TRANSFER_TO_SELF`、`409 MEMBER_NOT_ACTIVE`、`404 MEMBER_NOT_FOUND`
+- 邏輯：原 ADMIN 降為 `MEMBER` 並留在群組，目標成員升為 ADMIN（FR-032）
 
 ### `POST /api/families/{familyGroupId}/members/{memberId}/kick`
 - Header: `Authorization`（限該群組 ADMIN）
 - Response 200: `{ memberId, status: "REMOVED" }`（被移出者不可以邀請碼重新加入，FR-028、FR-030）
 - Errors: `403 NOT_GROUP_ADMIN`（FR-028）、`400 CANNOT_KICK_SELF`、`409 MEMBER_NOT_ACTIVE`
+
+### `PUT /api/families/{familyGroupId}/members/{memberId}/display-name`
+- Header: `Authorization`（呼叫者須為該群組在職成員；編輯自己不需 ADMIN，編輯他人限 ADMIN，FR-031）
+- Request: `{ displayName: string }`（非空白、最長 50 字，前後空白會去除）
+- Response 200: 同 `GET .../members` 的單筆成員 `{ familyMemberId, userId, displayName, status, role, joinedAt, leftAt }`
+- Errors: `400`（欄位驗證失敗）、`403 NOT_GROUP_MEMBER`、`403 NOT_GROUP_ADMIN`（一般成員編輯他人）、`404 MEMBER_NOT_FOUND`
+- 說明：顯示名稱存於 `users.display_name`，並將 `display_name_customized` 設為 true，之後 LINE 登入不再覆蓋。
 
 ### `POST /api/families/{familyGroupId}/members/{memberId}/restore-eligibility`
 - Header: `Authorization`（限該群組 ADMIN）

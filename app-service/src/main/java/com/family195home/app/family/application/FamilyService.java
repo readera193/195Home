@@ -28,11 +28,14 @@ public class FamilyService implements FamilyAccess {
 
     private final FamilyGroupRepository familyGroupRepository;
     private final FamilyMemberRepository familyMemberRepository;
+    private final UserRepository userRepository;
     private final SecureRandom random = new SecureRandom();
 
-    public FamilyService(FamilyGroupRepository familyGroupRepository, FamilyMemberRepository familyMemberRepository) {
+    public FamilyService(FamilyGroupRepository familyGroupRepository, FamilyMemberRepository familyMemberRepository,
+                         UserRepository userRepository) {
         this.familyGroupRepository = familyGroupRepository;
         this.familyMemberRepository = familyMemberRepository;
+        this.userRepository = userRepository;
     }
 
     // FR-001, FR-026
@@ -101,14 +104,36 @@ public class FamilyService implements FamilyAccess {
         return familyMemberRepository.findByGroupId(familyGroupId, includeLeft);
     }
 
-    // FR-018, FR-029
+    // FR-018, FR-029：管理者離開仍有其他在職成員的群組時，MUST 指定接任的管理者
     @Transactional
-    public LeaveResult leave(Long familyGroupId, Long memberId, Long callerUserId) {
+    public LeaveResult leave(Long familyGroupId, Long memberId, Long callerUserId, Long newAdminMemberId) {
         FamilyMember member = requireActiveMemberInGroup(familyGroupId, memberId);
         if (!member.getUserId().equals(callerUserId)) {
             throw new ApiException(ErrorKind.FORBIDDEN, "NOT_SELF", "僅能操作自己的成員身分");
         }
-        return doLeave(member, MemberStatus.LEFT);
+        return doLeave(member, MemberStatus.LEFT, newAdminMemberId);
+    }
+
+    // FR-032：管理者直接指定另一位在職成員接任管理者，原管理者降為一般成員並留在群組
+    @Transactional
+    public FamilyMember transferAdmin(Long familyGroupId, Long callerUserId, Long newAdminMemberId) {
+        FamilyMember caller = assertMemberAuthorized(familyGroupId, callerUserId, RequiredRole.ADMIN);
+        FamilyMember newAdmin = requireTransferTarget(familyGroupId, caller, newAdminMemberId);
+        caller.setRole(MemberRole.MEMBER);
+        familyMemberRepository.update(caller);
+        newAdmin.setRole(MemberRole.ADMIN);
+        familyMemberRepository.update(newAdmin);
+        return newAdmin;
+    }
+
+    private FamilyMember requireTransferTarget(Long familyGroupId, FamilyMember currentAdmin, Long newAdminMemberId) {
+        if (newAdminMemberId == null) {
+            throw new ApiException(ErrorKind.BAD_REQUEST, "NEW_ADMIN_REQUIRED", "請指定下一位管理者");
+        }
+        if (newAdminMemberId.equals(currentAdmin.getId())) {
+            throw new ApiException(ErrorKind.BAD_REQUEST, "CANNOT_TRANSFER_TO_SELF", "不能指定自己為下一位管理者");
+        }
+        return requireActiveMemberInGroup(familyGroupId, newAdminMemberId);
     }
 
     // FR-028
@@ -119,7 +144,7 @@ public class FamilyService implements FamilyAccess {
         if (target.getUserId().equals(callerUserId)) {
             throw new ApiException(ErrorKind.BAD_REQUEST, "CANNOT_KICK_SELF", "無法移出自己，請使用離開群組");
         }
-        doLeave(target, MemberStatus.REMOVED);
+        doLeave(target, MemberStatus.REMOVED, null);
         return target;
     }
 
@@ -137,6 +162,20 @@ public class FamilyService implements FamilyAccess {
         return target;
     }
 
+    // 一般成員可編輯自己的顯示名稱；管理者可編輯群組內任何成員的顯示名稱
+    @Transactional
+    public FamilyMember renameMember(Long familyGroupId, Long memberId, Long callerUserId, String displayName) {
+        FamilyMember caller = assertMemberAuthorized(familyGroupId, callerUserId, RequiredRole.ANY_MEMBER);
+        FamilyMember target = familyMemberRepository.findById(memberId)
+                .filter(m -> m.getFamilyGroupId().equals(familyGroupId))
+                .orElseThrow(() -> new ApiException(ErrorKind.NOT_FOUND, "MEMBER_NOT_FOUND", "找不到成員"));
+        if (!target.getUserId().equals(callerUserId) && !caller.isAdmin()) {
+            throw new ApiException(ErrorKind.FORBIDDEN, "NOT_GROUP_ADMIN", "僅群組管理者可修改其他成員的名稱");
+        }
+        userRepository.renameDisplayName(target.getUserId(), displayName.trim());
+        return target;
+    }
+
     private FamilyMember requireActiveMemberInGroup(Long familyGroupId, Long memberId) {
         FamilyMember member = familyMemberRepository.findById(memberId)
                 .filter(m -> m.getFamilyGroupId().equals(familyGroupId))
@@ -147,11 +186,19 @@ public class FamilyService implements FamilyAccess {
         return member;
     }
 
-    private LeaveResult doLeave(FamilyMember member, MemberStatus newStatus) {
+    private LeaveResult doLeave(FamilyMember member, MemberStatus newStatus, Long newAdminMemberId) {
         Long familyGroupId = member.getFamilyGroupId();
         int activeCountBeforeLeaving = familyMemberRepository.countActiveByGroupId(familyGroupId);
 
+        // FR-029：管理者離開仍有其他在職成員的群組時，先驗證所指定的接任者，再變更任何資料
+        FamilyMember newAdmin = null;
+        if (member.isAdmin() && activeCountBeforeLeaving > 1) {
+            newAdmin = requireTransferTarget(familyGroupId, member, newAdminMemberId);
+        }
+
         member.setStatus(newStatus);
+        // 離開者不再持有角色，避免與接任者同時顯示為管理者，或重新加入時帶回管理權限
+        member.setRole(MemberRole.MEMBER);
         member.setLeftAt(LocalDateTime.now());
         familyMemberRepository.update(member);
 
@@ -164,16 +211,12 @@ public class FamilyService implements FamilyAccess {
             return new LeaveResult(newStatus, FamilyGroupStatus.DISSOLVED, null);
         }
 
-        // FR-029：管理者離開仍有其他在職成員的群組時，自動轉移給 joinedAt 最早的其他在職成員
-        Long newAdminMemberId = null;
-        if (member.isAdmin()) {
-            FamilyMember newAdmin = familyMemberRepository.findEarliestOtherActiveMember(familyGroupId, member.getId())
-                    .orElseThrow(() -> new ApiException(ErrorKind.INTERNAL, "NO_ELIGIBLE_ADMIN", "找不到可接任的管理者"));
+        if (newAdmin != null) {
             newAdmin.setRole(MemberRole.ADMIN);
             familyMemberRepository.update(newAdmin);
-            newAdminMemberId = newAdmin.getId();
+            return new LeaveResult(newStatus, FamilyGroupStatus.ACTIVE, newAdmin.getId());
         }
-        return new LeaveResult(newStatus, FamilyGroupStatus.ACTIVE, newAdminMemberId);
+        return new LeaveResult(newStatus, FamilyGroupStatus.ACTIVE, null);
     }
 
     /**

@@ -149,7 +149,7 @@ export default function PaymentAccountsPage() {
               {isAdmin && (
                 <span className="actions">
                   <button className="btn-secondary btn-sm" onClick={() => handleRename(account.accountId, account.name)}>
-                    改名
+                    編輯
                   </button>
                   {account.status === 'ACTIVE' ? (
                     <button className="btn-secondary btn-sm" onClick={() => handleDisable(account.accountId)}>

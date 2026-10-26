@@ -27,13 +27,13 @@ public class UserService {
         this.tokenIssuer = tokenIssuer;
     }
 
-    // FR-024：以 LINE 身分登入；首次登入自動建立帳號，之後沿用並同步暱稱
+    // FR-024：以 LINE 身分登入；首次登入自動建立帳號，之後沿用並同步暱稱（已自訂名稱者不覆蓋）
     @Transactional
     public LoginResult loginWithLine(String code) {
         LineProfile profile = lineLoginClient.fetchProfile(code);
         User user = userRepository.findByLineUserId(profile.lineUserId())
                 .map(existing -> {
-                    if (!existing.getDisplayName().equals(profile.displayName())) {
+                    if (!existing.isDisplayNameCustomized() && !existing.getDisplayName().equals(profile.displayName())) {
                         userRepository.updateDisplayName(existing.getId(), profile.displayName());
                         existing.setDisplayName(profile.displayName());
                     }

@@ -7,6 +7,7 @@ public class User {
     private Long id;
     private String lineUserId;
     private String displayName;
+    private boolean displayNameCustomized;
     private LocalDateTime createdAt;
 
     public User() {
@@ -40,6 +41,14 @@ public class User {
 
     public void setDisplayName(String displayName) {
         this.displayName = displayName;
+    }
+
+    public boolean isDisplayNameCustomized() {
+        return displayNameCustomized;
+    }
+
+    public void setDisplayNameCustomized(boolean displayNameCustomized) {
+        this.displayNameCustomized = displayNameCustomized;
     }
 
     public LocalDateTime getCreatedAt() {

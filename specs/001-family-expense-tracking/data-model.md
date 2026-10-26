@@ -14,7 +14,8 @@ schema 定義對應 `app-service/src/main/resources/db/migration/`（Flyway migr
 |------|------|------|
 | id | BIGINT PK | |
 | lineUserId | VARCHAR(64) UNIQUE NOT NULL | LINE userId，即登入身分，全系統唯一（FR-020、FR-024）；Demo 體驗帳號為 `"demo-" + UUID` |
-| displayName | VARCHAR(255) NOT NULL | LINE 暱稱；每次登入時同步更新 |
+| displayName | VARCHAR(255) NOT NULL | 顯示名稱；預設為 LINE 暱稱，未自訂時每次登入同步更新；可由本人或群組管理者編輯（FR-031） |
+| displayNameCustomized | BOOLEAN NOT NULL DEFAULT FALSE | 是否曾被自訂；為 true 時 LINE 登入不再覆蓋 displayName（Flyway `V3__user_display_name_customized.sql`） |
 | createdAt | DATETIME(6) NOT NULL | |
 
 **驗證規則**：以 `lineUserId` 查詢，不存在則於首次登入時自動建立（FR-024）；無密碼欄位。
@@ -56,7 +57,7 @@ schema 定義對應 `app-service/src/main/resources/db/migration/`（Flyway migr
 - `REMOVED` → `ACTIVE`：**不允許**以邀請碼加入，邀請碼加入時 MUST 拒絕（FR-030）。
 - `REMOVED` → `LEFT`：管理者明確「恢復加入資格」後，該成員方可依上一條以邀請碼重新加入（FR-030）。
 - `LEFT` 與 `REMOVED` 皆視為「已離開」顯示於成員篩選清單（FR-021），且皆不佔用 FR-026 的在職名額，可建立或加入其他群組。
-- `role`：`ADMIN` 離開仍有其他在職成員的群組時，自動將 `ADMIN` 轉移給群組內 `joinedAt` 最早的其他在職成員（FR-029）。
+- `role`：`ADMIN` 離開仍有其他在職成員的群組時，MUST 由其指定接任者並將 `ADMIN` 轉移過去（FR-029）；管理者亦可直接轉移（FR-032）。成員離開或被移出時 `role` 一律重設為 `MEMBER`，前端對非 `ACTIVE` 成員不顯示角色（FR-033）。
 
 #### 登入驗證
 

@@ -13,6 +13,8 @@ public interface UserMapper {
 
     void updateDisplayName(@Param("id") Long id, @Param("displayName") String displayName);
 
+    void renameDisplayName(@Param("id") Long id, @Param("displayName") String displayName);
+
     User selectByLineUserId(@Param("lineUserId") String lineUserId);
 
     User selectById(@Param("id") Long id);

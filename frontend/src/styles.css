@@ -607,20 +607,40 @@ tbody tr:hover {
   h1 {
     font-size: 1.35rem;
   }
-  /* 成員列表：縮小間距並允許成員名稱換行，避免操作欄被擠出畫面 */
-  .member-table th,
-  .member-table td {
-    padding: 10px 8px;
+  /* 成員列表：改為卡片式，第一列為名稱＋角色＋狀態，操作按鈕另起一列，避免名稱被擠成直排 */
+  .member-table thead {
+    display: none;
   }
-  .member-table th:first-child,
+  .member-table,
+  .member-table tbody {
+    display: block;
+  }
+  .member-table tr {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 8px 8px;
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .member-table tr:last-child {
+    border-bottom: 0;
+  }
+  .member-table td {
+    padding: 0;
+    border: 0;
+    text-align: left;
+  }
   .member-table td:first-child {
-    padding-left: 12px;
     white-space: normal;
     word-break: break-word;
+    font-weight: 600;
   }
-  .member-table th:last-child,
   .member-table td:last-child {
-    padding-right: 12px;
+    grid-column: 1 / -1;
+  }
+  .member-table td .actions {
+    justify-content: flex-start;
   }
 }
 
@@ -834,4 +854,28 @@ tbody tr:hover {
 .checkbox-label input {
   width: auto;
   padding: 0;
+}
+
+/* SweetAlert2 的下拉選單預設寬度會超出視窗，縮為對話框的一半並置中 */
+.swal2-container .swal2-select {
+  box-sizing: border-box;
+  width: 50%;
+  min-width: 0;
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.inactive-members {
+  margin-top: 16px;
+}
+.inactive-members summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.inactive-members .hint {
+  font-size: 13px;
+  margin: 0 0 8px;
 }

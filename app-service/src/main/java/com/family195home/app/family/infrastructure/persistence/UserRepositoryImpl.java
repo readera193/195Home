@@ -28,6 +28,11 @@ public class UserRepositoryImpl implements UserRepository {
     }
 
     @Override
+    public void renameDisplayName(Long id, String displayName) {
+        userMapper.renameDisplayName(id, displayName);
+    }
+
+    @Override
     public Optional<User> findByLineUserId(String lineUserId) {
         return Optional.ofNullable(userMapper.selectByLineUserId(lineUserId));
     }

@@ -8,9 +8,12 @@ import com.family195home.app.family.presentation.dto.FamilyGroupResponse;
 import com.family195home.app.family.presentation.dto.JoinFamilyGroupRequest;
 import com.family195home.app.family.presentation.dto.JoinFamilyGroupResponse;
 import com.family195home.app.family.presentation.dto.KickResponse;
+import com.family195home.app.family.presentation.dto.LeaveRequest;
 import com.family195home.app.family.presentation.dto.LeaveResponse;
 import com.family195home.app.family.presentation.dto.MemberView;
 import com.family195home.app.family.presentation.dto.MyFamilyResponse;
+import com.family195home.app.family.presentation.dto.RenameMemberRequest;
+import com.family195home.app.family.presentation.dto.TransferAdminRequest;
 import com.family195home.app.family.application.FamilyService;
 import com.family195home.app.shared.AuthenticatedUser;
 import jakarta.validation.Valid;
@@ -77,10 +80,21 @@ public class FamilyController {
     public ResponseEntity<LeaveResponse> leave(
             @AuthenticationPrincipal AuthenticatedUser caller,
             @PathVariable Long familyGroupId,
-            @PathVariable Long memberId) {
-        FamilyService.LeaveResult result = familyService.leave(familyGroupId, memberId, caller.userId());
+            @PathVariable Long memberId,
+            @RequestBody(required = false) LeaveRequest request) {
+        Long newAdminMemberId = request == null ? null : request.newAdminMemberId();
+        FamilyService.LeaveResult result = familyService.leave(familyGroupId, memberId, caller.userId(), newAdminMemberId);
         return ResponseEntity.ok(new LeaveResponse(
                 result.status().name(), result.familyGroupStatus().name(), result.newAdminMemberId()));
+    }
+
+    @PostMapping("/{familyGroupId}/transfer-admin")
+    public ResponseEntity<MemberView> transferAdmin(
+            @AuthenticationPrincipal AuthenticatedUser caller,
+            @PathVariable Long familyGroupId,
+            @Valid @RequestBody TransferAdminRequest request) {
+        FamilyMember newAdmin = familyService.transferAdmin(familyGroupId, caller.userId(), request.newAdminMemberId());
+        return ResponseEntity.ok(toView(newAdmin));
     }
 
     @PostMapping("/{familyGroupId}/members/{memberId}/kick")
@@ -99,6 +113,16 @@ public class FamilyController {
             @PathVariable Long memberId) {
         FamilyMember target = familyService.restoreEligibility(familyGroupId, memberId, caller.userId());
         return ResponseEntity.ok(new KickResponse(target.getId(), target.getStatus().name()));
+    }
+
+    @PutMapping("/{familyGroupId}/members/{memberId}/display-name")
+    public ResponseEntity<MemberView> rename(
+            @AuthenticationPrincipal AuthenticatedUser caller,
+            @PathVariable Long familyGroupId,
+            @PathVariable Long memberId,
+            @Valid @RequestBody RenameMemberRequest request) {
+        FamilyMember target = familyService.renameMember(familyGroupId, memberId, caller.userId(), request.displayName());
+        return ResponseEntity.ok(toView(target));
     }
 
     private MemberView toView(FamilyMember member) {

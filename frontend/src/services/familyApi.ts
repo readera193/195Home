@@ -57,12 +57,32 @@ export function getMembers(familyGroupId: number, includeLeft = true): Promise<M
     .then((res) => res.data);
 }
 
-export function leaveGroup(familyGroupId: number, memberId: number): Promise<LeaveResponse> {
-  return apiClient.post(`/families/${familyGroupId}/members/${memberId}/leave`).then((res) => res.data);
+/** 管理者離開仍有其他在職成員的群組時，須帶入 newAdminMemberId 指定接任者（FR-029）。 */
+export function leaveGroup(
+  familyGroupId: number,
+  memberId: number,
+  newAdminMemberId?: number,
+): Promise<LeaveResponse> {
+  return apiClient
+    .post(`/families/${familyGroupId}/members/${memberId}/leave`, { newAdminMemberId })
+    .then((res) => res.data);
+}
+
+/** 管理者直接指定另一位在職成員為管理者（FR-032）。 */
+export function transferAdmin(familyGroupId: number, newAdminMemberId: number): Promise<MemberView> {
+  return apiClient
+    .post(`/families/${familyGroupId}/transfer-admin`, { newAdminMemberId })
+    .then((res) => res.data);
 }
 
 export function kickMember(familyGroupId: number, memberId: number): Promise<{ memberId: number; status: string }> {
   return apiClient.post(`/families/${familyGroupId}/members/${memberId}/kick`).then((res) => res.data);
+}
+
+export function renameMember(familyGroupId: number, memberId: number, displayName: string): Promise<MemberView> {
+  return apiClient
+    .put(`/families/${familyGroupId}/members/${memberId}/display-name`, { displayName })
+    .then((res) => res.data);
 }
 
 export function restoreMemberEligibility(

@@ -6,6 +6,7 @@
         <id property="id" column="id"/>
         <result property="lineUserId" column="line_user_id"/>
         <result property="displayName" column="display_name"/>
+        <result property="displayNameCustomized" column="display_name_customized"/>
         <result property="createdAt" column="created_at"/>
     </resultMap>
 
@@ -18,16 +19,20 @@
         UPDATE users SET display_name = #{displayName} WHERE id = #{id}
     </update>
 
+    <update id="renameDisplayName">
+        UPDATE users SET display_name = #{displayName}, display_name_customized = TRUE WHERE id = #{id}
+    </update>
+
     <select id="selectByLineUserId" resultMap="UserResultMap">
-        SELECT id, line_user_id, display_name, created_at FROM users WHERE line_user_id = #{lineUserId}
+        SELECT id, line_user_id, display_name, display_name_customized, created_at FROM users WHERE line_user_id = #{lineUserId}
     </select>
 
     <select id="selectById" resultMap="UserResultMap">
-        SELECT id, line_user_id, display_name, created_at FROM users WHERE id = #{id}
+        SELECT id, line_user_id, display_name, display_name_customized, created_at FROM users WHERE id = #{id}
     </select>
 
     <select id="selectAll" resultMap="UserResultMap">
-        SELECT id, line_user_id, display_name, created_at FROM users
+        SELECT id, line_user_id, display_name, display_name_customized, created_at FROM users
     </select>
 
 </mapper>

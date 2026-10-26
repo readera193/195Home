@@ -22,13 +22,15 @@ class FamilyServiceTest {
 
     private FamilyGroupRepository familyGroupRepository;
     private FamilyMemberRepository familyMemberRepository;
+    private UserRepository userRepository;
     private FamilyService familyService;
 
     @BeforeEach
     void setUp() {
         familyGroupRepository = mock(FamilyGroupRepository.class);
         familyMemberRepository = mock(FamilyMemberRepository.class);
-        familyService = new FamilyService(familyGroupRepository, familyMemberRepository);
+        userRepository = mock(UserRepository.class);
+        familyService = new FamilyService(familyGroupRepository, familyMemberRepository, userRepository);
     }
 
     @Test
@@ -101,7 +103,7 @@ class FamilyServiceTest {
         when(familyGroupRepository.findById(10L))
                 .thenReturn(Optional.of(groupOf(10L, "王家", FamilyGroupStatus.ACTIVE, "CODE1")));
 
-        FamilyService.LeaveResult result = familyService.leave(10L, 1L, admin.getUserId());
+        FamilyService.LeaveResult result = familyService.leave(10L, 1L, admin.getUserId(), null);
 
         assertThat(result.familyGroupStatus()).isEqualTo(FamilyGroupStatus.DISSOLVED);
         ArgumentCaptor<FamilyGroup> captor = ArgumentCaptor.forClass(FamilyGroup.class);
@@ -110,20 +112,98 @@ class FamilyServiceTest {
     }
 
     @Test
-    void leave_adminWithOtherActiveMembers_transfersAdminToEarliestJoinedMember() {
+    void leave_adminWithOtherActiveMembers_transfersAdminToDesignatedMember() {
         // FR-029
         FamilyMember admin = activeMember(1L, 10L, MemberRole.ADMIN);
-        FamilyMember earliestOther = activeMember(2L, 10L, MemberRole.MEMBER);
+        FamilyMember designated = activeMember(2L, 10L, MemberRole.MEMBER);
         when(familyMemberRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(familyMemberRepository.findById(2L)).thenReturn(Optional.of(designated));
         when(familyMemberRepository.countActiveByGroupId(10L)).thenReturn(2);
-        when(familyMemberRepository.findEarliestOtherActiveMember(10L, 1L)).thenReturn(Optional.of(earliestOther));
 
-        FamilyService.LeaveResult result = familyService.leave(10L, 1L, admin.getUserId());
+        FamilyService.LeaveResult result = familyService.leave(10L, 1L, admin.getUserId(), 2L);
 
         assertThat(result.familyGroupStatus()).isEqualTo(FamilyGroupStatus.ACTIVE);
         assertThat(result.newAdminMemberId()).isEqualTo(2L);
-        assertThat(earliestOther.getRole()).isEqualTo(MemberRole.ADMIN);
+        assertThat(designated.getRole()).isEqualTo(MemberRole.ADMIN);
+        // 離開者不再持有管理者角色
+        assertThat(admin.getStatus()).isEqualTo(MemberStatus.LEFT);
+        assertThat(admin.getRole()).isEqualTo(MemberRole.MEMBER);
         verify(familyGroupRepository, never()).update(any());
+    }
+
+    @Test
+    void leave_adminWithOtherActiveMembers_rejectsWhenNoNewAdminDesignated() {
+        // FR-029：必須指定接任者，且驗證失敗時不得變更離開者狀態
+        FamilyMember admin = activeMember(1L, 10L, MemberRole.ADMIN);
+        when(familyMemberRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(familyMemberRepository.countActiveByGroupId(10L)).thenReturn(2);
+
+        assertThatThrownBy(() -> familyService.leave(10L, 1L, admin.getUserId(), null))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("NEW_ADMIN_REQUIRED"));
+        assertThat(admin.getStatus()).isEqualTo(MemberStatus.ACTIVE);
+        verify(familyMemberRepository, never()).update(any());
+    }
+
+    @Test
+    void leave_adminWithOtherActiveMembers_rejectsInactiveOrSelfDesignation() {
+        FamilyMember admin = activeMember(1L, 10L, MemberRole.ADMIN);
+        FamilyMember gone = activeMember(2L, 10L, MemberRole.MEMBER);
+        gone.setStatus(MemberStatus.LEFT);
+        when(familyMemberRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(familyMemberRepository.findById(2L)).thenReturn(Optional.of(gone));
+        when(familyMemberRepository.countActiveByGroupId(10L)).thenReturn(2);
+
+        assertThatThrownBy(() -> familyService.leave(10L, 1L, admin.getUserId(), 2L))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("MEMBER_NOT_ACTIVE"));
+        assertThatThrownBy(() -> familyService.leave(10L, 1L, admin.getUserId(), 1L))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("CANNOT_TRANSFER_TO_SELF"));
+        assertThat(admin.getStatus()).isEqualTo(MemberStatus.ACTIVE);
+    }
+
+    @Test
+    void leave_regularMember_doesNotNeedNewAdmin() {
+        FamilyMember member = activeMember(2L, 10L, MemberRole.MEMBER);
+        when(familyMemberRepository.findById(2L)).thenReturn(Optional.of(member));
+        when(familyMemberRepository.countActiveByGroupId(10L)).thenReturn(2);
+
+        FamilyService.LeaveResult result = familyService.leave(10L, 2L, member.getUserId(), null);
+
+        assertThat(result.newAdminMemberId()).isNull();
+        assertThat(member.getStatus()).isEqualTo(MemberStatus.LEFT);
+    }
+
+    @Test
+    void transferAdmin_swapsRolesBetweenCallerAndTarget() {
+        // FR-032
+        FamilyMember admin = activeMember(1L, 10L, MemberRole.ADMIN);
+        FamilyMember target = activeMember(2L, 10L, MemberRole.MEMBER);
+        when(familyMemberRepository.findActiveByUserId(admin.getUserId())).thenReturn(Optional.of(admin));
+        when(familyMemberRepository.findById(2L)).thenReturn(Optional.of(target));
+
+        FamilyMember result = familyService.transferAdmin(10L, admin.getUserId(), 2L);
+
+        assertThat(result.getRole()).isEqualTo(MemberRole.ADMIN);
+        assertThat(admin.getRole()).isEqualTo(MemberRole.MEMBER);
+        assertThat(admin.getStatus()).isEqualTo(MemberStatus.ACTIVE);
+    }
+
+    @Test
+    void transferAdmin_rejectsNonAdminCaller() {
+        FamilyMember caller = activeMember(2L, 10L, MemberRole.MEMBER);
+        when(familyMemberRepository.findActiveByUserId(caller.getUserId())).thenReturn(Optional.of(caller));
+
+        assertThatThrownBy(() -> familyService.transferAdmin(10L, caller.getUserId(), 3L))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("NOT_GROUP_ADMIN"));
+    }
+
+    @Test
+    void transferAdmin_rejectsSelfTarget() {
+        FamilyMember admin = activeMember(1L, 10L, MemberRole.ADMIN);
+        when(familyMemberRepository.findActiveByUserId(admin.getUserId())).thenReturn(Optional.of(admin));
+
+        assertThatThrownBy(() -> familyService.transferAdmin(10L, admin.getUserId(), 1L))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("CANNOT_TRANSFER_TO_SELF"));
+        assertThat(admin.getRole()).isEqualTo(MemberRole.ADMIN);
     }
 
     @Test
@@ -131,7 +211,7 @@ class FamilyServiceTest {
         FamilyMember member = activeMember(1L, 10L, MemberRole.MEMBER);
         when(familyMemberRepository.findById(1L)).thenReturn(Optional.of(member));
 
-        assertThatThrownBy(() -> familyService.leave(10L, 1L, 999L))
+        assertThatThrownBy(() -> familyService.leave(10L, 1L, 999L, null))
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("NOT_SELF"));
     }
 
@@ -237,6 +317,41 @@ class FamilyServiceTest {
         FamilyMember result = familyService.assertMemberAuthorized(10L, admin.getUserId(), FamilyService.RequiredRole.ADMIN);
 
         assertThat(result).isEqualTo(admin);
+    }
+
+    @Test
+    void renameMember_allowsSelf() {
+        FamilyMember member = activeMember(1L, 10L, MemberRole.MEMBER);
+        when(familyMemberRepository.findActiveByUserId(member.getUserId())).thenReturn(Optional.of(member));
+        when(familyMemberRepository.findById(1L)).thenReturn(Optional.of(member));
+
+        familyService.renameMember(10L, 1L, member.getUserId(), " 小明 ");
+
+        verify(userRepository).renameDisplayName(member.getUserId(), "小明");
+    }
+
+    @Test
+    void renameMember_rejectsRegularMemberRenamingOthers() {
+        FamilyMember caller = activeMember(1L, 10L, MemberRole.MEMBER);
+        FamilyMember other = activeMember(2L, 10L, MemberRole.MEMBER);
+        when(familyMemberRepository.findActiveByUserId(caller.getUserId())).thenReturn(Optional.of(caller));
+        when(familyMemberRepository.findById(2L)).thenReturn(Optional.of(other));
+
+        assertThatThrownBy(() -> familyService.renameMember(10L, 2L, caller.getUserId(), "新名"))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("NOT_GROUP_ADMIN"));
+        verify(userRepository, never()).renameDisplayName(any(), any());
+    }
+
+    @Test
+    void renameMember_adminCanRenameOthers() {
+        FamilyMember admin = activeMember(1L, 10L, MemberRole.ADMIN);
+        FamilyMember other = activeMember(2L, 10L, MemberRole.MEMBER);
+        when(familyMemberRepository.findActiveByUserId(admin.getUserId())).thenReturn(Optional.of(admin));
+        when(familyMemberRepository.findById(2L)).thenReturn(Optional.of(other));
+
+        familyService.renameMember(10L, 2L, admin.getUserId(), "新名");
+
+        verify(userRepository).renameDisplayName(other.getUserId(), "新名");
     }
 
     private FamilyMember activeMember(Long id, Long groupId, MemberRole role) {

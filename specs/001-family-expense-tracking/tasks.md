@@ -85,7 +85,7 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 - [X] T022 [P] [US1] 實作 `POST /api/families`、`POST /api/families/join`、`GET /api/families/{id}/members?includeLeft=`（已離開成員標示保留於清單，FR-021；呼叫 `assertMemberAuthorized` 確認呼叫者本身即為該 `{id}` 家庭群組成員，否則回傳 `403`，FR-017）、`POST .../{memberId}/leave`、`POST .../{memberId}/kick`、`POST .../{memberId}/restore-eligibility` 端點於 `app-service/src/main/java/com/family195home/app/family/presentation/FamilyController.java`（依賴 T018、T019、T020、T021）
 - [X] T023 [P] [US1] 單元測試：群組名稱唯一性、單一在職群組限制（FR-026）、唯一成員離開解散群組（FR-018）、管理者自動轉移（FR-029）、kick 權限判斷與狀態變為 `REMOVED`（FR-028）、被移出成員以邀請碼加入被拒絕且管理者恢復資格後方可重新加入（FR-030）、已離開成員以邀請碼重新加入後狀態恢復為 `ACTIVE` 且沿用原 FamilyMember id（FR-025）、`assertMemberAuthorized` 各角色情境於 `app-service/src/test/java/com/family195home/app/family/application/FamilyServiceTest.java`
 - [X] T024 [P] [US1] 前端建立家庭群組頁面（建立群組表單、顯示邀請碼/邀請連結、輸入邀請碼加入）於 `frontend/src/pages/FamilyGroupPage.tsx`
-- [X] T025 [P] [US1] 前端成員列表（已併入家庭群組頁，見 T098；顯示在職/已離開/已移出成員、管理者可移出成員與恢復被移出成員的加入資格、本人可離開群組）於 `frontend/src/pages/FamilyGroupPage.tsx`
+- [X] T025 [P] [US1] 前端成員列表（已併入家庭群組頁，見 T098；顯示在職成員與可收合的「已不在群組」區（已封鎖/已退出）、管理者可移出成員與「解除封鎖」被移出成員、本人可離開群組）於 `frontend/src/pages/FamilyGroupPage.tsx`
 - [X] T026 [US1] 前端封裝家庭群組相關 API 呼叫於 `frontend/src/services/familyApi.ts`（依賴 T014 的 apiClient）
 
 **Checkpoint**: User Story 1 應可獨立完整運作與測試
@@ -368,3 +368,17 @@ Task: "前端成員列表頁面於 frontend/src/pages/FamilyGroupPage.tsx"
 
 - [X] T103 後端 `GET /api/accounts` 回應新增 `deletable`（帳戶從未被任何支出紀錄使用）：於 `PaymentAccountResponse`、`PaymentAccountController`（必要時 `PaymentAccountService`／repository 批次查詢，避免 N+1）計算並回傳，補測試 per US2/AC7, FR-022 (missing)
 - [X] T104 前端支付帳戶頁：「刪除」僅在 `deletable` 為 true 時顯示、「停用／啟用」依狀態互斥；新增「顯示已停用帳戶」開關（預設關閉，僅前端過濾）；`expenseApi.ts` 的 `PaymentAccountResponse` 補 `deletable`，更新 `frontend/tests/PaymentAccountsPage.test.tsx` per US2/AC6, US2/AC7 (missing)
+
+## Phase 16: 成員顯示名稱編輯
+
+**Purpose**: 2026-10-25 第十一輪 Clarification（FR-031）。
+
+- [X] T105 後端新增編輯顯示名稱：Flyway `V3__user_display_name_customized.sql`（`users.display_name_customized`）、`User`／`UserMapper`／`UserRepository.renameDisplayName`、`FamilyService.renameMember`（本人或 ADMIN）、`PUT /api/families/{id}/members/{memberId}/display-name`（`RenameMemberRequest`）；`UserService.loginWithLine` 對已自訂者不覆蓋 LINE 暱稱；於 `FamilyServiceTest`、`UserServiceTest` 補測試 per US1/AC6, US1/AC7, FR-031
+- [X] T106 前端：`familyApi.ts` 新增 `renameMember`，`FamilyGroupPage.tsx` 成員列表加入「編輯」按鈕（一般成員僅自己、管理者所有未被移出成員）；`PaymentAccountsPage.tsx` 原「改名」按鈕改名為「編輯」 per FR-031
+
+---
+
+**Purpose**: 2026-10-25 第十二輪 Clarification（FR-029 修訂、FR-032、FR-033）。
+
+- [X] T107 後端：`FamilyService.leave` 新增 `newAdminMemberId`（管理者離開須指定接任者，離開者 role 重設為 `MEMBER`）、新增 `transferAdmin`、`POST /transfer-admin` 端點與 `LeaveRequest`／`TransferAdminRequest` DTO，並補 `FamilyServiceTest`（FR-029、FR-032、FR-033）
+- [X] T108 前端：`familyApi.ts` 新增 `transferAdmin` 並讓 `leaveGroup` 帶入接任者，`notify.ts` 新增 `selectOption`，`FamilyGroupPage.tsx` 管理者離開時須選擇接任者、成員列表新增「設為管理者」按鈕、非「正常」成員的角色欄顯示「—」（FR-029、FR-032、FR-033）

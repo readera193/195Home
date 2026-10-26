@@ -38,3 +38,29 @@ export async function promptText(title: string, value: string) {
   });
   return result.isConfirmed ? (result.value as string) : undefined;
 }
+
+/** 下拉選單對話框；取消時回傳 undefined，否則回傳所選項目的 value。 */
+export async function selectOption(options: {
+  title: string;
+  text?: string;
+  choices: { value: number; label: string }[];
+  placeholder: string;
+  confirmText?: string;
+  danger?: boolean;
+}) {
+  const result = await Swal.fire({
+    icon: options.danger ? 'warning' : 'question',
+    title: options.title,
+    text: options.text,
+    input: 'select',
+    inputOptions: Object.fromEntries(options.choices.map((c) => [String(c.value), c.label])),
+    inputPlaceholder: options.placeholder,
+    inputValidator: (value) => (value ? undefined : options.placeholder),
+    showCancelButton: true,
+    confirmButtonText: options.confirmText ?? '確定',
+    cancelButtonText: '取消',
+    confirmButtonColor: options.danger ? DANGER : PRIMARY,
+    reverseButtons: true,
+  });
+  return result.isConfirmed ? Number(result.value) : undefined;
+}
