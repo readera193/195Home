@@ -108,7 +108,7 @@ describe('ExpenseListPage 新增支出表單', () => {
     });
     vi.mocked(familyApi.getMembers).mockResolvedValue([]);
     vi.mocked(expenseApi.listAccounts).mockResolvedValue([
-      { accountId: 100, familyMemberId: 1, name: '現金', status: 'ACTIVE' },
+      { accountId: 100, familyMemberId: 1, name: '現金', status: 'ACTIVE', deletable: true },
     ]);
     vi.mocked(expenseApi.listExpenses).mockResolvedValue({
       items: [],
@@ -216,7 +216,7 @@ describe('ExpenseListPage 編輯／刪除', () => {
     });
     vi.mocked(familyApi.getMembers).mockResolvedValue([]);
     vi.mocked(expenseApi.listAccounts).mockResolvedValue([
-      { accountId: 100, familyMemberId: 1, name: '現金', status: 'ACTIVE' },
+      { accountId: 100, familyMemberId: 1, name: '現金', status: 'ACTIVE', deletable: true },
     ]);
     vi.mocked(expenseApi.listExpenses).mockResolvedValue({
       items: [expense(1, '午餐')],

@@ -8,7 +8,9 @@ import com.linecorp.bot.client.LineMessagingClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.YearMonth;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -71,5 +73,15 @@ class LineWebhookControllerTest {
         String reply = controller.determineReply("hello", "line-user-1");
 
         assertThat(reply).contains("YYYY-MM");
+    }
+
+    @Test
+    void extractMonth_usesDatePickerParamsOrPlainYearMonthData() {
+        YearMonth now = YearMonth.of(2026, 1);
+        assertThat(LineWebhookController.extractMonth("pick", Map.of("date", "2026-07-15"), now)).isEqualTo("2026-07");
+        assertThat(LineWebhookController.extractMonth("2026-06", null, now)).isEqualTo("2026-06");
+        assertThat(LineWebhookController.extractMonth("month=current", null, now)).isEqualTo("2026-01");
+        assertThat(LineWebhookController.extractMonth("month=previous", null, now)).isEqualTo("2025-12");
+        assertThat(LineWebhookController.extractMonth("other", null, now)).isNull();
     }
 }

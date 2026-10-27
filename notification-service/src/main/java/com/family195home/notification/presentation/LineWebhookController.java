@@ -8,14 +8,17 @@ import com.linecorp.bot.client.LineMessagingClient;
 import com.linecorp.bot.model.ReplyMessage;
 import com.linecorp.bot.model.event.Event;
 import com.linecorp.bot.model.event.MessageEvent;
+import com.linecorp.bot.model.event.PostbackEvent;
 import com.linecorp.bot.model.event.message.TextMessageContent;
 import com.linecorp.bot.model.message.TextMessage;
 import com.linecorp.bot.spring.boot.annotation.EventMapping;
 import com.linecorp.bot.spring.boot.annotation.LineMessageHandler;
 
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
@@ -52,6 +55,35 @@ public class LineWebhookController {
         }
         // FR-014：不符合 YYYY-MM 格式的訊息一律回覆格式提示，不視為有效查詢
         return FORMAT_HINT;
+    }
+
+    /** Datetime Picker / Rich Menu 的 postback：取選到日期的年月（params.date），或 data 本身即 YYYY-MM。 */
+    @EventMapping
+    public void handlePostback(PostbackEvent event) {
+        String month = extractMonth(event.getPostbackContent().getData(), event.getPostbackContent().getParams(),
+                YearMonth.now(ZoneId.of("Asia/Taipei")));
+        String lineUserId = event.getSource().getUserId();
+        reply(event.getReplyToken(), month == null ? FORMAT_HINT : determineReply(month, lineUserId));
+    }
+
+    /**
+     * Rich Menu 為固定內容，「本月」「上月」以 data 為 {@code month=current}／{@code month=previous} 表示，
+     * 由此換算成實際月份；Datetime Picker 則由 params.date 取年月。
+     */
+    static String extractMonth(String data, Map<String, String> params, YearMonth now) {
+        String date = params == null ? null : params.get("date");
+        if (date != null && date.length() >= 7) {
+            return date.substring(0, 7);
+        }
+        if (data == null) {
+            return null;
+        }
+        String trimmed = data.trim();
+        return switch (trimmed) {
+            case "month=current" -> now.toString();
+            case "month=previous" -> now.minusMonths(1).toString();
+            default -> YEAR_MONTH_PATTERN.matcher(trimmed).matches() ? trimmed : null;
+        };
     }
 
     @EventMapping
