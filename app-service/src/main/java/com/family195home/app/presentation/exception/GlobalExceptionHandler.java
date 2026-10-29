@@ -2,6 +2,7 @@ package com.family195home.app.presentation.exception;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -38,6 +39,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         HttpStatus status = toStatus(ex.getKind());
         ProblemDetail problem = ProblemDetails.of(status, ex.getCode(), ex.getMessage());
         return handleExceptionInternal(ex, problem, new HttpHeaders(), status, request);
+    }
+
+    /** 先查後寫的檢查在併發時會漏過，由資料庫唯一約束兜底，轉為 409 而非 500。 */
+    @ExceptionHandler(DuplicateKeyException.class)
+    public ResponseEntity<Object> handleDuplicateKey(DuplicateKeyException ex, WebRequest request) {
+        ProblemDetail problem = ProblemDetails.of(HttpStatus.CONFLICT, "DUPLICATE_RESOURCE", "資料已存在，請重新整理後再試");
+        return handleExceptionInternal(ex, problem, new HttpHeaders(), HttpStatus.CONFLICT, request);
     }
 
     @ExceptionHandler(DateTimeParseException.class)

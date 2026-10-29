@@ -69,7 +69,7 @@ public class FamilyController {
             @PathVariable Long familyGroupId,
             @RequestParam(defaultValue = "true") boolean includeLeft) {
         // FR-017：呼叫者必須本身即為該家庭群組成員，避免跨家庭資料外洩
-        familyService.assertMemberAuthorized(familyGroupId, caller.userId(), FamilyService.RequiredRole.ANY_MEMBER);
+        familyService.requireMember(familyGroupId, caller.userId());
         List<MemberView> views = familyService.getMembers(familyGroupId, includeLeft).stream()
                 .map(this::toView)
                 .toList();

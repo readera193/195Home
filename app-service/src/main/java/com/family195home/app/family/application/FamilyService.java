@@ -10,32 +10,28 @@ import com.family195home.app.family.domain.MemberStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 /**
- * 家庭群組核心業務邏輯（US1）。{@link #assertMemberAuthorized} 是
- * 供 expense、statistics 模組直接呼叫（同進程方法呼叫）確認呼叫者角色與在職狀態的
- * 唯一入口（見 research.md 決策 7）。
+ * 家庭群組核心業務邏輯（US1）。其他模組透過 {@link FamilyAccess} 這個 port 以同進程方法呼叫
+ * 確認呼叫者角色與在職狀態（見 research.md 決策 7）。
  */
 @Service
 public class FamilyService implements FamilyAccess {
 
-    private static final String INVITE_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    private static final int INVITE_CODE_LENGTH = 10;
-
     private final FamilyGroupRepository familyGroupRepository;
     private final FamilyMemberRepository familyMemberRepository;
     private final UserRepository userRepository;
-    private final SecureRandom random = new SecureRandom();
+    private final InviteCodeGenerator inviteCodeGenerator;
 
     public FamilyService(FamilyGroupRepository familyGroupRepository, FamilyMemberRepository familyMemberRepository,
-                         UserRepository userRepository) {
+                         UserRepository userRepository, InviteCodeGenerator inviteCodeGenerator) {
         this.familyGroupRepository = familyGroupRepository;
         this.familyMemberRepository = familyMemberRepository;
         this.userRepository = userRepository;
+        this.inviteCodeGenerator = inviteCodeGenerator;
     }
 
     // FR-001, FR-026
@@ -70,8 +66,7 @@ public class FamilyService implements FamilyAccess {
             if (member.getStatus() == MemberStatus.REMOVED) {
                 throw new ApiException(ErrorKind.FORBIDDEN, "MEMBER_REMOVED", "您已被管理者移出此群組，無法再次加入");
             }
-            member.setStatus(MemberStatus.ACTIVE);
-            member.setLeftAt(null);
+            member.rejoin();
             familyMemberRepository.update(member);
             return member;
         }
@@ -117,11 +112,11 @@ public class FamilyService implements FamilyAccess {
     // FR-032：管理者直接指定另一位在職成員接任管理者，原管理者降為一般成員並留在群組
     @Transactional
     public FamilyMember transferAdmin(Long familyGroupId, Long callerUserId, Long newAdminMemberId) {
-        FamilyMember caller = assertMemberAuthorized(familyGroupId, callerUserId, RequiredRole.ADMIN);
+        FamilyMember caller = authorize(familyGroupId, callerUserId, RequiredRole.ADMIN);
         FamilyMember newAdmin = requireTransferTarget(familyGroupId, caller, newAdminMemberId);
-        caller.setRole(MemberRole.MEMBER);
+        caller.demoteToMember();
         familyMemberRepository.update(caller);
-        newAdmin.setRole(MemberRole.ADMIN);
+        newAdmin.promoteToAdmin();
         familyMemberRepository.update(newAdmin);
         return newAdmin;
     }
@@ -139,7 +134,7 @@ public class FamilyService implements FamilyAccess {
     // FR-028
     @Transactional
     public FamilyMember kick(Long familyGroupId, Long memberId, Long callerUserId) {
-        assertMemberAuthorized(familyGroupId, callerUserId, RequiredRole.ADMIN);
+        authorize(familyGroupId, callerUserId, RequiredRole.ADMIN);
         FamilyMember target = requireActiveMemberInGroup(familyGroupId, memberId);
         if (target.getUserId().equals(callerUserId)) {
             throw new ApiException(ErrorKind.BAD_REQUEST, "CANNOT_KICK_SELF", "無法移出自己，請使用離開群組");
@@ -150,14 +145,14 @@ public class FamilyService implements FamilyAccess {
 
     // FR-030：管理者恢復被移出成員的加入資格（REMOVED → LEFT），之後該成員方可依 FR-025 以邀請碼重新加入
     public FamilyMember restoreEligibility(Long familyGroupId, Long memberId, Long callerUserId) {
-        assertMemberAuthorized(familyGroupId, callerUserId, RequiredRole.ADMIN);
+        authorize(familyGroupId, callerUserId, RequiredRole.ADMIN);
         FamilyMember target = familyMemberRepository.findById(memberId)
                 .filter(m -> m.getFamilyGroupId().equals(familyGroupId))
                 .orElseThrow(() -> new ApiException(ErrorKind.NOT_FOUND, "MEMBER_NOT_FOUND", "找不到成員"));
         if (target.getStatus() != MemberStatus.REMOVED) {
             throw new ApiException(ErrorKind.CONFLICT, "MEMBER_NOT_REMOVED", "此成員並非被移出狀態");
         }
-        target.setStatus(MemberStatus.LEFT);
+        target.allowRejoin();
         familyMemberRepository.update(target);
         return target;
     }
@@ -165,7 +160,7 @@ public class FamilyService implements FamilyAccess {
     // 一般成員可編輯自己的顯示名稱；管理者可編輯群組內任何成員的顯示名稱
     @Transactional
     public FamilyMember renameMember(Long familyGroupId, Long memberId, Long callerUserId, String displayName) {
-        FamilyMember caller = assertMemberAuthorized(familyGroupId, callerUserId, RequiredRole.ANY_MEMBER);
+        FamilyMember caller = authorize(familyGroupId, callerUserId, RequiredRole.ANY_MEMBER);
         FamilyMember target = familyMemberRepository.findById(memberId)
                 .filter(m -> m.getFamilyGroupId().equals(familyGroupId))
                 .orElseThrow(() -> new ApiException(ErrorKind.NOT_FOUND, "MEMBER_NOT_FOUND", "找不到成員"));
@@ -196,10 +191,8 @@ public class FamilyService implements FamilyAccess {
             newAdmin = requireTransferTarget(familyGroupId, member, newAdminMemberId);
         }
 
-        member.setStatus(newStatus);
-        // 離開者不再持有角色，避免與接任者同時顯示為管理者，或重新加入時帶回管理權限
-        member.setRole(MemberRole.MEMBER);
-        member.setLeftAt(LocalDateTime.now());
+        // 離開者不再持有角色，避免與接任者同時顯示為管理者，或重新加入時帶回管理權限（見 FamilyMember.leave）
+        member.leave(newStatus, LocalDateTime.now());
         familyMemberRepository.update(member);
 
         // FR-018：唯一在職成員離開時，群組自動解散
@@ -212,7 +205,7 @@ public class FamilyService implements FamilyAccess {
         }
 
         if (newAdmin != null) {
-            newAdmin.setRole(MemberRole.ADMIN);
+            newAdmin.promoteToAdmin();
             familyMemberRepository.update(newAdmin);
             return new LeaveResult(newStatus, FamilyGroupStatus.ACTIVE, newAdmin.getId());
         }
@@ -220,11 +213,10 @@ public class FamilyService implements FamilyAccess {
     }
 
     /**
-     * 同進程方法呼叫入口：確認 callerUserId 是否為
-     * familyGroupId 的在職成員，並視需要要求 ADMIN 角色（FR-017、FR-019）。
+     * 內部授權檢查：確認 callerUserId 是否為 familyGroupId 的在職成員，並視需要要求 ADMIN 角色（FR-017、FR-019）。
+     * 對其他模組的唯一入口是 {@link FamilyAccess}（requireMember / requireAdmin）。
      */
-    @Transactional(readOnly = true)
-    public FamilyMember assertMemberAuthorized(Long familyGroupId, Long callerUserId, RequiredRole requiredRole) {
+    private FamilyMember authorize(Long familyGroupId, Long callerUserId, RequiredRole requiredRole) {
         FamilyMember member = familyMemberRepository.findActiveByUserId(callerUserId)
                 .filter(m -> m.getFamilyGroupId().equals(familyGroupId))
                 .orElseThrow(() -> new ApiException(ErrorKind.FORBIDDEN, "NOT_GROUP_MEMBER", "您不是該家庭群組成員"));
@@ -237,29 +229,21 @@ public class FamilyService implements FamilyAccess {
     private String generateUniqueInviteCode() {
         String code;
         do {
-            code = randomCode(INVITE_CODE_LENGTH);
+            code = inviteCodeGenerator.generate();
         } while (familyGroupRepository.findByInviteCode(code).isPresent());
         return code;
-    }
-
-    private String randomCode(int length) {
-        StringBuilder sb = new StringBuilder(length);
-        for (int i = 0; i < length; i++) {
-            sb.append(INVITE_CODE_ALPHABET.charAt(random.nextInt(INVITE_CODE_ALPHABET.length())));
-        }
-        return sb.toString();
     }
 
     @Override
     @Transactional(readOnly = true)
     public MemberRef requireMember(Long familyGroupId, Long callerUserId) {
-        return new MemberRef(assertMemberAuthorized(familyGroupId, callerUserId, RequiredRole.ANY_MEMBER).getId());
+        return new MemberRef(authorize(familyGroupId, callerUserId, RequiredRole.ANY_MEMBER).getId());
     }
 
     @Override
     @Transactional(readOnly = true)
     public MemberRef requireAdmin(Long familyGroupId, Long callerUserId) {
-        return new MemberRef(assertMemberAuthorized(familyGroupId, callerUserId, RequiredRole.ADMIN).getId());
+        return new MemberRef(authorize(familyGroupId, callerUserId, RequiredRole.ADMIN).getId());
     }
 
     @Override
@@ -270,7 +254,7 @@ public class FamilyService implements FamilyAccess {
                 .orElse(GroupState.NOT_FOUND);
     }
 
-    public enum RequiredRole {
+    private enum RequiredRole {
         ANY_MEMBER,
         ADMIN
     }

@@ -1,16 +1,15 @@
 package com.family195home.app.expense.presentation;
 
-import com.family195home.app.shared.PagedResult;
-import com.family195home.app.expense.application.PaymentAccountRepository;
+import com.family195home.app.expense.application.ExpenseService;
+import com.family195home.app.expense.application.PaymentAccountService;
 import com.family195home.app.expense.domain.ExpenseRecord;
-import com.family195home.app.expense.domain.PaymentAccount;
 import com.family195home.app.expense.presentation.dto.CreateExpenseRequest;
 import com.family195home.app.expense.presentation.dto.ExpenseResponse;
 import com.family195home.app.expense.presentation.dto.LockResponse;
 import com.family195home.app.expense.presentation.dto.UpdateExpenseRequest;
-import com.family195home.app.expense.application.ExpenseService;
 import com.family195home.app.family.application.FamilyAccess;
 import com.family195home.app.shared.AuthenticatedUser;
+import com.family195home.app.shared.PagedResult;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -19,34 +18,29 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/expenses")
 public class ExpenseController {
 
     private final ExpenseService expenseService;
+    private final PaymentAccountService paymentAccountService;
     private final FamilyAccess familyAccess;
-    private final PaymentAccountRepository paymentAccountRepository;
 
-    public ExpenseController(ExpenseService expenseService, FamilyAccess familyAccess, PaymentAccountRepository paymentAccountRepository) {
+    public ExpenseController(
+            ExpenseService expenseService, PaymentAccountService paymentAccountService, FamilyAccess familyAccess) {
         this.expenseService = expenseService;
+        this.paymentAccountService = paymentAccountService;
         this.familyAccess = familyAccess;
-        this.paymentAccountRepository = paymentAccountRepository;
     }
 
     @PostMapping
     public ResponseEntity<ExpenseResponse> create(
             @AuthenticationPrincipal AuthenticatedUser caller, @Valid @RequestBody CreateExpenseRequest request) {
         FamilyAccess.MemberRef member = familyAccess.requireMember(request.familyGroupId(), caller.userId());
-        LocalDateTime occurredAt = request.occurredAt() != null && !request.occurredAt().isBlank()
-                ? LocalDateTime.parse(request.occurredAt())
-                : null;
         ExpenseRecord record = expenseService.create(
-                request.familyGroupId(), member.memberId(), request.paymentAccountId(), request.amount(), request.note(), occurredAt);
+                request.familyGroupId(), member.memberId(), request.paymentAccountId(), request.amount(), request.note(), request.occurredAt());
         return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(record));
     }
 
@@ -63,11 +57,10 @@ public class ExpenseController {
         // FR-017：家庭範圍隔離，呼叫者須為該家庭群組成員，否則回傳 403
         familyAccess.requireMember(familyGroupId, caller.userId());
         // 帳戶名稱整個群組只查一次（避免每筆紀錄各查一次 N+1）
-        Map<Long, String> accountNames = paymentAccountRepository.findByGroupId(familyGroupId, null).stream()
-                .collect(Collectors.toMap(PaymentAccount::getId, PaymentAccount::getName));
+        Map<Long, String> accountNames = paymentAccountService.nameById(familyGroupId);
         PagedResult<ExpenseResponse> responses = expenseService
                 .listPage(familyGroupId, paymentAccountId, authorMemberId, startDate, endDate, page, size)
-                .map(record -> toResponse(record, accountNames::get));
+                .map(record -> toResponse(record, accountNames));
         return ResponseEntity.ok(responses);
     }
 
@@ -77,11 +70,8 @@ public class ExpenseController {
             @PathVariable Long expenseId,
             @RequestParam Long familyGroupId,
             @Valid @RequestBody UpdateExpenseRequest request) {
-        LocalDateTime occurredAt = request.occurredAt() != null && !request.occurredAt().isBlank()
-                ? LocalDateTime.parse(request.occurredAt())
-                : null;
         ExpenseRecord record = expenseService.update(
-                familyGroupId, expenseId, caller.userId(), request.paymentAccountId(), request.amount(), request.note(), occurredAt);
+                familyGroupId, expenseId, caller.userId(), request.paymentAccountId(), request.amount(), request.note(), request.occurredAt());
         return ResponseEntity.ok(toResponse(record));
     }
 
@@ -112,14 +102,14 @@ public class ExpenseController {
     }
 
     private ExpenseResponse toResponse(ExpenseRecord record) {
-        return toResponse(record, id -> paymentAccountRepository.findById(id).map(PaymentAccount::getName).orElse(null));
+        return toResponse(record, paymentAccountService.nameById(record.getFamilyGroupId()));
     }
 
-    private ExpenseResponse toResponse(ExpenseRecord record, Function<Long, String> accountNameLookup) {
+    private ExpenseResponse toResponse(ExpenseRecord record, Map<Long, String> accountNames) {
         boolean locked = expenseService.isCurrentlyLocked(record);
         return new ExpenseResponse(
                 record.getId(), record.getAmount(), record.getNote(), record.getOccurredAt(),
-                record.getPaymentAccountId(), accountNameLookup.apply(record.getPaymentAccountId()),
+                record.getPaymentAccountId(), accountNames.get(record.getPaymentAccountId()),
                 record.getAuthorMemberId(), locked);
     }
 }

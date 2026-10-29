@@ -42,6 +42,12 @@ class ExpenseServiceTest {
         stubAccount(200L, 10L, PaymentAccountStatus.ACTIVE);
     }
 
+    @Test
+    void create_rejectsAmountOutOfIntRange() {
+        assertThatThrownBy(() -> expenseService.create(10L, 1L, 100L, new BigDecimal("3000000000"), "太大", null))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("AMOUNT_OUT_OF_RANGE"));
+    }
+
     private void stubAccount(Long id, Long groupId, PaymentAccountStatus status) {
         PaymentAccount account = new PaymentAccount(1L, groupId, "帳戶", status, LocalDateTime.now());
         account.setId(id);

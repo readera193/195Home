@@ -10,7 +10,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 支付帳戶為群組層級，新增／改名／停用／啟用／刪除一律限該群組管理者（FR-003、FR-022）。
@@ -50,6 +52,13 @@ public class PaymentAccountService {
     @Transactional(readOnly = true)
     public List<PaymentAccount> list(Long familyGroupId, PaymentAccountStatus status) {
         return paymentAccountRepository.findByGroupId(familyGroupId, status);
+    }
+
+    /** 群組內「帳戶 id → 名稱」對照（含已停用帳戶），供列表一次查出帳戶名稱避免 N+1。 */
+    @Transactional(readOnly = true)
+    public Map<Long, String> nameById(Long familyGroupId) {
+        return paymentAccountRepository.findByGroupId(familyGroupId, null).stream()
+                .collect(Collectors.toMap(PaymentAccount::getId, PaymentAccount::getName));
     }
 
     // FR-022：從未被支出紀錄使用的帳戶才可真正刪除

@@ -43,6 +43,7 @@ public class ExpenseService {
     }
 
     // FR-004, FR-005, FR-006, FR-016, FR-018
+    @Transactional
     public ExpenseRecord create(Long familyGroupId, Long authorMemberId, Long paymentAccountId, BigDecimal amount, String note, LocalDateTime occurredAt) {
         var groupState = familyAccess.groupState(familyGroupId);
         if (groupState == FamilyAccess.GroupState.NOT_FOUND) {
@@ -106,6 +107,7 @@ public class ExpenseService {
     }
 
     // FR-027：條件式 UPDATE 取得鎖，5 分鐘 TTL（見 research.md 決策 3）
+    @Transactional
     public ExpenseRecord lock(Long familyGroupId, Long expenseId, Long callerMemberId) {
         ExpenseRecord target = findRequired(expenseId);
         if (!familyGroupId.equals(target.getFamilyGroupId())) {
@@ -160,6 +162,7 @@ public class ExpenseService {
         return record;
     }
 
+    @Transactional
     public void delete(Long familyGroupId, Long expenseId, Long callerUserId) {
         ExpenseRecord record = requireRecordInGroup(familyGroupId, expenseId, callerUserId);
         requireLockHeldByCaller(record, familyGroupId, callerUserId);
@@ -201,6 +204,10 @@ public class ExpenseService {
         if (amount.stripTrailingZeros().scale() > 0) {
             throw new ApiException(ErrorKind.BAD_REQUEST, "AMOUNT_MUST_BE_INTEGER", "金額必須為整數，不支援小數點");
         }
-        return amount.intValueExact();
+        try {
+            return amount.intValueExact();
+        } catch (ArithmeticException e) {
+            throw new ApiException(ErrorKind.BAD_REQUEST, "AMOUNT_OUT_OF_RANGE", "金額超出可記錄的範圍");
+        }
     }
 }

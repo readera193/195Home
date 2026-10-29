@@ -30,7 +30,7 @@ class FamilyServiceTest {
         familyGroupRepository = mock(FamilyGroupRepository.class);
         familyMemberRepository = mock(FamilyMemberRepository.class);
         userRepository = mock(UserRepository.class);
-        familyService = new FamilyService(familyGroupRepository, familyMemberRepository, userRepository);
+        familyService = new FamilyService(familyGroupRepository, familyMemberRepository, userRepository, new InviteCodeGenerator());
     }
 
     @Test
@@ -291,32 +291,32 @@ class FamilyServiceTest {
     }
 
     @Test
-    void assertMemberAuthorized_anyMember_rejectsNonMember() {
+    void requireMember_rejectsNonMember() {
         // FR-017
         when(familyMemberRepository.findActiveByUserId(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> familyService.assertMemberAuthorized(10L, 99L, FamilyService.RequiredRole.ANY_MEMBER))
+        assertThatThrownBy(() -> familyService.requireMember(10L, 99L))
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("NOT_GROUP_MEMBER"));
     }
 
     @Test
-    void assertMemberAuthorized_admin_rejectsRegularMember() {
+    void requireAdmin_rejectsRegularMember() {
         // FR-019
         FamilyMember member = activeMember(1L, 10L, MemberRole.MEMBER);
         when(familyMemberRepository.findActiveByUserId(member.getUserId())).thenReturn(Optional.of(member));
 
-        assertThatThrownBy(() -> familyService.assertMemberAuthorized(10L, member.getUserId(), FamilyService.RequiredRole.ADMIN))
+        assertThatThrownBy(() -> familyService.requireAdmin(10L, member.getUserId()))
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("NOT_GROUP_ADMIN"));
     }
 
     @Test
-    void assertMemberAuthorized_admin_allowsAdmin() {
+    void requireAdmin_allowsAdmin() {
         FamilyMember admin = activeMember(1L, 10L, MemberRole.ADMIN);
         when(familyMemberRepository.findActiveByUserId(admin.getUserId())).thenReturn(Optional.of(admin));
 
-        FamilyMember result = familyService.assertMemberAuthorized(10L, admin.getUserId(), FamilyService.RequiredRole.ADMIN);
+        FamilyAccess.MemberRef result = familyService.requireAdmin(10L, admin.getUserId());
 
-        assertThat(result).isEqualTo(admin);
+        assertThat(result.memberId()).isEqualTo(admin.getId());
     }
 
     @Test
