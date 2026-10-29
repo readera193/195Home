@@ -4,6 +4,8 @@
 #   prod → 正式環境（Northflank），機密一律由環境變數 / Secret Group 提供，缺少時啟動即失敗
 server:
   port: 8080
+  # 部署於反向代理（Northflank）後方，還原真實用戶端 IP 供 Demo 登入限流使用
+  forward-headers-strategy: framework
 
 spring:
   application:

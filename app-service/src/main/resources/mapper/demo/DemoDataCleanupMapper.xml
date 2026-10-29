@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.family195home.app.demo.DemoDataCleanupMapper">
+
+    <select id="selectExpiredDemoGroupIds" resultType="long">
+        SELECT g.id FROM family_groups g
+        WHERE g.created_at &lt; #{cutoff}
+          AND NOT EXISTS (
+              SELECT 1 FROM family_members m
+              JOIN users u ON u.id = m.user_id
+              WHERE m.family_group_id = g.id AND u.line_user_id NOT LIKE CONCAT(#{prefix}, '%'))
+        ORDER BY g.id
+        LIMIT #{limit}
+    </select>
+
+    <delete id="deleteExpensesByGroupIds">
+        DELETE FROM expense_records WHERE family_group_id IN
+        <foreach collection="groupIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </delete>
+
+    <delete id="deletePaymentAccountsByGroupIds">
+        DELETE FROM payment_accounts WHERE family_group_id IN
+        <foreach collection="groupIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </delete>
+
+    <delete id="deleteMembersByGroupIds">
+        DELETE FROM family_members WHERE family_group_id IN
+        <foreach collection="groupIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </delete>
+
+    <delete id="deleteGroupsByIds">
+        DELETE FROM family_groups WHERE id IN
+        <foreach collection="groupIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </delete>
+
+    <delete id="deleteOrphanDemoUsers">
+        DELETE FROM users
+        WHERE line_user_id LIKE CONCAT(#{prefix}, '%')
+          AND created_at &lt; #{cutoff}
+          AND NOT EXISTS (SELECT 1 FROM family_members m WHERE m.user_id = users.id)
+    </delete>
+
+</mapper>

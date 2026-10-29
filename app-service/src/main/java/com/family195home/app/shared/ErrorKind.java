@@ -12,5 +12,6 @@ public enum ErrorKind {
     NOT_FOUND,
     CONFLICT,
     GONE,
+    TOO_MANY_REQUESTS,
     INTERNAL
 }

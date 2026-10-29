@@ -1,5 +1,6 @@
 package com.family195home.app.family.presentation;
 
+import com.family195home.app.demo.DemoLoginRateLimiter;
 import com.family195home.app.demo.DemoLoginService;
 import com.family195home.app.family.application.UserService;
 import com.family195home.app.family.presentation.dto.AuthConfigResponse;
@@ -7,6 +8,7 @@ import com.family195home.app.family.presentation.dto.LoginRequest;
 import com.family195home.app.family.presentation.dto.LoginResponse;
 import com.family195home.app.shared.ApiException;
 import com.family195home.app.shared.ErrorKind;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -24,14 +26,17 @@ public class UserController {
 
     private final UserService userService;
     private final DemoLoginService demoLoginService;
+    private final DemoLoginRateLimiter demoLoginRateLimiter;
     private final boolean demoLoginEnabled;
 
     public UserController(
             UserService userService,
             DemoLoginService demoLoginService,
+            DemoLoginRateLimiter demoLoginRateLimiter,
             @Value("${app.demo-login.enabled:false}") boolean demoLoginEnabled) {
         this.userService = userService;
         this.demoLoginService = demoLoginService;
+        this.demoLoginRateLimiter = demoLoginRateLimiter;
         this.demoLoginEnabled = demoLoginEnabled;
     }
 
@@ -47,10 +52,11 @@ public class UserController {
 
     // Demo 體驗登入：無需輸入，僅在 app.demo-login.enabled=true 時可用
     @PostMapping("/demo")
-    public ResponseEntity<LoginResponse> loginAsDemo() {
+    public ResponseEntity<LoginResponse> loginAsDemo(HttpServletRequest request) {
         if (!demoLoginEnabled) {
             throw new ApiException(ErrorKind.NOT_FOUND, "DEMO_LOGIN_DISABLED", "Demo 體驗未開啟");
         }
+        demoLoginRateLimiter.acquire(request.getRemoteAddr());
         return ResponseEntity.ok(toResponse(demoLoginService.login()));
     }
 
