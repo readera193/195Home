@@ -171,6 +171,15 @@ cd frontend && npm ci && npm run lint && npm test
 
 詳見 [quickstart.md](specs/001-family-expense-tracking/quickstart.md)。
 
+## 已知限制與取捨
+
+- **併發的「先查後寫」**：加入／建立群組、群組名稱與邀請碼都是先查再寫，併發時可能漏過檢查；資料庫的唯一約束會兜底，並由 `GlobalExceptionHandler` 把 `DuplicateKeyException` 轉成 409。尚未對「每位使用者同時只能有一個在職成員身分」建立資料庫層約束。
+- **編輯鎖為樂觀機制**：以條件式 `UPDATE` 取得鎖（5 分鐘 TTL），不使用分散式鎖；適合單一資料庫的家庭規模，無法防止鎖逾時後的覆寫。
+- **分頁使用 `OFFSET`**：家庭資料量下足夠，資料量大時應改用 keyset 分頁。
+- **Demo 限流為記憶體計數**：重啟會歸零、多實例不共用，目前單一實例已足夠。
+- **Token 存在 `localStorage`**：容易受 XSS 影響，但改用 HttpOnly Cookie 需另行處理 CSRF，對此規模屬過度設計。
+- **程式碼格式**：後端以 spotless 檢查未使用 import、行尾空白與結尾換行（`./mvnw spotless:apply` 可自動修正），不強制 google-java-format 以維持既有風格。
+
 ## 目錄結構
 
 ```text
