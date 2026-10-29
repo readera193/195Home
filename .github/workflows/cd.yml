@@ -65,23 +65,22 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             VITE_LINE_CHANNEL_ID=${{ vars.LINE_LOGIN_CHANNEL_ID }}
-
-  # 注意：實際設定 Northflank 專案時，請對照 Northflank API 文件確認觸發重新部署的
-  # 端點路徑與所需 secrets（NORTHFLANK_API_TOKEN、NORTHFLANK_PROJECT_ID、
-  # NORTHFLANK_APP_SERVICE_ID、NORTHFLANK_NOTIFICATION_SERVICE_ID）是否與下方一致，
-  # 必要時改用 Northflank 官方 CLI（northflank）取代直接呼叫 REST API。
+  # 以 Northflank API 重啟服務（POST .../services/{id}/restart），所需 secrets：NORTHFLANK_API_TOKEN、
+  # NORTHFLANK_PROJECT_ID、NORTHFLANK_APP_SERVICE_ID、NORTHFLANK_NOTIFICATION_SERVICE_ID。
+  # 注意：重啟是否會重新拉取 latest 這個 tag 的新 image 取決於服務的 image 拉取設定，
+  # 若新版沒有生效，請改用 redeploy 或調整拉取策略。
   deploy-to-northflank:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
       # --fail-with-body：端點回 4xx/5xx 時讓 step 失敗並印出回應內容，避免部署失敗卻顯示綠燈
-      - name: Trigger Northflank redeploy - app-service
+      - name: Trigger Northflank restart - app-service
         run: |
           curl --fail-with-body -X POST \
             -H "Authorization: Bearer ${{ secrets.NORTHFLANK_API_TOKEN }}" \
-            "https://api.northflank.com/v1/projects/${{ secrets.NORTHFLANK_PROJECT_ID }}/services/${{ secrets.NORTHFLANK_APP_SERVICE_ID }}/redeploy"
-      - name: Trigger Northflank redeploy - notification-service
+            "https://api.northflank.com/v1/projects/${{ secrets.NORTHFLANK_PROJECT_ID }}/services/${{ secrets.NORTHFLANK_APP_SERVICE_ID }}/restart"
+      - name: Trigger Northflank restart - notification-service
         run: |
           curl --fail-with-body -X POST \
             -H "Authorization: Bearer ${{ secrets.NORTHFLANK_API_TOKEN }}" \
-            "https://api.northflank.com/v1/projects/${{ secrets.NORTHFLANK_PROJECT_ID }}/services/${{ secrets.NORTHFLANK_NOTIFICATION_SERVICE_ID }}/redeploy"
+            "https://api.northflank.com/v1/projects/${{ secrets.NORTHFLANK_PROJECT_ID }}/services/${{ secrets.NORTHFLANK_NOTIFICATION_SERVICE_ID }}/restart"
