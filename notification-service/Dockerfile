@@ -12,4 +12,9 @@ EXPOSE 8081
 # 預設為正式環境設定：機密與連線資訊須由環境變數提供，缺少時啟動失敗（docker-compose 會覆寫為 dev）
 ENV SPRING_PROFILES_ACTIVE=prod
 ENV JAVA_TOOL_OPTIONS="-Duser.timezone=Asia/Taipei"
+# 非 root 執行，並以 actuator health 供容器平台判斷存活
+RUN addgroup -S app && adduser -S app -G app
+USER app
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD wget -qO- http://localhost:8081/actuator/health || exit 1
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
