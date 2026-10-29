@@ -39,6 +39,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/auth/line", "/api/auth/demo").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/config").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                        // 內部 API 僅限持有 X-Internal-Token 的服務（InternalTokenFilter 授予 ROLE_INTERNAL），一般使用者 JWT 不可呼叫
+                        .requestMatchers("/api/internal/**").hasRole("INTERNAL")
                         .requestMatchers("/api/**").authenticated()
                         // 前端靜態檔案（打包進 src/main/resources/static），同源無需驗證
                         .anyRequest().permitAll())

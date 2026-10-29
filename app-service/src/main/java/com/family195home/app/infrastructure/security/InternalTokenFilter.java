@@ -12,6 +12,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.List;
 
 /**
@@ -23,10 +25,10 @@ public class InternalTokenFilter extends OncePerRequestFilter {
 
     private static final String HEADER_NAME = "X-Internal-Token";
 
-    private final String expectedToken;
+    private final byte[] expectedBytes;
 
     public InternalTokenFilter(@Value("${app.internal.token}") String expectedToken) {
-        this.expectedToken = expectedToken;
+        this.expectedBytes = expectedToken.getBytes(StandardCharsets.UTF_8);
     }
 
     @Override
@@ -35,7 +37,8 @@ public class InternalTokenFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         if (path.startsWith("/api/internal/")) {
             String header = request.getHeader(HEADER_NAME);
-            if (expectedToken.equals(header)) {
+            // 常數時間比較，避免以回應時間差推測密鑰（與 notification-service 的 InternalTokenInterceptor 一致）
+            if (header != null && MessageDigest.isEqual(expectedBytes, header.getBytes(StandardCharsets.UTF_8))) {
                 var authentication = new UsernamePasswordAuthenticationToken(
                         "internal-service", null, List.of(new SimpleGrantedAuthority("ROLE_INTERNAL")));
                 SecurityContextHolder.getContext().setAuthentication(authentication);
