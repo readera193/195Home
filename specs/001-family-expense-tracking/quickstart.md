@@ -90,7 +90,7 @@ cd frontend && npm ci && npm run lint && npm test
 1. 於 Northflank 建立專案，開通 1 個免費 MySQL database（建立 `appdb`、`notificationdb` 兩個 schema）
 2. 建立 2 個 Northflank service：`app-service`、`notification-service`，各自設定對應的 GHCR 映像檔來源
 3. 於 Northflank 設定各服務所需環境變數（`DB_HOST`、`DB_USERNAME`、`DB_PASSWORD`、`JWT_SECRET`、`INTERNAL_TOKEN`、`APP_SERVICE_BASE_URL`、`LINE_CHANNEL_TOKEN`、`LINE_CHANNEL_SECRET`、`LINE_LOGIN_CHANNEL_ID`、`LINE_LOGIN_CHANNEL_SECRET`、`LINE_LOGIN_REDIRECT_URI` 等，見 [research.md](./research.md) 決策 5、7）；映像檔預設 `SPRING_PROFILES_ACTIVE=prod`，缺少必要環境變數時服務會啟動失敗，屬預期行為；`LINE_LOGIN_REDIRECT_URI` 須為 `<網站網址>/login/callback` 並登錄於 LINE Developers Console，且 GitHub Actions variable `LINE_LOGIN_CHANNEL_ID` 需設定，前端才會啟用真實 LINE 登入（見 research.md 決策 7）
-4. GitHub Actions CD pipeline（`.github/workflows/cd.yml`）於 push 到主分支時建置映像檔、推送至 GHCR，並觸發 Northflank 兩個 service 重新部署最新映像檔
+4. GitHub Actions CD pipeline（`.github/workflows/cd.yml`）於主分支的 CI 成功後建置映像檔、推送至 GHCR，並觸發 Northflank 兩個 service 重新部署最新映像檔
 
 ## 停止與清除（本機開發）
 

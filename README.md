@@ -167,7 +167,7 @@ cd frontend && npm ci && npm run lint && npm test
 1. 於 Northflank 建立專案，開通 1 個免費 MySQL database，建立 `appdb`、`notificationdb` 兩個 schema
 2. 建立 2 個 Northflank service：`app-service`、`notification-service`，各自設定對應的映像檔來源（GHCR）
 3. 設定各服務所需環境變數：資料庫連線資訊、`JWT_SECRET`、`INTERNAL_TOKEN`、LINE Login 的 `LINE_LOGIN_CHANNEL_ID`、`LINE_LOGIN_CHANNEL_SECRET`、`LINE_LOGIN_REDIRECT_URI`（須為 `<網站網址>/login/callback`，並登錄於 LINE Developers Console 的 Callback URL）、`DEMO_LOGIN_ENABLED=true`（要開放 Demo 體驗時）、`LINE_CHANNEL_TOKEN`、`LINE_CHANNEL_SECRET`、`APP_SERVICE_BASE_URL`（notification-service 指向 app-service 的 Northflank 內部網域）
-4. 於 GitHub repo 設定 Actions variable `LINE_LOGIN_CHANNEL_ID`（公開資訊，建置前端時內嵌為 `VITE_LINE_CHANNEL_ID`）。`.github/workflows/cd.yml` 於 push 到 `main` 分支時建置映像檔、推送至 GHCR，並觸發 Northflank 兩個 service 重新部署（實際觸發方式請對照 Northflank API/CLI 文件核實）
+4. 於 GitHub repo 設定 Actions variable `LINE_LOGIN_CHANNEL_ID`（公開資訊，建置前端時內嵌為 `VITE_LINE_CHANNEL_ID`）。`.github/workflows/cd.yml` 於 `main` 分支的 CI 成功後（workflow_run）建置映像檔（`latest` 與 `sha-<commit>` tag）、推送至 GHCR，並觸發 Northflank 兩個 service 重新部署（實際觸發方式請對照 Northflank API/CLI 文件核實）
 
 詳見 [quickstart.md](specs/001-family-expense-tracking/quickstart.md)。
 
