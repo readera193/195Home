@@ -1,11 +1,11 @@
 name: CD
 
-# 僅在 main 分支的 CI 成功後才發布；CI 失敗不會部署
+# 僅在 master 分支的 CI 成功後才發布；CI 失敗不會部署
 on:
   workflow_run:
     workflows: [CI]
     types: [completed]
-    branches: [main]
+    branches: [master]
 
 env:
   REGISTRY: ghcr.io
@@ -36,7 +36,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # 部署通過 CI 的那個 commit，而非 workflow 觸發當下 main 的最新狀態
+          # 部署通過 CI 的那個 commit，而非 workflow 觸發當下 master 的最新狀態
           ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Log in to GHCR
