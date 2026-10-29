@@ -4,6 +4,8 @@ import com.family195home.app.shared.ApiException;
 import com.family195home.app.shared.ErrorKind;
 import com.family195home.app.shared.PagedResult;
 import com.family195home.app.expense.domain.ExpenseRecord;
+import com.family195home.app.expense.domain.PaymentAccount;
+import com.family195home.app.expense.domain.PaymentAccountStatus;
 import com.family195home.app.family.application.FamilyAccess;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -25,14 +27,17 @@ public class ExpenseService {
     public static final int MAX_PAGE_SIZE = 100;
 
     private final ExpenseRecordRepository expenseRecordRepository;
+    private final PaymentAccountRepository paymentAccountRepository;
     private final FamilyAccess familyAccess;
     private final long lockTtlMinutes;
 
     public ExpenseService(
             ExpenseRecordRepository expenseRecordRepository,
+            PaymentAccountRepository paymentAccountRepository,
             FamilyAccess familyAccess,
             @Value("${app.expense-lock.ttl-minutes}") long lockTtlMinutes) {
         this.expenseRecordRepository = expenseRecordRepository;
+        this.paymentAccountRepository = paymentAccountRepository;
         this.familyAccess = familyAccess;
         this.lockTtlMinutes = lockTtlMinutes;
     }
@@ -53,6 +58,7 @@ public class ExpenseService {
         if (paymentAccountId == null) {
             throw new ApiException(ErrorKind.BAD_REQUEST, "PAYMENT_ACCOUNT_REQUIRED", "支付帳戶為必填欄位");
         }
+        requireUsableAccount(familyGroupId, paymentAccountId);
 
         ExpenseRecord record = new ExpenseRecord();
         record.setFamilyGroupId(familyGroupId);
@@ -100,7 +106,11 @@ public class ExpenseService {
     }
 
     // FR-027：條件式 UPDATE 取得鎖，5 分鐘 TTL（見 research.md 決策 3）
-    public ExpenseRecord lock(Long expenseId, Long callerMemberId) {
+    public ExpenseRecord lock(Long familyGroupId, Long expenseId, Long callerMemberId) {
+        ExpenseRecord target = findRequired(expenseId);
+        if (!familyGroupId.equals(target.getFamilyGroupId())) {
+            throw new ApiException(ErrorKind.FORBIDDEN, "EXPENSE_NOT_IN_GROUP", "此支出紀錄不屬於該家庭群組");
+        }
         LocalDateTime now = LocalDateTime.now();
         int updated = expenseRecordRepository.tryLock(expenseId, callerMemberId, now, lockTtlMinutes);
         if (updated == 0) {
@@ -133,6 +143,10 @@ public class ExpenseService {
     public ExpenseRecord update(Long familyGroupId, Long expenseId, Long callerUserId, Long paymentAccountId, BigDecimal amount, String note, LocalDateTime occurredAt) {
         ExpenseRecord record = requireRecordInGroup(familyGroupId, expenseId, callerUserId);
         requireLockHeldByCaller(record, familyGroupId, callerUserId);
+        // 沿用原帳戶時不重新檢查狀態，讓歷史紀錄在帳戶停用後仍可編輯其他欄位
+        if (!paymentAccountId.equals(record.getPaymentAccountId())) {
+            requireUsableAccount(familyGroupId, paymentAccountId);
+        }
 
         record.setPaymentAccountId(paymentAccountId);
         record.setAmount(toIntegerAmount(amount));
@@ -167,6 +181,18 @@ public class ExpenseService {
         FamilyAccess.MemberRef caller = familyAccess.requireMember(familyGroupId, callerUserId);
         if (record.getLockedByMemberId() == null || !record.getLockedByMemberId().equals(caller.memberId())) {
             throw new ApiException(ErrorKind.FORBIDDEN, "LOCK_NOT_HELD_BY_CALLER", "請先取得編輯鎖定後再操作");
+        }
+    }
+
+    // FR-003、FR-022：支付帳戶須存在、屬於同一群組且為啟用狀態；他組帳戶視為授權問題回傳 403
+    private void requireUsableAccount(Long familyGroupId, Long paymentAccountId) {
+        PaymentAccount account = paymentAccountRepository.findById(paymentAccountId)
+                .orElseThrow(() -> new ApiException(ErrorKind.NOT_FOUND, "ACCOUNT_NOT_FOUND", "找不到支付帳戶"));
+        if (!familyGroupId.equals(account.getFamilyGroupId())) {
+            throw new ApiException(ErrorKind.FORBIDDEN, "ACCOUNT_NOT_IN_GROUP", "此支付帳戶不屬於該家庭群組");
+        }
+        if (account.getStatus() != PaymentAccountStatus.ACTIVE) {
+            throw new ApiException(ErrorKind.CONFLICT, "ACCOUNT_DISABLED", "此支付帳戶已停用，無法使用");
         }
     }
 

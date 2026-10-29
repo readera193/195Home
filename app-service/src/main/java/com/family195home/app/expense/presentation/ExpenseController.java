@@ -100,7 +100,7 @@ public class ExpenseController {
             @PathVariable Long expenseId,
             @RequestParam Long familyGroupId) {
         FamilyAccess.MemberRef member = familyAccess.requireMember(familyGroupId, caller.userId());
-        ExpenseRecord record = expenseService.lock(expenseId, member.memberId());
+        ExpenseRecord record = expenseService.lock(familyGroupId, expenseId, member.memberId());
         return ResponseEntity.ok(new LockResponse(record.getId(), record.getLockedByMemberId(), record.getLockedAt()));
     }
 

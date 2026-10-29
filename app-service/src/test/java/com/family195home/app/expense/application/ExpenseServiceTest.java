@@ -4,6 +4,8 @@ import com.family195home.app.shared.ApiException;
 import com.family195home.app.shared.ErrorKind;
 import com.family195home.app.shared.PagedResult;
 import com.family195home.app.expense.domain.ExpenseRecord;
+import com.family195home.app.expense.domain.PaymentAccount;
+import com.family195home.app.expense.domain.PaymentAccountStatus;
 import com.family195home.app.family.domain.FamilyMember;
 import com.family195home.app.family.domain.MemberRole;
 import com.family195home.app.family.domain.MemberStatus;
@@ -25,15 +27,90 @@ import static org.mockito.Mockito.*;
 class ExpenseServiceTest {
 
     private ExpenseRecordRepository expenseRecordRepository;
+    private PaymentAccountRepository paymentAccountRepository;
     private FamilyAccess familyAccess;
     private ExpenseService expenseService;
 
     @BeforeEach
     void setUp() {
         expenseRecordRepository = mock(ExpenseRecordRepository.class);
+        paymentAccountRepository = mock(PaymentAccountRepository.class);
         familyAccess = mock(FamilyAccess.class);
-        expenseService = new ExpenseService(expenseRecordRepository, familyAccess, 5L);
+        expenseService = new ExpenseService(expenseRecordRepository, paymentAccountRepository, familyAccess, 5L);
         when(familyAccess.groupState(10L)).thenReturn(FamilyAccess.GroupState.ACTIVE);
+        stubAccount(100L, 10L, PaymentAccountStatus.ACTIVE);
+        stubAccount(200L, 10L, PaymentAccountStatus.ACTIVE);
+    }
+
+    private void stubAccount(Long id, Long groupId, PaymentAccountStatus status) {
+        PaymentAccount account = new PaymentAccount(1L, groupId, "帳戶", status, LocalDateTime.now());
+        account.setId(id);
+        when(paymentAccountRepository.findById(id)).thenReturn(Optional.of(account));
+    }
+
+    @Test
+    void create_rejectsAccountFromAnotherGroup() {
+        stubAccount(300L, 99L, PaymentAccountStatus.ACTIVE);
+
+        assertThatThrownBy(() -> expenseService.create(10L, 1L, 300L, BigDecimal.TEN, "備註", null))
+                .isInstanceOfSatisfying(ApiException.class, e -> {
+                    assertThat(e.getCode()).isEqualTo("ACCOUNT_NOT_IN_GROUP");
+                    assertThat(e.getKind()).isEqualTo(ErrorKind.FORBIDDEN);
+                });
+        verify(expenseRecordRepository, never()).save(any());
+    }
+
+    @Test
+    void create_rejectsDisabledAccount() {
+        stubAccount(300L, 10L, PaymentAccountStatus.DISABLED);
+
+        assertThatThrownBy(() -> expenseService.create(10L, 1L, 300L, BigDecimal.TEN, "備註", null))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("ACCOUNT_DISABLED"));
+    }
+
+    @Test
+    void create_rejectsUnknownAccount() {
+        assertThatThrownBy(() -> expenseService.create(10L, 1L, 404L, BigDecimal.TEN, "備註", null))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("ACCOUNT_NOT_FOUND"));
+    }
+
+    @Test
+    void update_rejectsSwitchingToAccountFromAnotherGroup() {
+        ExpenseRecord record = expenseRecord(1L, 10L, 100L);
+        record.setPaymentAccountId(100L);
+        record.setLockedByMemberId(2L);
+        record.setLockedAt(LocalDateTime.now());
+        when(expenseRecordRepository.findById(1L)).thenReturn(Optional.of(record));
+        when(familyAccess.requireMember(10L, 5L)).thenReturn(new FamilyAccess.MemberRef(2L));
+        stubAccount(300L, 99L, PaymentAccountStatus.ACTIVE);
+
+        assertThatThrownBy(() -> expenseService.update(10L, 1L, 5L, 300L, BigDecimal.TEN, "備註", null))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("ACCOUNT_NOT_IN_GROUP"));
+        verify(expenseRecordRepository, never()).update(any());
+    }
+
+    @Test
+    void update_allowsKeepingDisabledAccount() {
+        ExpenseRecord record = expenseRecord(1L, 10L, 100L);
+        record.setPaymentAccountId(300L);
+        record.setLockedByMemberId(2L);
+        record.setLockedAt(LocalDateTime.now());
+        when(expenseRecordRepository.findById(1L)).thenReturn(Optional.of(record));
+        when(familyAccess.requireMember(10L, 5L)).thenReturn(new FamilyAccess.MemberRef(2L));
+        stubAccount(300L, 10L, PaymentAccountStatus.DISABLED);
+
+        ExpenseRecord result = expenseService.update(10L, 1L, 5L, 300L, BigDecimal.TEN, "改備註", null);
+
+        assertThat(result.getNote()).isEqualTo("改備註");
+    }
+
+    @Test
+    void lock_rejectsRecordFromAnotherGroup() {
+        when(expenseRecordRepository.findById(1L)).thenReturn(Optional.of(expenseRecord(1L, 99L, 100L)));
+
+        assertThatThrownBy(() -> expenseService.lock(10L, 1L, 2L))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("EXPENSE_NOT_IN_GROUP"));
+        verify(expenseRecordRepository, never()).tryLock(anyLong(), anyLong(), any(), anyLong());
     }
 
     @Test
@@ -83,11 +160,12 @@ class ExpenseServiceTest {
         when(expenseRecordRepository.tryLock(eq(1L), eq(2L), any(), anyLong())).thenReturn(1);
         ExpenseRecord locked = new ExpenseRecord();
         locked.setId(1L);
+        locked.setFamilyGroupId(10L);
         locked.setLockedByMemberId(2L);
         locked.setLockedAt(LocalDateTime.now());
         when(expenseRecordRepository.findById(1L)).thenReturn(Optional.of(locked));
 
-        ExpenseRecord result = expenseService.lock(1L, 2L);
+        ExpenseRecord result = expenseService.lock(10L, 1L, 2L);
 
         assertThat(result.getLockedByMemberId()).isEqualTo(2L);
     }
@@ -95,9 +173,10 @@ class ExpenseServiceTest {
     @Test
     void lock_rejectsWhenAlreadyLockedByOther() {
         // FR-027
+        when(expenseRecordRepository.findById(1L)).thenReturn(Optional.of(expenseRecord(1L, 10L, 100L)));
         when(expenseRecordRepository.tryLock(eq(1L), eq(2L), any(), anyLong())).thenReturn(0);
 
-        assertThatThrownBy(() -> expenseService.lock(1L, 2L))
+        assertThatThrownBy(() -> expenseService.lock(10L, 1L, 2L))
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("RECORD_LOCKED"));
     }
 
