@@ -33,7 +33,7 @@ class MonthlyNotificationSchedulerTest {
         appServiceClient = mock(AppServiceClient.class);
         lineMessageSender = mock(LineMessageSender.class);
         notificationLogRepository = mock(NotificationLogRepository.class);
-        scheduler = new MonthlyNotificationScheduler(appServiceClient, lineMessageSender, notificationLogRepository, 3);
+        scheduler = new MonthlyNotificationScheduler(appServiceClient, lineMessageSender, notificationLogRepository, 3, 0);
 
         when(appServiceClient.getMonthlySummary(any(), any())).thenReturn(
                 new MonthlySummaryView(10L, "2026-09", List.of(new AccountSummaryView(1L, "現金", -350)), -350));
@@ -79,6 +79,34 @@ class MonthlyNotificationSchedulerTest {
         List<NotificationLog> logs = captor.getAllValues();
         assertThat(logs).extracting(NotificationLog::getStatus)
                 .containsExactlyInAnyOrder(NotificationStatus.FAILED, NotificationStatus.SUCCESS);
+    }
+
+    @Test
+    void sendMonthlySummaries_summaryFailureDoesNotAbortRemainingMembers() {
+        // 第一位成員的家庭彙總取得失敗，第二位（另一個家庭）仍須送出
+        LineBindingView first = new LineBindingView(1L, 10L, "line-user-1");
+        LineBindingView second = new LineBindingView(2L, 20L, "line-user-2");
+        when(appServiceClient.findAllBindings()).thenReturn(List.of(first, second));
+        when(appServiceClient.getMonthlySummary(eq(10L), any())).thenThrow(new RuntimeException("app-service down"));
+
+        scheduler.sendMonthlySummaries();
+
+        verify(lineMessageSender).pushText(eq("line-user-2"), any());
+        ArgumentCaptor<NotificationLog> captor = ArgumentCaptor.forClass(NotificationLog.class);
+        verify(notificationLogRepository, times(2)).save(captor.capture());
+        assertThat(captor.getAllValues()).extracting(NotificationLog::getStatus)
+                .containsExactlyInAnyOrder(NotificationStatus.FAILED, NotificationStatus.SUCCESS);
+    }
+
+    @Test
+    void sendMonthlySummaries_sameFamilyFetchesSummaryOnce() {
+        when(appServiceClient.findAllBindings()).thenReturn(List.of(
+                new LineBindingView(1L, 10L, "line-user-1"), new LineBindingView(2L, 10L, "line-user-2")));
+
+        scheduler.sendMonthlySummaries();
+
+        verify(appServiceClient, times(1)).getMonthlySummary(eq(10L), any());
+        verify(lineMessageSender, times(2)).pushText(any(), any());
     }
 
 }

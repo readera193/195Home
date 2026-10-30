@@ -14,6 +14,9 @@ import com.linecorp.bot.model.message.TextMessage;
 import com.linecorp.bot.spring.boot.annotation.EventMapping;
 import com.linecorp.bot.spring.boot.annotation.LineMessageHandler;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
@@ -29,6 +32,7 @@ import java.util.regex.Pattern;
 @LineMessageHandler
 public class LineWebhookController {
 
+    private static final Logger log = LoggerFactory.getLogger(LineWebhookController.class);
     private static final Pattern YEAR_MONTH_PATTERN = Pattern.compile("\\d{4}-\\d{2}");
     private static final String FORMAT_HINT = "請以「YYYY-MM」格式（例如 2026-07）查詢指定月份支出匯總。";
 
@@ -99,6 +103,7 @@ public class LineWebhookController {
             return queryMonthlySummary(month, lineUserId);
         } catch (RuntimeException e) {
             // app-service 呼叫失敗時仍回覆可讀訊息，避免使用者收不到任何回應（FR-014）
+            log.warn("查詢月結匯總失敗，month={}", month, e);
             return "目前無法查詢支出匯總，請稍後再試。";
         }
     }
@@ -127,6 +132,7 @@ public class LineWebhookController {
             lineMessagingClient.replyMessage(new ReplyMessage(replyToken, List.of(new TextMessage(text)))).get();
         } catch (Exception e) {
             // 回覆失敗不影響 Webhook 本身回應 LINE 平台（見 contracts/notification-service.md）
+            log.warn("LINE 回覆訊息失敗", e);
         }
     }
 }

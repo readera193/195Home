@@ -17,7 +17,9 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.ZoneId;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 每月最後一天 23:00 自動推播當月支出匯總（FR-013）。使用 Spring 內建 cron 的 {@code L}
@@ -32,16 +34,19 @@ public class MonthlyNotificationScheduler {
     private final LineMessageSender lineMessageSender;
     private final NotificationLogRepository notificationLogRepository;
     private final int maxRetries;
+    private final long retryBackoffMs;
 
     public MonthlyNotificationScheduler(
             AppServiceClient appServiceClient,
             LineMessageSender lineMessageSender,
             NotificationLogRepository notificationLogRepository,
-            @Value("${app.notification.max-retries}") int maxRetries) {
+            @Value("${app.notification.max-retries}") int maxRetries,
+            @Value("${app.notification.retry-backoff-ms:1000}") long retryBackoffMs) {
         this.appServiceClient = appServiceClient;
         this.lineMessageSender = lineMessageSender;
         this.notificationLogRepository = notificationLogRepository;
         this.maxRetries = maxRetries;
+        this.retryBackoffMs = retryBackoffMs;
     }
 
     @Scheduled(cron = "0 0 23 L * ?", zone = "Asia/Taipei")
@@ -49,14 +54,26 @@ public class MonthlyNotificationScheduler {
         String yearMonth = YearMonth.now(ZoneId.of("Asia/Taipei")).toString();
         List<LineBindingView> bindings = appServiceClient.findAllBindings();
         // 若某家庭當下無任何已綁定 LINE 的成員，該家庭不會出現在 bindings 中，等同自動略過（見 spec.md Edge Cases）
+        // 同一家庭的多位成員共用同一份彙總，避免重複呼叫 app-service
+        Map<Long, String> textByFamily = new HashMap<>();
         for (LineBindingView binding : bindings) {
-            sendToOneMember(binding, yearMonth);
+            try {
+                sendToOneMember(binding, yearMonth, textByFamily);
+            } catch (Exception e) {
+                // FR-013：任一成員的任何失敗（含取得彙總、寫入紀錄）都不得中斷其他成員
+                log.error("月結通知處理失敗，familyMemberId={}", binding.familyMemberId(), e);
+                recordFailure(binding, yearMonth, e.getMessage());
+            }
         }
     }
 
-    private void sendToOneMember(LineBindingView binding, String yearMonth) {
-        MonthlySummaryView summary = appServiceClient.getMonthlySummary(binding.familyGroupId(), yearMonth);
-        String text = MonthlySummaryFormatter.format(summary);
+    private void sendToOneMember(LineBindingView binding, String yearMonth, Map<Long, String> textByFamily) {
+        String text = textByFamily.get(binding.familyGroupId());
+        if (text == null) {
+            MonthlySummaryView summary = appServiceClient.getMonthlySummary(binding.familyGroupId(), yearMonth);
+            text = MonthlySummaryFormatter.format(summary);
+            textByFamily.put(binding.familyGroupId(), text);
+        }
 
         int attempts = 0;
         Exception lastError = null;
@@ -69,10 +86,32 @@ public class MonthlyNotificationScheduler {
             } catch (Exception e) {
                 lastError = e;
                 log.warn("推播月結通知失敗（第 {} 次嘗試），familyMemberId={}", attempts, binding.familyMemberId(), e);
+                if (attempts < maxRetries) {
+                    backoff(attempts);
+                }
             }
         }
         // FR-013：達重試上限仍失敗則記錄錯誤並放棄，不影響其他已綁定成員
         saveLog(binding, yearMonth, NotificationStatus.FAILED, attempts, lastError != null ? lastError.getMessage() : "unknown error");
+    }
+
+    private void backoff(int attempt) {
+        if (retryBackoffMs <= 0) {
+            return;
+        }
+        try {
+            Thread.sleep(retryBackoffMs * attempt);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private void recordFailure(LineBindingView binding, String yearMonth, String errorMessage) {
+        try {
+            saveLog(binding, yearMonth, NotificationStatus.FAILED, 0, errorMessage);
+        } catch (Exception e) {
+            log.error("寫入月結通知失敗紀錄時發生錯誤，familyMemberId={}", binding.familyMemberId(), e);
+        }
     }
 
     private void saveLog(LineBindingView binding, String yearMonth, NotificationStatus status, int attempts, String errorMessage) {
