@@ -15,6 +15,12 @@
 |---|---|
 | ![月結統計](docs/screenshots/06-statistics.png) | ![家庭群組](docs/screenshots/07-family.png) |
 
+支援手機版面（RWD）：
+
+| 支出紀錄（手機） | 家庭群組（手機） |
+|---|---|
+| <img src="docs/screenshots/10-mobile-expenses.png" width="260"> | <img src="docs/screenshots/11-mobile-family.png" width="260"> |
+
 ## 系統架構
 
 ```mermaid
