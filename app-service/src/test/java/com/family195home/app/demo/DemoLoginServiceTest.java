@@ -1,5 +1,6 @@
 package com.family195home.app.demo;
 
+import java.time.Clock;
 import com.family195home.app.expense.application.ExpenseService;
 import com.family195home.app.expense.application.PaymentAccountService;
 import com.family195home.app.expense.domain.PaymentAccount;
@@ -63,7 +64,7 @@ class DemoLoginServiceTest {
             return account;
         });
 
-        UserService.LoginResult result = new DemoLoginService(userService, familyService, accountService, expenseService).login();
+        UserService.LoginResult result = new DemoLoginService(userService, familyService, accountService, expenseService, Clock.systemDefaultZone()).login();
 
         assertThat(result.token()).isEqualTo("jwt");
         verify(accountService, times(5)).create(eq(20L), eq(7L), any());

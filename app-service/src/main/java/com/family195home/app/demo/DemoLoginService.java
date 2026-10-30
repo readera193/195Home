@@ -1,5 +1,6 @@
 package com.family195home.app.demo;
 
+import java.time.Clock;
 import com.family195home.app.expense.application.ExpenseService;
 import com.family195home.app.expense.application.PaymentAccountService;
 import com.family195home.app.expense.domain.PaymentAccount;
@@ -76,16 +77,19 @@ public class DemoLoginService {
     private final FamilyService familyService;
     private final PaymentAccountService paymentAccountService;
     private final ExpenseService expenseService;
+    private final Clock clock;
 
     public DemoLoginService(
             UserService userService,
             FamilyService familyService,
             PaymentAccountService paymentAccountService,
-            ExpenseService expenseService) {
+            ExpenseService expenseService,
+            Clock clock) {
         this.userService = userService;
         this.familyService = familyService;
         this.paymentAccountService = paymentAccountService;
         this.expenseService = expenseService;
+        this.clock = clock;
     }
 
     @Transactional
@@ -107,7 +111,7 @@ public class DemoLoginService {
             accounts[i] = paymentAccountService.create(group.getId(), userId, ACCOUNT_NAMES[i]);
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         ThreadLocalRandom random = ThreadLocalRandom.current();
         LocalDate today = now.toLocalDate();
         // 從上個月 1 日到今天（不產生未來日期），每天隨機 0–MAX_PER_DAY 筆

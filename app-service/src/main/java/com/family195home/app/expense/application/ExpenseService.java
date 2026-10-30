@@ -1,5 +1,6 @@
 package com.family195home.app.expense.application;
 
+import java.time.Clock;
 import com.family195home.app.shared.ApiException;
 import com.family195home.app.shared.ErrorKind;
 import com.family195home.app.shared.PagedResult;
@@ -30,16 +31,19 @@ public class ExpenseService {
     private final PaymentAccountRepository paymentAccountRepository;
     private final FamilyAccess familyAccess;
     private final long lockTtlMinutes;
+    private final Clock clock;
 
     public ExpenseService(
             ExpenseRecordRepository expenseRecordRepository,
             PaymentAccountRepository paymentAccountRepository,
             FamilyAccess familyAccess,
-            @Value("${app.expense-lock.ttl-minutes}") long lockTtlMinutes) {
+            @Value("${app.expense-lock.ttl-minutes}") long lockTtlMinutes,
+            Clock clock) {
         this.expenseRecordRepository = expenseRecordRepository;
         this.paymentAccountRepository = paymentAccountRepository;
         this.familyAccess = familyAccess;
         this.lockTtlMinutes = lockTtlMinutes;
+        this.clock = clock;
     }
 
     // FR-004, FR-005, FR-006, FR-016, FR-018
@@ -67,8 +71,8 @@ public class ExpenseService {
         record.setAuthorMemberId(authorMemberId);
         record.setAmount(intAmount);
         record.setNote(note);
-        record.setOccurredAt(occurredAt != null ? occurredAt : LocalDateTime.now()); // FR-005/FR-006
-        LocalDateTime now = LocalDateTime.now();
+        record.setOccurredAt(occurredAt != null ? occurredAt : LocalDateTime.now(clock)); // FR-005/FR-006
+        LocalDateTime now = LocalDateTime.now(clock);
         record.setCreatedAt(now);
         record.setUpdatedAt(now);
         expenseRecordRepository.save(record);
@@ -113,7 +117,7 @@ public class ExpenseService {
         if (!familyGroupId.equals(target.getFamilyGroupId())) {
             throw new ApiException(ErrorKind.FORBIDDEN, "EXPENSE_NOT_IN_GROUP", "此支出紀錄不屬於該家庭群組");
         }
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         int updated = expenseRecordRepository.tryLock(expenseId, callerMemberId, now, lockTtlMinutes);
         if (updated == 0) {
             throw new ApiException(ErrorKind.CONFLICT, "RECORD_LOCKED", "此紀錄目前正被編輯中，請稍後再試");
@@ -137,7 +141,7 @@ public class ExpenseService {
     }
 
     public boolean isCurrentlyLocked(ExpenseRecord record) {
-        return record.isLocked(LocalDateTime.now(), lockTtlMinutes);
+        return record.isLocked(LocalDateTime.now(clock), lockTtlMinutes);
     }
 
     // FR-019：群組任一在職成員皆可編輯/刪除任何紀錄；FR-027：須已持有鎖
@@ -156,7 +160,7 @@ public class ExpenseService {
         if (occurredAt != null) {
             record.setOccurredAt(occurredAt);
         }
-        record.setUpdatedAt(LocalDateTime.now());
+        record.setUpdatedAt(LocalDateTime.now(clock));
         expenseRecordRepository.update(record);
         expenseRecordRepository.releaseLock(record.getId());
         return record;

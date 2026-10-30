@@ -1,5 +1,6 @@
 package com.family195home.notification.presentation;
 
+import java.time.Clock;
 import com.family195home.notification.infrastructure.client.AppServiceClient;
 import com.family195home.notification.application.dto.AccountSummaryView;
 import com.family195home.notification.application.dto.BindingResult;
@@ -25,7 +26,7 @@ class LineWebhookControllerTest {
     @BeforeEach
     void setUp() {
         appServiceClient = mock(AppServiceClient.class);
-        controller = new LineWebhookController(appServiceClient, mock(LineMessagingClient.class));
+        controller = new LineWebhookController(appServiceClient, mock(LineMessagingClient.class), Clock.systemDefaultZone());
     }
 
     @Test

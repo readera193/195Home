@@ -1,5 +1,6 @@
 package com.family195home.app.family.application;
 
+import java.time.Clock;
 import com.family195home.app.shared.ApiException;
 import com.family195home.app.shared.ErrorKind;
 import com.family195home.app.family.domain.FamilyGroup;
@@ -25,13 +26,15 @@ public class FamilyService implements FamilyAccess {
     private final FamilyMemberRepository familyMemberRepository;
     private final UserRepository userRepository;
     private final InviteCodeGenerator inviteCodeGenerator;
+    private final Clock clock;
 
     public FamilyService(FamilyGroupRepository familyGroupRepository, FamilyMemberRepository familyMemberRepository,
-                         UserRepository userRepository, InviteCodeGenerator inviteCodeGenerator) {
+                         UserRepository userRepository, InviteCodeGenerator inviteCodeGenerator, Clock clock) {
         this.familyGroupRepository = familyGroupRepository;
         this.familyMemberRepository = familyMemberRepository;
         this.userRepository = userRepository;
         this.inviteCodeGenerator = inviteCodeGenerator;
+        this.clock = clock;
     }
 
     // FR-001, FR-026
@@ -41,9 +44,9 @@ public class FamilyService implements FamilyAccess {
         if (familyGroupRepository.existsByName(name)) {
             throw new ApiException(ErrorKind.CONFLICT, "GROUP_NAME_TAKEN", "此家庭群組名稱已被使用");
         }
-        FamilyGroup group = new FamilyGroup(name, FamilyGroupStatus.ACTIVE, generateUniqueInviteCode(), LocalDateTime.now());
+        FamilyGroup group = new FamilyGroup(name, FamilyGroupStatus.ACTIVE, generateUniqueInviteCode(), LocalDateTime.now(clock));
         familyGroupRepository.save(group);
-        FamilyMember admin = new FamilyMember(group.getId(), userId, MemberStatus.ACTIVE, MemberRole.ADMIN, LocalDateTime.now());
+        FamilyMember admin = new FamilyMember(group.getId(), userId, MemberStatus.ACTIVE, MemberRole.ADMIN, LocalDateTime.now(clock));
         familyMemberRepository.save(admin);
         return group;
     }
@@ -71,7 +74,7 @@ public class FamilyService implements FamilyAccess {
             return member;
         }
 
-        FamilyMember member = new FamilyMember(group.getId(), userId, MemberStatus.ACTIVE, MemberRole.MEMBER, LocalDateTime.now());
+        FamilyMember member = new FamilyMember(group.getId(), userId, MemberStatus.ACTIVE, MemberRole.MEMBER, LocalDateTime.now(clock));
         familyMemberRepository.save(member);
         return member;
     }
@@ -192,7 +195,7 @@ public class FamilyService implements FamilyAccess {
         }
 
         // 離開者不再持有角色，避免與接任者同時顯示為管理者，或重新加入時帶回管理權限（見 FamilyMember.leave）
-        member.leave(newStatus, LocalDateTime.now());
+        member.leave(newStatus, LocalDateTime.now(clock));
         familyMemberRepository.update(member);
 
         // FR-018：唯一在職成員離開時，群組自動解散

@@ -1,5 +1,6 @@
 package com.family195home.notification.presentation.scheduler;
 
+import java.time.Clock;
 import com.family195home.notification.application.LineMessageSendException;
 import com.family195home.notification.application.LineMessageSender;
 import com.family195home.notification.application.NotificationLogRepository;
@@ -33,7 +34,7 @@ class MonthlyNotificationSchedulerTest {
         appServiceClient = mock(AppServiceClient.class);
         lineMessageSender = mock(LineMessageSender.class);
         notificationLogRepository = mock(NotificationLogRepository.class);
-        scheduler = new MonthlyNotificationScheduler(appServiceClient, lineMessageSender, notificationLogRepository, 3, 0);
+        scheduler = new MonthlyNotificationScheduler(appServiceClient, lineMessageSender, notificationLogRepository, 3, 0, Clock.systemDefaultZone());
 
         when(appServiceClient.getMonthlySummary(any(), any())).thenReturn(
                 new MonthlySummaryView(10L, "2026-09", List.of(new AccountSummaryView(1L, "現金", -350)), -350));

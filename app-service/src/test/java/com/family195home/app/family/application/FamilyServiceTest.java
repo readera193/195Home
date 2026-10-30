@@ -1,5 +1,6 @@
 package com.family195home.app.family.application;
 
+import java.time.Clock;
 import com.family195home.app.shared.ApiException;
 import com.family195home.app.family.domain.FamilyGroup;
 import com.family195home.app.family.domain.FamilyGroupStatus;
@@ -30,7 +31,7 @@ class FamilyServiceTest {
         familyGroupRepository = mock(FamilyGroupRepository.class);
         familyMemberRepository = mock(FamilyMemberRepository.class);
         userRepository = mock(UserRepository.class);
-        familyService = new FamilyService(familyGroupRepository, familyMemberRepository, userRepository, new InviteCodeGenerator());
+        familyService = new FamilyService(familyGroupRepository, familyMemberRepository, userRepository, new InviteCodeGenerator(), Clock.systemDefaultZone());
     }
 
     @Test

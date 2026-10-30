@@ -1,5 +1,6 @@
 package com.family195home.app.family.application;
 
+import java.time.Clock;
 import com.family195home.app.family.domain.User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,11 +21,13 @@ public class UserService {
     private final UserRepository userRepository;
     private final LineLoginClient lineLoginClient;
     private final TokenIssuer tokenIssuer;
+    private final Clock clock;
 
-    public UserService(UserRepository userRepository, LineLoginClient lineLoginClient, TokenIssuer tokenIssuer) {
+    public UserService(UserRepository userRepository, LineLoginClient lineLoginClient, TokenIssuer tokenIssuer, Clock clock) {
         this.userRepository = userRepository;
         this.lineLoginClient = lineLoginClient;
         this.tokenIssuer = tokenIssuer;
+        this.clock = clock;
     }
 
     // FR-024：以 LINE 身分登入；首次登入自動建立帳號，之後沿用並同步暱稱（已自訂名稱者不覆蓋）
@@ -40,7 +43,7 @@ public class UserService {
                     return existing;
                 })
                 .orElseGet(() -> userRepository.save(
-                        new User(profile.lineUserId(), profile.displayName(), LocalDateTime.now())));
+                        new User(profile.lineUserId(), profile.displayName(), LocalDateTime.now(clock))));
         TokenIssuer.IssuedToken generated = tokenIssuer.issue(user.getId(), user.getDisplayName());
         return new LoginResult(generated.token(), user.getId(), user.getDisplayName(), generated.expiresAt());
     }
@@ -50,7 +53,7 @@ public class UserService {
     public LoginResult loginAsDemo() {
         String suffix = UUID.randomUUID().toString();
         User user = userRepository.save(new User(
-                DEMO_LINE_USER_ID_PREFIX + suffix, DEMO_DISPLAY_NAME, LocalDateTime.now()));
+                DEMO_LINE_USER_ID_PREFIX + suffix, DEMO_DISPLAY_NAME, LocalDateTime.now(clock)));
         TokenIssuer.IssuedToken generated = tokenIssuer.issue(user.getId(), user.getDisplayName());
         return new LoginResult(generated.token(), user.getId(), user.getDisplayName(), generated.expiresAt());
     }
@@ -59,7 +62,7 @@ public class UserService {
     @Transactional
     public User createDemoMember(String displayName) {
         return userRepository.save(new User(
-                DEMO_LINE_USER_ID_PREFIX + UUID.randomUUID(), displayName, LocalDateTime.now()));
+                DEMO_LINE_USER_ID_PREFIX + UUID.randomUUID(), displayName, LocalDateTime.now(clock)));
     }
 
     public record LoginResult(String token, Long userId, String displayName, Instant expiresAt) {

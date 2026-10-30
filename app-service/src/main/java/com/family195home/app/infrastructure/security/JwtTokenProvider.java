@@ -1,5 +1,6 @@
 package com.family195home.app.infrastructure.security;
 
+import java.time.Clock;
 import com.family195home.app.family.application.TokenIssuer;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -24,17 +25,20 @@ public class JwtTokenProvider implements TokenIssuer {
 
     private final SecretKey key;
     private final long expirationMinutes;
+    private final Clock clock;
 
     public JwtTokenProvider(
             @Value("${app.jwt.secret}") String secret,
-            @Value("${app.jwt.expiration-minutes}") long expirationMinutes) {
+            @Value("${app.jwt.expiration-minutes}") long expirationMinutes,
+            Clock clock) {
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expirationMinutes = expirationMinutes;
+        this.clock = clock;
     }
 
     @Override
     public IssuedToken issue(Long userId, String displayName) {
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         Instant expiry = now.plus(expirationMinutes, ChronoUnit.MINUTES);
         String token = Jwts.builder()
                 .subject(String.valueOf(userId))
