@@ -1,5 +1,7 @@
 package com.family195home.app.expense.presentation;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.family195home.app.expense.application.ExpenseService;
 import com.family195home.app.expense.application.PaymentAccountService;
 import com.family195home.app.expense.domain.ExpenseRecord;
@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.Map;
 
+@Tag(name = "支出紀錄", description = "支出的新增、分頁篩選、編輯與刪除；編輯與刪除須先取得編輯鎖")
 @RestController
 @RequestMapping("/api/expenses")
 public class ExpenseController {
@@ -64,6 +67,7 @@ public class ExpenseController {
         return ResponseEntity.ok(responses);
     }
 
+    @Operation(summary = "更新支出", description = "須已持有編輯鎖；成功後自動釋放。更換支付帳戶時帳戶須屬於同群組且為啟用狀態。")
     @PutMapping("/{expenseId}")
     public ResponseEntity<ExpenseResponse> update(
             @AuthenticationPrincipal AuthenticatedUser caller,
@@ -84,6 +88,7 @@ public class ExpenseController {
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(summary = "取得編輯鎖", description = "以條件式 UPDATE 取得 5 分鐘的編輯鎖；紀錄正被他人編輯且鎖未逾時回 409 RECORD_LOCKED。編輯或刪除前必須先呼叫。")
     @PostMapping("/{expenseId}/lock")
     public ResponseEntity<LockResponse> lock(
             @AuthenticationPrincipal AuthenticatedUser caller,
@@ -94,6 +99,7 @@ public class ExpenseController {
         return ResponseEntity.ok(new LockResponse(record.getId(), record.getLockedByMemberId(), record.getLockedAt()));
     }
 
+    @Operation(summary = "釋放編輯鎖", description = "取消編輯時釋放；未鎖定或鎖已逾時視為已釋放（冪等），鎖由他人持有則回 403。")
     @PostMapping("/{expenseId}/unlock")
     public ResponseEntity<Void> unlock(
             @AuthenticationPrincipal AuthenticatedUser caller, @PathVariable Long expenseId) {

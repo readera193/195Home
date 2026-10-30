@@ -1,5 +1,6 @@
 package com.family195home.app.statistics.presentation;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.family195home.app.family.application.FamilyAccess;
 import com.family195home.app.shared.AuthenticatedUser;
 import com.family195home.app.statistics.presentation.dto.MonthlySummaryResponse;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+@Tag(name = "月結統計", description = "依月份彙總各支付帳戶的支出")
 @RestController
 public class StatisticsController {
 

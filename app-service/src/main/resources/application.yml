@@ -44,3 +44,8 @@ app:
     enabled: ${DEMO_LOGIN_ENABLED:false}
   expense-lock:
     ttl-minutes: 5
+
+springdoc:
+  # 只列出對外 API；內部 API 僅供 notification-service 以 X-Internal-Token 呼叫
+  paths-to-match: /api/**
+  paths-to-exclude: /api/internal/**

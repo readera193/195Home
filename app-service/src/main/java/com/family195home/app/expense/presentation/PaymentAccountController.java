@@ -1,5 +1,6 @@
 package com.family195home.app.expense.presentation;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.family195home.app.expense.domain.PaymentAccount;
 import com.family195home.app.expense.domain.PaymentAccountStatus;
 import com.family195home.app.expense.presentation.dto.CreateAccountRequest;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Set;
 
+@Tag(name = "支付帳戶", description = "群組層級的支付帳戶；新增、改名、停用、刪除限管理者")
 @RestController
 @RequestMapping("/api/accounts")
 public class PaymentAccountController {

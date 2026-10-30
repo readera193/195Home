@@ -1,5 +1,6 @@
 package com.family195home.app.family.presentation;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.family195home.app.family.application.UserRepository;
 import com.family195home.app.family.domain.FamilyGroup;
 import com.family195home.app.family.domain.FamilyMember;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Tag(name = "家庭群組", description = "建立／加入群組、成員管理、管理者轉移")
 @RestController
 @RequestMapping("/api/families")
 public class FamilyController {

@@ -1,5 +1,8 @@
 package com.family195home.app.family.presentation;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.family195home.app.demo.DemoLoginRateLimiter;
 import com.family195home.app.demo.DemoLoginService;
 import com.family195home.app.family.application.UserService;
@@ -20,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.format.DateTimeFormatter;
 
+@Tag(name = "認證", description = "LINE 登入與 Demo 體驗登入（無需 token）")
 @RestController
 @RequestMapping("/api/auth")
 public class UserController {
@@ -40,17 +44,20 @@ public class UserController {
         this.demoLoginEnabled = demoLoginEnabled;
     }
 
+    @SecurityRequirements
     @GetMapping("/config")
     public AuthConfigResponse config() {
         return new AuthConfigResponse(demoLoginEnabled);
     }
 
+    @SecurityRequirements
     @PostMapping("/line")
     public ResponseEntity<LoginResponse> loginWithLine(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(toResponse(userService.loginWithLine(request.code())));
     }
 
-    // Demo 體驗登入：無需輸入，僅在 app.demo-login.enabled=true 時可用
+    @Operation(summary = "Demo 體驗登入", description = "一鍵建立隨機帳號與示範資料並回傳 token；僅在 app.demo-login.enabled=true 時可用，每小時限流（每 IP 20 次）。")
+    @SecurityRequirements
     @PostMapping("/demo")
     public ResponseEntity<LoginResponse> loginAsDemo(HttpServletRequest request) {
         if (!demoLoginEnabled) {
