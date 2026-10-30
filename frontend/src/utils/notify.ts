@@ -12,7 +12,7 @@ export function notifyError(message: string) {
 export async function confirmDialog(options: { title: string; text?: string; confirmText?: string; danger?: boolean }) {
   const result = await Swal.fire({
     icon: options.danger ? 'warning' : 'question',
-    title: options.title,
+    titleText: options.title,
     text: options.text,
     showCancelButton: true,
     confirmButtonText: options.confirmText ?? '確定',
@@ -27,7 +27,7 @@ export async function confirmDialog(options: { title: string; text?: string; con
 /** 單行文字輸入對話框（取代 window.prompt）；取消時回傳 undefined。 */
 export async function promptText(title: string, value: string) {
   const result = await Swal.fire({
-    title,
+    titleText: title,
     input: 'text',
     inputValue: value,
     showCancelButton: true,
@@ -50,7 +50,7 @@ export async function selectOption(options: {
 }) {
   const result = await Swal.fire({
     icon: options.danger ? 'warning' : 'question',
-    title: options.title,
+    titleText: options.title,
     text: options.text,
     input: 'select',
     inputOptions: Object.fromEntries(options.choices.map((c) => [String(c.value), c.label])),

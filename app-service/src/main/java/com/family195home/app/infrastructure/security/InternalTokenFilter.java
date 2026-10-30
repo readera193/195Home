@@ -28,6 +28,9 @@ public class InternalTokenFilter extends OncePerRequestFilter {
     private final byte[] expectedBytes;
 
     public InternalTokenFilter(@Value("${app.internal.token}") String expectedToken) {
+        if (expectedToken == null || expectedToken.isBlank()) {
+            throw new IllegalArgumentException("app.internal.token must not be blank");
+        }
         this.expectedBytes = expectedToken.getBytes(StandardCharsets.UTF_8);
     }
 

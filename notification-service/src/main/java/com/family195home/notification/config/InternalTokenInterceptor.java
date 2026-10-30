@@ -28,6 +28,9 @@ public class InternalTokenInterceptor implements HandlerInterceptor {
     private final ObjectMapper objectMapper;
 
     public InternalTokenInterceptor(@Value("${app.internal.token}") String expectedToken, ObjectMapper objectMapper) {
+        if (expectedToken == null || expectedToken.isBlank()) {
+            throw new IllegalArgumentException("app.internal.token must not be blank");
+        }
         this.expectedToken = expectedToken.getBytes(StandardCharsets.UTF_8);
         this.objectMapper = objectMapper;
     }

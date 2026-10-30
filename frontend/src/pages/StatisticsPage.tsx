@@ -15,16 +15,25 @@ function amountClass(amount: number): string {
 }
 
 export default function StatisticsPage() {
-  const { data: myFamily } = useQuery({ queryKey: ['myFamily'], queryFn: getMyFamily });
+  const familyQuery = useQuery({ queryKey: ['myFamily'], queryFn: getMyFamily });
+  const myFamily = familyQuery.data;
   const familyGroupId = myFamily?.familyGroupId ?? undefined;
 
   const [month, setMonth] = useState(currentYearMonth());
 
-  const { data: summary, isLoading } = useQuery({
+  const { data: summary, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['statistics', familyGroupId, month],
     queryFn: () => getMonthlySummary(familyGroupId!, month),
     enabled: !!familyGroupId,
   });
+
+  if (familyQuery.isLoading) return <p role="status">載入中...</p>;
+  if (familyQuery.isError) return (
+    <div className="card" role="alert">
+      <p>無法載入家庭資料，請稍後再試。</p>
+      <button type="button" onClick={() => void familyQuery.refetch()}>重新載入</button>
+    </div>
+  );
 
   if (!familyGroupId) {
     return (
@@ -52,6 +61,11 @@ export default function StatisticsPage() {
 
       {isLoading ? (
         <p className="empty">載入中...</p>
+      ) : isError ? (
+        <div className="card" role="alert">
+          <p>無法載入月結統計，請重新載入。</p>
+          <button type="button" disabled={isFetching} onClick={() => void refetch()}>重新載入</button>
+        </div>
       ) : (
         <>
           <div className="table-wrap stats-table">
