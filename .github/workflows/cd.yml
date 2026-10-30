@@ -1,11 +1,11 @@
 name: CD
 
-# 僅在 master 分支的 CI 成功後才發布；CI 失敗不會部署
+# 僅在 main 分支的 CI 成功後才發布；CI 失敗不會部署
 on:
   workflow_run:
     workflows: [CI]
     types: [completed]
-    branches: [master]
+    branches: [main]
 
 env:
   REGISTRY: ghcr.io
@@ -34,9 +34,9 @@ jobs:
           - service: notification-service
             context: ./notification-service
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
-          # 部署通過 CI 的那個 commit，而非 workflow 觸發當下 master 的最新狀態
+          # 部署通過 CI 的那個 commit，而非 workflow 觸發當下 main 的最新狀態
           ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Log in to GHCR
@@ -46,6 +46,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Short sha
+        id: vars
+        run: echo "short_sha=${HEAD_SHA::7}" >> "$GITHUB_OUTPUT"
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -53,10 +59,10 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/195home-${{ matrix.service }}
           tags: |
             type=raw,value=latest
-            type=sha,prefix=sha-,value=${{ github.event.workflow_run.head_sha }}
+            type=raw,value=sha-${{ steps.vars.outputs.short_sha }}
 
       - name: Build and push ${{ matrix.service }} image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.service }}/Dockerfile
@@ -65,22 +71,32 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             VITE_LINE_CHANNEL_ID=${{ vars.LINE_LOGIN_CHANNEL_ID }}
-  # 以 Northflank API 重啟服務（POST .../services/{id}/restart），所需 secrets：NORTHFLANK_API_TOKEN、
-  # NORTHFLANK_PROJECT_ID、NORTHFLANK_APP_SERVICE_ID、NORTHFLANK_NOTIFICATION_SERVICE_ID。
-  # 注意：重啟是否會重新拉取 latest 這個 tag 的新 image 取決於服務的 image 拉取設定，
-  # 若新版沒有生效，請改用 redeploy 或調整拉取策略。
+
+  # 以不可變的 sha tag 指定 Northflank 部署的 image，部署結果可追溯、也方便回滾。
+  # 所需 secrets：NORTHFLANK_API_TOKEN、NORTHFLANK_PROJECT_ID、NORTHFLANK_APP_SERVICE_ID、NORTHFLANK_NOTIFICATION_SERVICE_ID；
+  # 所需 variables：NORTHFLANK_CREDENTIALS_ID（Northflank 內可拉取 GHCR image 的 registry credentials）。
   deploy-to-northflank:
     needs: build-and-push
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - service: app-service
+            service-id-secret: NORTHFLANK_APP_SERVICE_ID
+          - service: notification-service
+            service-id-secret: NORTHFLANK_NOTIFICATION_SERVICE_ID
     steps:
-      # --fail-with-body：端點回 4xx/5xx 時讓 step 失敗並印出回應內容，避免部署失敗卻顯示綠燈
-      - name: Trigger Northflank restart - app-service
+      - name: Set deployment image
         run: |
-          curl --fail-with-body -X POST \
-            -H "Authorization: Bearer ${{ secrets.NORTHFLANK_API_TOKEN }}" \
-            "https://api.northflank.com/v1/projects/${{ secrets.NORTHFLANK_PROJECT_ID }}/services/${{ secrets.NORTHFLANK_APP_SERVICE_ID }}/restart"
-      - name: Trigger Northflank restart - notification-service
-        run: |
-          curl --fail-with-body -X POST \
-            -H "Authorization: Bearer ${{ secrets.NORTHFLANK_API_TOKEN }}" \
-            "https://api.northflank.com/v1/projects/${{ secrets.NORTHFLANK_PROJECT_ID }}/services/${{ secrets.NORTHFLANK_NOTIFICATION_SERVICE_ID }}/restart"
+          echo "DEPLOY_IMAGE=${{ env.REGISTRY }}/${{ github.repository_owner }}/195home-${{ matrix.service }}:sha-${HEAD_SHA::7}" >> "$GITHUB_ENV"
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Deploy ${{ matrix.service }} to Northflank
+        uses: northflank/deploy-to-northflank@v1
+        with:
+          northflank-api-key: ${{ secrets.NORTHFLANK_API_TOKEN }}
+          project-id: ${{ secrets.NORTHFLANK_PROJECT_ID }}
+          service-id: ${{ secrets[matrix.service-id-secret] }}
+          image-path: ${{ env.DEPLOY_IMAGE }}
+          credentials-id: ${{ vars.NORTHFLANK_CREDENTIALS_ID }}

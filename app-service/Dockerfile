@@ -1,5 +1,5 @@
 # build context 為 repo 根目錄（見 docker-compose.yml），以便同時存取 frontend/ 與 app-service/
-FROM node:20-alpine AS frontend-build
+FROM node:22-alpine AS frontend-build
 WORKDIR /frontend
 COPY frontend/package*.json ./
 RUN npm ci
@@ -8,13 +8,15 @@ COPY frontend/ ./
 ARG VITE_LINE_CHANNEL_ID
 RUN npm run build
 
-FROM maven:3.9-eclipse-temurin-17 AS build
+FROM eclipse-temurin:17-jdk AS build
 WORKDIR /workspace
-COPY app-service/pom.xml ./
-RUN mvn -B dependency:go-offline
+COPY app-service/.mvn .mvn
+COPY app-service/mvnw app-service/pom.xml ./
+RUN chmod +x mvnw
+RUN ./mvnw -B dependency:go-offline
 COPY app-service/src ./src
 COPY --from=frontend-build /frontend/dist ./src/main/resources/static
-RUN mvn -B -DskipTests package
+RUN ./mvnw -B -DskipTests package
 
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
