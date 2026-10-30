@@ -16,6 +16,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** 驗證 filter 層的 401 與 MVC 層的 404 都回傳同一格式的 Problem Details JSON。 */
 @WebMvcTest(controllers = SecurityErrorResponseTest.ProbeController.class)
@@ -29,6 +30,28 @@ class SecurityErrorResponseTest {
 
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
+
+    @Test
+    void blankInternalTokenIsRejectedAtStartup() {
+        assertThatThrownBy(() -> new InternalTokenFilter(" "))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void userJwtCannotAccessInternalEndpoint() throws Exception {
+        String token = jwtTokenProvider.issue(1L, "tester").token();
+        mockMvc.perform(get("/api/internal/probe").header("Authorization", "Bearer " + token))
+                // 內部路徑不採用使用者 JWT，須提供服務密鑰才算已驗證。
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void wrongInternalTokenIsRejectedButCorrectTokenIsAllowed() throws Exception {
+        mockMvc.perform(get("/api/internal/probe").header("X-Internal-Token", "wrong"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/internal/probe").header("X-Internal-Token", "test-only-internal-token"))
+                .andExpect(status().isOk());
+    }
 
     @Test
     void noToken_returns401ProblemDetail() throws Exception {
@@ -75,7 +98,7 @@ class SecurityErrorResponseTest {
     @RestController
     static class ProbeController {
 
-        @GetMapping("/api/probe")
+        @GetMapping({"/api/probe", "/api/internal/probe"})
         String probe() {
             return "ok";
         }

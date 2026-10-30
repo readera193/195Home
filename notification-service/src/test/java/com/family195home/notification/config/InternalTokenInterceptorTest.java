@@ -12,6 +12,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.util.List;
 
 import static org.mockito.Mockito.mock;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -29,6 +30,12 @@ class InternalTokenInterceptorTest {
         mockMvc = MockMvcBuilders.standaloneSetup(new NotificationLogController(repository))
                 .addMappedInterceptors(new String[]{"/api/notifications/**"}, new InternalTokenInterceptor("secret-token", Jackson2ObjectMapperBuilder.json().build()))
                 .build();
+    }
+
+    @Test
+    void blankInternalTokenIsRejectedAtStartup() {
+        assertThatThrownBy(() -> new InternalTokenInterceptor("", Jackson2ObjectMapperBuilder.json().build()))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
