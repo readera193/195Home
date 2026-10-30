@@ -4,27 +4,33 @@
 
 ## 系統架構
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│                        app-service                           │
-│  （單一 Spring Boot 應用，唯一對外入口，含前端靜態檔案）        │
-│                                                                │
-│   family 模組 ── expense 模組 ── statistics 模組               │
-│  （帳號/家庭群組     （支付帳戶/         （月結彙總，            │
-│   /成員/LINE 登入）    支出紀錄）          即時運算不持久化）      │
-│                                                                │
-│   模組間一律以 Java service 方法直接呼叫（同進程），            │
-│   不透過 HTTP                                                 │
-└───────────────────────────┬────────────────────────────────┘
-                             │ 唯一跨進程呼叫：REST + X-Internal-Token
-                             ▼
-                  ┌────────────────────────┐
-                  │  notification-service   │
-                  │  LINE Webhook、每月排程   │
-                  │  推播、關鍵字查詢          │
-                  └────────────────────────┘
+```mermaid
+flowchart TB
+    User([家庭成員<br/>瀏覽器]) -->|HTTPS| App
+    Line([LINE 平台]) -->|Webhook<br/>X-Line-Signature| Notif
 
-資料庫：單一 MySQL 執行個體，appdb（app-service）+ notificationdb（notification-service）
+    subgraph App["app-service（單一 Spring Boot，唯一對外入口，含前端靜態檔案）"]
+        direction LR
+        Family["family 模組<br/>帳號 / 家庭群組 / 成員 / LINE 登入"]
+        Expense["expense 模組<br/>支付帳戶 / 支出紀錄 / 編輯鎖"]
+        Stats["statistics 模組<br/>月結彙總（即時運算，不持久化）"]
+        Expense -->|FamilyAccess port<br/>同進程呼叫| Family
+        Stats -->|同進程呼叫| Expense
+    end
+
+    subgraph Notif["notification-service"]
+        direction LR
+        Webhook["LINE Webhook<br/>關鍵字 / Rich Menu 查詢"]
+        Scheduler["每月最後一天 23:00<br/>推播月結"]
+    end
+
+    Notif -->|"唯一跨進程呼叫<br/>REST + X-Internal-Token"| App
+    Notif -->|Messaging API| Line
+
+    App --- AppDB[("appdb")]
+    Notif --- NotifDB[("notificationdb")]
+    AppDB --- MySQL{{"單一 MySQL 執行個體"}}
+    NotifDB --- MySQL
 ```
 
 系統依 [constitution](.specify/memory/constitution.md) 採 **2 個部署服務**：
@@ -33,6 +39,97 @@
 - **notification-service**：LINE Bot Webhook、每月最後一天 23:00 自動推播、LINE 關鍵字查詢。與 app-service 之間唯一透過內部 REST API（`X-Internal-Token` 驗證）溝通。
 
 完整規格與設計文件見 [`specs/001-family-expense-tracking/`](specs/001-family-expense-tracking/)（spec.md、plan.md、research.md、data-model.md、contracts/、tasks.md）。
+
+## 畫面預覽
+
+| 登入（LINE／Demo 體驗） | 支出紀錄（篩選、分頁） |
+|---|---|
+| ![登入](docs/screenshots/01-login.png) | ![支出紀錄](docs/screenshots/03-expenses.png) |
+
+| 編輯支出（先取得編輯鎖） | 月結統計 |
+|---|---|
+| ![編輯支出](docs/screenshots/05-edit-expense.png) | ![月結統計](docs/screenshots/06-statistics.png) |
+
+| 家庭群組與成員 | 支付帳戶 |
+|---|---|
+| ![家庭群組](docs/screenshots/07-family.png) | ![支付帳戶](docs/screenshots/08-accounts.png) |
+
+## 關鍵流程
+
+### 支出編輯鎖
+
+多位家人可能同時編輯同一筆紀錄。編輯鎖以資料庫的**條件式 `UPDATE`** 實作（不需要額外的分散式鎖元件）：只有「未鎖定」或「鎖已逾時（5 分鐘）」時更新才會成功，因此同時搶鎖時有且只有一人取得。
+
+```mermaid
+sequenceDiagram
+    actor A as 成員 A
+    actor B as 成員 B
+    participant API as app-service
+    participant DB as MySQL
+
+    A->>API: POST /api/expenses/{id}/lock
+    API->>DB: UPDATE ... SET locked_by = A<br/>WHERE id = ? AND (locked_by IS NULL OR locked_at < now - 5 分鐘)
+    DB-->>API: 影響 1 筆
+    API-->>A: 200 取得鎖
+
+    B->>API: POST /api/expenses/{id}/lock
+    API->>DB: 同一條件式 UPDATE
+    DB-->>API: 影響 0 筆
+    API-->>B: 409 RECORD_LOCKED（編輯中）
+
+    A->>API: PUT /api/expenses/{id}（須持有鎖）
+    API->>DB: UPDATE 內容，並釋放鎖
+    API-->>A: 200 更新成功
+
+    Note over A,B: A 取消編輯時呼叫 /unlock；A 忘了操作則 5 分鐘後鎖自動失效
+```
+
+### LINE 登入
+
+```mermaid
+sequenceDiagram
+    actor U as 使用者
+    participant FE as 前端
+    participant LINE as LINE 平台
+    participant API as app-service
+
+    U->>FE: 點「使用 LINE 登入」
+    FE->>FE: 產生 state 存入 sessionStorage（防 CSRF）
+    FE->>LINE: 導向授權頁（client_id、redirect_uri、state）
+    LINE-->>FE: 回到 /login/callback?code=...&state=...
+    FE->>FE: 驗證 state（一次性）
+    FE->>API: POST /api/auth/line { code }
+    API->>LINE: 以授權碼換 access token，再取 profile
+    LINE-->>API: userId、displayName
+    API->>API: 依 LINE userId 建立或更新使用者，簽發 JWT
+    API-->>FE: JWT
+```
+
+### LINE Bot 月結查詢與每月推播
+
+```mermaid
+sequenceDiagram
+    actor U as 家庭成員（LINE）
+    participant LINE as LINE 平台
+    participant N as notification-service
+    participant API as app-service
+
+    U->>LINE: 輸入「2026-10」或點 Rich Menu
+    LINE->>N: Webhook（簽章由 line-bot-sdk 驗證）
+    N->>API: GET /api/internal/line-bindings/by-line-user/{id}<br/>X-Internal-Token
+    API-->>N: 綁定的成員與家庭群組
+    N->>API: GET /api/internal/statistics/monthly
+    API-->>N: 各支付帳戶淨額與總計
+    N->>LINE: 回覆月結訊息
+
+    Note over N,API: 每月最後一天 23:00（Spring cron 的 L）<br/>排程對所有已綁定成員執行相同流程並推播，失敗會重試並記錄於 notificationdb
+```
+
+## API 文件
+
+app-service 內建 OpenAPI（springdoc）：啟動後開啟 `/swagger-ui.html` 即可瀏覽與試用，規格在 `/v3/api-docs`。先呼叫 `POST /api/auth/demo` 取得 token，再按右上角 **Authorize** 貼上即可。內部 API（`/api/internal/**`）不列入文件。
+
+![Swagger UI](docs/screenshots/09-swagger.png)
 
 ## 技術選型
 
