@@ -1,5 +1,6 @@
 package com.family195home.notification.presentation;
 
+import java.time.Clock;
 import com.family195home.notification.infrastructure.client.AppServiceClient;
 import com.family195home.notification.application.dto.BindingResult;
 import com.family195home.notification.application.dto.MonthlySummaryView;
@@ -38,10 +39,12 @@ public class LineWebhookController {
 
     private final AppServiceClient appServiceClient;
     private final LineMessagingClient lineMessagingClient;
+    private final Clock clock;
 
-    public LineWebhookController(AppServiceClient appServiceClient, LineMessagingClient lineMessagingClient) {
+    public LineWebhookController(AppServiceClient appServiceClient, LineMessagingClient lineMessagingClient, Clock clock) {
         this.appServiceClient = appServiceClient;
         this.lineMessagingClient = lineMessagingClient;
+        this.clock = clock;
     }
 
     @EventMapping
@@ -65,7 +68,7 @@ public class LineWebhookController {
     @EventMapping
     public void handlePostback(PostbackEvent event) {
         String month = extractMonth(event.getPostbackContent().getData(), event.getPostbackContent().getParams(),
-                YearMonth.now(ZoneId.of("Asia/Taipei")));
+                YearMonth.now(clock.withZone(ZoneId.of("Asia/Taipei"))));
         String lineUserId = event.getSource().getUserId();
         reply(event.getReplyToken(), month == null ? FORMAT_HINT : determineReply(month, lineUserId));
     }

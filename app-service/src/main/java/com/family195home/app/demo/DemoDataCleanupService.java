@@ -1,5 +1,6 @@
 package com.family195home.app.demo;
 
+import java.time.Clock;
 import com.family195home.app.family.application.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,17 +24,21 @@ public class DemoDataCleanupService {
 
     private final DemoDataCleanupMapper mapper;
     private final long retentionHours;
+    private final Clock clock;
 
     public DemoDataCleanupService(
-            DemoDataCleanupMapper mapper, @Value("${app.demo-login.retention-hours:24}") long retentionHours) {
+            DemoDataCleanupMapper mapper,
+            @Value("${app.demo-login.retention-hours:24}") long retentionHours,
+            Clock clock) {
         this.mapper = mapper;
         this.retentionHours = retentionHours;
+        this.clock = clock;
     }
 
     /** @return 本次刪除的群組數 */
     @Transactional
     public int cleanup() {
-        return cleanup(LocalDateTime.now().minusHours(retentionHours));
+        return cleanup(LocalDateTime.now(clock).minusHours(retentionHours));
     }
 
     @Transactional

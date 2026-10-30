@@ -1,5 +1,6 @@
 package com.family195home.app.expense.application;
 
+import java.time.Clock;
 import com.family195home.app.shared.ApiException;
 import com.family195home.app.shared.ErrorKind;
 import com.family195home.app.shared.PagedResult;
@@ -36,7 +37,7 @@ class ExpenseServiceTest {
         expenseRecordRepository = mock(ExpenseRecordRepository.class);
         paymentAccountRepository = mock(PaymentAccountRepository.class);
         familyAccess = mock(FamilyAccess.class);
-        expenseService = new ExpenseService(expenseRecordRepository, paymentAccountRepository, familyAccess, 5L);
+        expenseService = new ExpenseService(expenseRecordRepository, paymentAccountRepository, familyAccess, 5L, Clock.systemDefaultZone());
         when(familyAccess.groupState(10L)).thenReturn(FamilyAccess.GroupState.ACTIVE);
         stubAccount(100L, 10L, PaymentAccountStatus.ACTIVE);
         stubAccount(200L, 10L, PaymentAccountStatus.ACTIVE);

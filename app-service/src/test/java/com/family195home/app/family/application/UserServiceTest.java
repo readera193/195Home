@@ -1,5 +1,6 @@
 package com.family195home.app.family.application;
 
+import java.time.Clock;
 import com.family195home.app.family.domain.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,7 @@ class UserServiceTest {
         userRepository = mock(UserRepository.class);
         lineLoginClient = mock(LineLoginClient.class);
         tokenIssuer = mock(TokenIssuer.class);
-        userService = new UserService(userRepository, lineLoginClient, tokenIssuer);
+        userService = new UserService(userRepository, lineLoginClient, tokenIssuer, Clock.systemDefaultZone());
     }
 
     @Test

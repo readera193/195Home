@@ -1,5 +1,6 @@
 package com.family195home.app.expense.application;
 
+import java.time.Clock;
 import com.family195home.app.shared.ApiException;
 import com.family195home.app.shared.ErrorKind;
 import com.family195home.app.expense.domain.PaymentAccount;
@@ -23,14 +24,17 @@ public class PaymentAccountService {
     private final PaymentAccountRepository paymentAccountRepository;
     private final ExpenseRecordRepository expenseRecordRepository;
     private final FamilyAccess familyAccess;
+    private final Clock clock;
 
     public PaymentAccountService(
             PaymentAccountRepository paymentAccountRepository,
             ExpenseRecordRepository expenseRecordRepository,
-            FamilyAccess familyAccess) {
+            FamilyAccess familyAccess,
+            Clock clock) {
         this.paymentAccountRepository = paymentAccountRepository;
         this.expenseRecordRepository = expenseRecordRepository;
         this.familyAccess = familyAccess;
+        this.clock = clock;
     }
 
     // FR-003（限 ADMIN）, FR-018（群組已解散拒絕新增支付帳戶）
@@ -44,7 +48,7 @@ public class PaymentAccountService {
             throw new ApiException(ErrorKind.CONFLICT, "GROUP_DISSOLVED", "此家庭群組已解散，無法新增支付帳戶");
         }
         PaymentAccount account = new PaymentAccount(
-                admin.memberId(), familyGroupId, name, PaymentAccountStatus.ACTIVE, LocalDateTime.now());
+                admin.memberId(), familyGroupId, name, PaymentAccountStatus.ACTIVE, LocalDateTime.now(clock));
         paymentAccountRepository.save(account);
         return account;
     }

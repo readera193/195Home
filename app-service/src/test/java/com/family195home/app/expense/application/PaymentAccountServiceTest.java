@@ -1,5 +1,6 @@
 package com.family195home.app.expense.application;
 
+import java.time.Clock;
 import com.family195home.app.shared.ApiException;
 import com.family195home.app.shared.ErrorKind;
 import com.family195home.app.expense.domain.PaymentAccount;
@@ -32,7 +33,7 @@ class PaymentAccountServiceTest {
         paymentAccountRepository = mock(PaymentAccountRepository.class);
         expenseRecordRepository = mock(ExpenseRecordRepository.class);
         familyAccess = mock(FamilyAccess.class);
-        service = new PaymentAccountService(paymentAccountRepository, expenseRecordRepository, familyAccess);
+        service = new PaymentAccountService(paymentAccountRepository, expenseRecordRepository, familyAccess, Clock.systemDefaultZone());
     }
 
     @Test
