@@ -7,6 +7,7 @@ import LoginPage from '../src/pages/LoginPage';
 import * as userApi from '../src/services/userApi';
 import * as notify from '../src/utils/notify';
 import { AuthProvider } from '../src/hooks/useAuth';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 vi.mock('../src/services/userApi');
 vi.mock('../src/utils/notify', () => ({
@@ -16,9 +17,11 @@ vi.mock('../src/utils/notify', () => ({
 function renderLoginPage() {
   return render(
     <MemoryRouter>
-      <AuthProvider>
-        <LoginPage />
-      </AuthProvider>
+      <QueryClientProvider client={new QueryClient()}>
+        <AuthProvider>
+          <LoginPage />
+        </AuthProvider>
+      </QueryClientProvider>
     </MemoryRouter>,
   );
 }

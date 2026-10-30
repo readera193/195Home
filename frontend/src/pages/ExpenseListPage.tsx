@@ -21,7 +21,8 @@ import ExpenseTable from '../components/expense/ExpenseTable';
 const PAGE_SIZE = 20;
 
 export default function ExpenseListPage() {
-  const { data: myFamily } = useQuery({ queryKey: ['myFamily'], queryFn: getMyFamily });
+  const familyQuery = useQuery({ queryKey: ['myFamily'], queryFn: getMyFamily });
+  const myFamily = familyQuery.data;
   const familyGroupId = myFamily?.familyGroupId ?? undefined;
 
   const { data: accounts } = useQuery({
@@ -123,7 +124,7 @@ export default function ExpenseListPage() {
     await refreshExpenses();
   }
 
-  const { data: expensePage, isLoading } = useQuery({
+  const { data: expensePage, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: [
       'expenses',
       familyGroupId,
@@ -147,6 +148,14 @@ export default function ExpenseListPage() {
     placeholderData: keepPreviousData,
   });
   const totalPages = expensePage?.totalPages ?? 0;
+
+  if (familyQuery.isLoading) return <p role="status">載入中...</p>;
+  if (familyQuery.isError) return (
+    <div className="card" role="alert">
+      <p>無法載入家庭資料，請稍後再試。</p>
+      <button type="button" onClick={() => void familyQuery.refetch()}>重新載入</button>
+    </div>
+  );
 
   if (!familyGroupId) {
     return (
@@ -190,6 +199,11 @@ export default function ExpenseListPage() {
 
       {isLoading ? (
         <p className="empty">載入中...</p>
+      ) : isError ? (
+        <div className="card" role="alert">
+          <p>無法載入支出紀錄，請重新載入。</p>
+          <button type="button" disabled={isFetching} onClick={() => void refetch()}>重新載入</button>
+        </div>
       ) : (
         <ExpenseTable
           expenses={expensePage?.items}
@@ -199,9 +213,9 @@ export default function ExpenseListPage() {
         />
       )}
 
-      {expensePage && (
+      {expensePage && !isError && (
         <nav className="pagination" aria-label="分頁">
-          <button type="button" className="btn-secondary" onClick={() => setPage((p) => p - 1)} disabled={page === 0}>
+          <button type="button" className="btn-secondary" onClick={() => setPage((p) => p - 1)} disabled={isFetching || page === 0}>
             上一頁
           </button>
           <span>
@@ -211,7 +225,7 @@ export default function ExpenseListPage() {
             type="button"
             className="btn-secondary"
             onClick={() => setPage((p) => p + 1)}
-            disabled={page + 1 >= totalPages}
+            disabled={isFetching || page + 1 >= totalPages}
           >
             下一頁
           </button>

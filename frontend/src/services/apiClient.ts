@@ -14,7 +14,7 @@ export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
 }
 
-const apiClient = axios.create({ baseURL: '/api' });
+const apiClient = axios.create({ baseURL: '/api', timeout: 30000 });
 
 apiClient.interceptors.request.use((config) => {
   const token = getToken();
