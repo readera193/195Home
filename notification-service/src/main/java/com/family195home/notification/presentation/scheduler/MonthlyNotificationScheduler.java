@@ -1,30 +1,29 @@
 package com.family195home.notification.presentation.scheduler;
 
-import java.time.Clock;
 import com.family195home.notification.application.LineMessageSender;
+import com.family195home.notification.application.MonthlySummaryFormatter;
 import com.family195home.notification.application.NotificationLogRepository;
-import com.family195home.notification.infrastructure.client.AppServiceClient;
-import com.family195home.notification.domain.NotificationLog;
-import com.family195home.notification.domain.NotificationStatus;
 import com.family195home.notification.application.dto.LineBindingView;
 import com.family195home.notification.application.dto.MonthlySummaryView;
-import com.family195home.notification.application.MonthlySummaryFormatter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Component;
-
+import com.family195home.notification.domain.NotificationLog;
+import com.family195home.notification.domain.NotificationStatus;
+import com.family195home.notification.infrastructure.client.AppServiceClient;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
 
 /**
- * 每月最後一天 23:00 自動推播當月支出匯總（FR-013）。使用 Spring 內建 cron 的 {@code L}
- * 表示月最後一天（見 research.md 決策 8），不引入 Quartz 等額外排程框架。
+ * 每月最後一天 23:00 自動推播當月支出匯總（FR-013）。使用 Spring 內建 cron 的 {@code L} 表示月最後一天（見 research.md 決策 8），不引入
+ * Quartz 等額外排程框架。
  */
 @Component
 public class MonthlyNotificationScheduler {
@@ -71,10 +70,12 @@ public class MonthlyNotificationScheduler {
         }
     }
 
-    private void sendToOneMember(LineBindingView binding, String yearMonth, Map<Long, String> textByFamily) {
+    private void sendToOneMember(
+            LineBindingView binding, String yearMonth, Map<Long, String> textByFamily) {
         String text = textByFamily.get(binding.familyGroupId());
         if (text == null) {
-            MonthlySummaryView summary = appServiceClient.getMonthlySummary(binding.familyGroupId(), yearMonth);
+            MonthlySummaryView summary =
+                    appServiceClient.getMonthlySummary(binding.familyGroupId(), yearMonth);
             text = MonthlySummaryFormatter.format(summary);
             textByFamily.put(binding.familyGroupId(), text);
         }
@@ -89,14 +90,23 @@ public class MonthlyNotificationScheduler {
                 return;
             } catch (Exception e) {
                 lastError = e;
-                log.warn("推播月結通知失敗（第 {} 次嘗試），familyMemberId={}", attempts, binding.familyMemberId(), e);
+                log.warn(
+                        "推播月結通知失敗（第 {} 次嘗試），familyMemberId={}",
+                        attempts,
+                        binding.familyMemberId(),
+                        e);
                 if (attempts < maxRetries) {
                     backoff(attempts);
                 }
             }
         }
         // FR-013：達重試上限仍失敗則記錄錯誤並放棄，不影響其他已綁定成員
-        saveLog(binding, yearMonth, NotificationStatus.FAILED, attempts, lastError != null ? lastError.getMessage() : "unknown error");
+        saveLog(
+                binding,
+                yearMonth,
+                NotificationStatus.FAILED,
+                attempts,
+                lastError != null ? lastError.getMessage() : "unknown error");
     }
 
     private void backoff(int attempt) {
@@ -118,8 +128,18 @@ public class MonthlyNotificationScheduler {
         }
     }
 
-    private void saveLog(LineBindingView binding, String yearMonth, NotificationStatus status, int attempts, String errorMessage) {
-        NotificationLog logEntry = new NotificationLog(binding.familyGroupId(), binding.familyMemberId(), binding.lineUserId(), yearMonth);
+    private void saveLog(
+            LineBindingView binding,
+            String yearMonth,
+            NotificationStatus status,
+            int attempts,
+            String errorMessage) {
+        NotificationLog logEntry =
+                new NotificationLog(
+                        binding.familyGroupId(),
+                        binding.familyMemberId(),
+                        binding.lineUserId(),
+                        yearMonth);
         logEntry.setStatus(status);
         logEntry.setAttempts(attempts);
         logEntry.setLastAttemptAt(LocalDateTime.now(clock));

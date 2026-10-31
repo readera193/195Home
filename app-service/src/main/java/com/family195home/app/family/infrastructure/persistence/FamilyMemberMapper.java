@@ -1,10 +1,9 @@
 package com.family195home.app.family.infrastructure.persistence;
 
 import com.family195home.app.family.domain.FamilyMember;
+import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-
-import java.util.List;
 
 @Mapper
 public interface FamilyMemberMapper {
@@ -17,12 +16,15 @@ public interface FamilyMemberMapper {
 
     FamilyMember selectActiveByUserId(@Param("userId") Long userId);
 
-    FamilyMember selectByUserIdAndGroupId(@Param("userId") Long userId, @Param("familyGroupId") Long familyGroupId);
+    FamilyMember selectByUserIdAndGroupId(
+            @Param("userId") Long userId, @Param("familyGroupId") Long familyGroupId);
 
-    List<FamilyMember> selectByGroupId(@Param("familyGroupId") Long familyGroupId, @Param("includeLeft") boolean includeLeft);
+    List<FamilyMember> selectByGroupId(
+            @Param("familyGroupId") Long familyGroupId, @Param("includeLeft") boolean includeLeft);
 
     int countActiveByGroupId(@Param("familyGroupId") Long familyGroupId);
 
     FamilyMember selectEarliestOtherActiveMember(
-            @Param("familyGroupId") Long familyGroupId, @Param("excludeMemberId") Long excludeMemberId);
+            @Param("familyGroupId") Long familyGroupId,
+            @Param("excludeMemberId") Long excludeMemberId);
 }

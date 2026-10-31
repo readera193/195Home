@@ -4,19 +4,18 @@ import com.family195home.notification.application.dto.BindingResult;
 import com.family195home.notification.application.dto.LineBindingView;
 import com.family195home.notification.application.dto.MonthlySummaryView;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.List;
+import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
-import java.util.List;
-import java.util.Optional;
-
 /**
- * 呼叫 app-service 內部 API（/api/internal/**）的唯一元件，帶入 X-Internal-Token 共用密鑰
- * （見 contracts/app-service.md、research.md 決策 6、7）。這是系統中唯一保留的跨進程呼叫。
- * 非 2xx 回應一律轉成 {@link AppServiceClientException}（解析 Problem Details 的 code / detail）。
+ * 呼叫 app-service 內部 API（/api/internal/**）的唯一元件，帶入 X-Internal-Token 共用密鑰 （見
+ * contracts/app-service.md、research.md 決策 6、7）。這是系統中唯一保留的跨進程呼叫。 非 2xx 回應一律轉成 {@link
+ * AppServiceClientException}（解析 Problem Details 的 code / detail）。
  */
 @Component
 public class AppServiceClient {
@@ -28,10 +27,11 @@ public class AppServiceClient {
     public AppServiceClient(
             @Value("${app.app-service.base-url}") String baseUrl,
             @Value("${app.internal.token}") String internalToken) {
-        this(WebClient.builder()
-                .baseUrl(baseUrl)
-                .defaultHeader("X-Internal-Token", internalToken)
-                .build());
+        this(
+                WebClient.builder()
+                        .baseUrl(baseUrl)
+                        .defaultHeader("X-Internal-Token", internalToken)
+                        .build());
     }
 
     /** 供測試注入自訂 WebClient（例如以 ExchangeFunction 模擬回應）。 */
@@ -41,12 +41,16 @@ public class AppServiceClient {
 
     public Optional<BindingResult> findByLineUserId(String lineUserId) {
         try {
-            BindingResult result = webClient.get()
-                    .uri("/api/internal/line-bindings/by-line-user/{lineUserId}", lineUserId)
-                    .retrieve()
-                    .bodyToMono(BindingResult.class)
-                    .onErrorMap(WebClientResponseException.class, this::toClientException)
-                    .block();
+            BindingResult result =
+                    webClient
+                            .get()
+                            .uri(
+                                    "/api/internal/line-bindings/by-line-user/{lineUserId}",
+                                    lineUserId)
+                            .retrieve()
+                            .bodyToMono(BindingResult.class)
+                            .onErrorMap(WebClientResponseException.class, this::toClientException)
+                            .block();
             return Optional.ofNullable(result);
         } catch (AppServiceClientException e) {
             // 404 NOT_BOUND：此 LINE 帳號尚未加入任何家庭，不視為錯誤
@@ -58,7 +62,8 @@ public class AppServiceClient {
     }
 
     public List<LineBindingView> findAllBindings() {
-        return webClient.get()
+        return webClient
+                .get()
                 .uri("/api/internal/line-bindings")
                 .retrieve()
                 .bodyToFlux(LineBindingView.class)
@@ -68,11 +73,15 @@ public class AppServiceClient {
     }
 
     public MonthlySummaryView getMonthlySummary(Long familyGroupId, String month) {
-        return webClient.get()
-                .uri(uriBuilder -> uriBuilder.path("/api/internal/statistics/monthly")
-                        .queryParam("familyGroupId", familyGroupId)
-                        .queryParam("month", month)
-                        .build())
+        return webClient
+                .get()
+                .uri(
+                        uriBuilder ->
+                                uriBuilder
+                                        .path("/api/internal/statistics/monthly")
+                                        .queryParam("familyGroupId", familyGroupId)
+                                        .queryParam("month", month)
+                                        .build())
                 .retrieve()
                 .bodyToMono(MonthlySummaryView.class)
                 .onErrorMap(WebClientResponseException.class, this::toClientException)
@@ -80,11 +89,19 @@ public class AppServiceClient {
     }
 
     private AppServiceClientException toClientException(WebClientResponseException e) {
-        return parseError(objectMapper, e.getStatusCode().value(), e.getResponseBodyAsString(), e.getMessage());
+        return parseError(
+                objectMapper,
+                e.getStatusCode().value(),
+                e.getResponseBodyAsString(),
+                e.getMessage());
     }
 
     /** 解析 app-service 的 Problem Details 錯誤本體；本體無法解析時以 UNKNOWN 錯誤代碼回報。 */
-    static AppServiceClientException parseError(ObjectMapper objectMapper, int statusCode, String responseBody, String fallbackMessage) {
+    static AppServiceClientException parseError(
+            ObjectMapper objectMapper,
+            int statusCode,
+            String responseBody,
+            String fallbackMessage) {
         try {
             ErrorBody body = objectMapper.readValue(responseBody, ErrorBody.class);
             String code = body.code() != null ? body.code() : "UNKNOWN";

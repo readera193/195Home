@@ -10,8 +10,7 @@ public class User {
     private boolean displayNameCustomized;
     private LocalDateTime createdAt;
 
-    public User() {
-    }
+    public User() {}
 
     public User(String lineUserId, String displayName, LocalDateTime createdAt) {
         this.lineUserId = lineUserId;

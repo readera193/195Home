@@ -1,7 +1,5 @@
 package com.family195home.app.expense.presentation;
 
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import com.family195home.app.expense.application.ExpenseService;
 import com.family195home.app.expense.application.PaymentAccountService;
 import com.family195home.app.expense.domain.ExpenseRecord;
@@ -12,15 +10,16 @@ import com.family195home.app.expense.presentation.dto.UpdateExpenseRequest;
 import com.family195home.app.family.application.FamilyAccess;
 import com.family195home.app.shared.AuthenticatedUser;
 import com.family195home.app.shared.PagedResult;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.time.LocalDate;
+import java.util.Map;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
-import java.time.LocalDate;
-import java.util.Map;
 
 @Tag(name = "支出紀錄", description = "支出的新增、分頁篩選、編輯與刪除；編輯與刪除須先取得編輯鎖")
 @RestController
@@ -32,7 +31,9 @@ public class ExpenseController {
     private final FamilyAccess familyAccess;
 
     public ExpenseController(
-            ExpenseService expenseService, PaymentAccountService paymentAccountService, FamilyAccess familyAccess) {
+            ExpenseService expenseService,
+            PaymentAccountService paymentAccountService,
+            FamilyAccess familyAccess) {
         this.expenseService = expenseService;
         this.paymentAccountService = paymentAccountService;
         this.familyAccess = familyAccess;
@@ -40,10 +41,18 @@ public class ExpenseController {
 
     @PostMapping
     public ResponseEntity<ExpenseResponse> create(
-            @AuthenticationPrincipal AuthenticatedUser caller, @Valid @RequestBody CreateExpenseRequest request) {
-        FamilyAccess.MemberRef member = familyAccess.requireMember(request.familyGroupId(), caller.userId());
-        ExpenseRecord record = expenseService.create(
-                request.familyGroupId(), member.memberId(), request.paymentAccountId(), request.amount(), request.note(), request.occurredAt());
+            @AuthenticationPrincipal AuthenticatedUser caller,
+            @Valid @RequestBody CreateExpenseRequest request) {
+        FamilyAccess.MemberRef member =
+                familyAccess.requireMember(request.familyGroupId(), caller.userId());
+        ExpenseRecord record =
+                expenseService.create(
+                        request.familyGroupId(),
+                        member.memberId(),
+                        request.paymentAccountId(),
+                        request.amount(),
+                        request.note(),
+                        request.occurredAt());
         return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(record));
     }
 
@@ -53,17 +62,27 @@ public class ExpenseController {
             @RequestParam Long familyGroupId,
             @RequestParam(required = false) Long paymentAccountId,
             @RequestParam(required = false) Long authorMemberId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+                    LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+                    LocalDate endDate,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "" + ExpenseService.DEFAULT_PAGE_SIZE) int size) {
         // FR-017：家庭範圍隔離，呼叫者須為該家庭群組成員，否則回傳 403
         familyAccess.requireMember(familyGroupId, caller.userId());
         // 帳戶名稱整個群組只查一次（避免每筆紀錄各查一次 N+1）
         Map<Long, String> accountNames = paymentAccountService.nameById(familyGroupId);
-        PagedResult<ExpenseResponse> responses = expenseService
-                .listPage(familyGroupId, paymentAccountId, authorMemberId, startDate, endDate, page, size)
-                .map(record -> toResponse(record, accountNames));
+        PagedResult<ExpenseResponse> responses =
+                expenseService
+                        .listPage(
+                                familyGroupId,
+                                paymentAccountId,
+                                authorMemberId,
+                                startDate,
+                                endDate,
+                                page,
+                                size)
+                        .map(record -> toResponse(record, accountNames));
         return ResponseEntity.ok(responses);
     }
 
@@ -74,8 +93,15 @@ public class ExpenseController {
             @PathVariable Long expenseId,
             @RequestParam Long familyGroupId,
             @Valid @RequestBody UpdateExpenseRequest request) {
-        ExpenseRecord record = expenseService.update(
-                familyGroupId, expenseId, caller.userId(), request.paymentAccountId(), request.amount(), request.note(), request.occurredAt());
+        ExpenseRecord record =
+                expenseService.update(
+                        familyGroupId,
+                        expenseId,
+                        caller.userId(),
+                        request.paymentAccountId(),
+                        request.amount(),
+                        request.note(),
+                        request.occurredAt());
         return ResponseEntity.ok(toResponse(record));
     }
 
@@ -88,7 +114,9 @@ public class ExpenseController {
         return ResponseEntity.noContent().build();
     }
 
-    @Operation(summary = "取得編輯鎖", description = "以條件式 UPDATE 取得 5 分鐘的編輯鎖；紀錄正被他人編輯且鎖未逾時回 409 RECORD_LOCKED。編輯或刪除前必須先呼叫。")
+    @Operation(
+            summary = "取得編輯鎖",
+            description = "以條件式 UPDATE 取得 5 分鐘的編輯鎖；紀錄正被他人編輯且鎖未逾時回 409 RECORD_LOCKED。編輯或刪除前必須先呼叫。")
     @PostMapping("/{expenseId}/lock")
     public ResponseEntity<LockResponse> lock(
             @AuthenticationPrincipal AuthenticatedUser caller,
@@ -96,7 +124,9 @@ public class ExpenseController {
             @RequestParam Long familyGroupId) {
         FamilyAccess.MemberRef member = familyAccess.requireMember(familyGroupId, caller.userId());
         ExpenseRecord record = expenseService.lock(familyGroupId, expenseId, member.memberId());
-        return ResponseEntity.ok(new LockResponse(record.getId(), record.getLockedByMemberId(), record.getLockedAt()));
+        return ResponseEntity.ok(
+                new LockResponse(
+                        record.getId(), record.getLockedByMemberId(), record.getLockedAt()));
     }
 
     @Operation(summary = "釋放編輯鎖", description = "取消編輯時釋放；未鎖定或鎖已逾時視為已釋放（冪等），鎖由他人持有則回 403。")
@@ -114,8 +144,13 @@ public class ExpenseController {
     private ExpenseResponse toResponse(ExpenseRecord record, Map<Long, String> accountNames) {
         boolean locked = expenseService.isCurrentlyLocked(record);
         return new ExpenseResponse(
-                record.getId(), record.getAmount(), record.getNote(), record.getOccurredAt(),
-                record.getPaymentAccountId(), accountNames.get(record.getPaymentAccountId()),
-                record.getAuthorMemberId(), locked);
+                record.getId(),
+                record.getAmount(),
+                record.getNote(),
+                record.getOccurredAt(),
+                record.getPaymentAccountId(),
+                accountNames.get(record.getPaymentAccountId()),
+                record.getAuthorMemberId(),
+                locked);
     }
 }

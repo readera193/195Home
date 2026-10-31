@@ -47,27 +47,32 @@ public class LineOAuthLoginClient implements LineLoginClient {
             form.add("client_id", channelId);
             form.add("client_secret", channelSecret);
 
-            TokenResponse token = restClient.post()
-                    .uri(TOKEN_URL)
-                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                    .body(form)
-                    .retrieve()
-                    .body(TokenResponse.class);
+            TokenResponse token =
+                    restClient
+                            .post()
+                            .uri(TOKEN_URL)
+                            .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                            .body(form)
+                            .retrieve()
+                            .body(TokenResponse.class);
             if (token == null || token.accessToken() == null) {
                 throw loginFailed(null);
             }
 
-            ProfileResponse profile = restClient.get()
-                    .uri(PROFILE_URL)
-                    .header("Authorization", "Bearer " + token.accessToken())
-                    .retrieve()
-                    .body(ProfileResponse.class);
+            ProfileResponse profile =
+                    restClient
+                            .get()
+                            .uri(PROFILE_URL)
+                            .header("Authorization", "Bearer " + token.accessToken())
+                            .retrieve()
+                            .body(ProfileResponse.class);
             if (profile == null || profile.userId() == null) {
                 throw loginFailed(null);
             }
-            String name = profile.displayName() != null && !profile.displayName().isBlank()
-                    ? profile.displayName()
-                    : "LINE 使用者";
+            String name =
+                    profile.displayName() != null && !profile.displayName().isBlank()
+                            ? profile.displayName()
+                            : "LINE 使用者";
             return new LineProfile(profile.userId(), name);
         } catch (RestClientException e) {
             // 授權碼無效/過期（4xx）或 LINE 服務異常：一律視為登入失敗，不外洩細節
@@ -76,7 +81,8 @@ public class LineOAuthLoginClient implements LineLoginClient {
     }
 
     private static ApiException loginFailed(Exception cause) {
-        ApiException ex = new ApiException(ErrorKind.UNAUTHORIZED, "LINE_LOGIN_FAILED", "LINE 登入失敗，請重新登入");
+        ApiException ex =
+                new ApiException(ErrorKind.UNAUTHORIZED, "LINE_LOGIN_FAILED", "LINE 登入失敗，請重新登入");
         if (cause != null) {
             ex.initCause(cause);
         }
@@ -84,10 +90,8 @@ public class LineOAuthLoginClient implements LineLoginClient {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    record TokenResponse(@JsonProperty("access_token") String accessToken) {
-    }
+    record TokenResponse(@JsonProperty("access_token") String accessToken) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    record ProfileResponse(String userId, String displayName) {
-    }
+    record ProfileResponse(String userId, String displayName) {}
 }

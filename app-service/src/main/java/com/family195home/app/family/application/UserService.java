@@ -1,13 +1,12 @@
 package com.family195home.app.family.application;
 
-import java.time.Clock;
 import com.family195home.app.family.domain.User;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class UserService {
@@ -23,7 +22,11 @@ public class UserService {
     private final TokenIssuer tokenIssuer;
     private final Clock clock;
 
-    public UserService(UserRepository userRepository, LineLoginClient lineLoginClient, TokenIssuer tokenIssuer, Clock clock) {
+    public UserService(
+            UserRepository userRepository,
+            LineLoginClient lineLoginClient,
+            TokenIssuer tokenIssuer,
+            Clock clock) {
         this.userRepository = userRepository;
         this.lineLoginClient = lineLoginClient;
         this.tokenIssuer = tokenIssuer;
@@ -34,37 +37,56 @@ public class UserService {
     @Transactional
     public LoginResult loginWithLine(String code) {
         LineProfile profile = lineLoginClient.fetchProfile(code);
-        User user = userRepository.findByLineUserId(profile.lineUserId())
-                .map(existing -> {
-                    if (!existing.isDisplayNameCustomized() && !existing.getDisplayName().equals(profile.displayName())) {
-                        userRepository.updateDisplayName(existing.getId(), profile.displayName());
-                        existing.setDisplayName(profile.displayName());
-                    }
-                    return existing;
-                })
-                .orElseGet(() -> userRepository.save(
-                        new User(profile.lineUserId(), profile.displayName(), LocalDateTime.now(clock))));
+        User user =
+                userRepository
+                        .findByLineUserId(profile.lineUserId())
+                        .map(
+                                existing -> {
+                                    if (!existing.isDisplayNameCustomized()
+                                            && !existing.getDisplayName()
+                                                    .equals(profile.displayName())) {
+                                        userRepository.updateDisplayName(
+                                                existing.getId(), profile.displayName());
+                                        existing.setDisplayName(profile.displayName());
+                                    }
+                                    return existing;
+                                })
+                        .orElseGet(
+                                () ->
+                                        userRepository.save(
+                                                new User(
+                                                        profile.lineUserId(),
+                                                        profile.displayName(),
+                                                        LocalDateTime.now(clock))));
         TokenIssuer.IssuedToken generated = tokenIssuer.issue(user.getId(), user.getDisplayName());
-        return new LoginResult(generated.token(), user.getId(), user.getDisplayName(), generated.expiresAt());
+        return new LoginResult(
+                generated.token(), user.getId(), user.getDisplayName(), generated.expiresAt());
     }
 
     // Demo 體驗：每次建立全新的隨機帳號（互不干擾），無需任何輸入
     @Transactional
     public LoginResult loginAsDemo() {
         String suffix = UUID.randomUUID().toString();
-        User user = userRepository.save(new User(
-                DEMO_LINE_USER_ID_PREFIX + suffix, DEMO_DISPLAY_NAME, LocalDateTime.now(clock)));
+        User user =
+                userRepository.save(
+                        new User(
+                                DEMO_LINE_USER_ID_PREFIX + suffix,
+                                DEMO_DISPLAY_NAME,
+                                LocalDateTime.now(clock)));
         TokenIssuer.IssuedToken generated = tokenIssuer.issue(user.getId(), user.getDisplayName());
-        return new LoginResult(generated.token(), user.getId(), user.getDisplayName(), generated.expiresAt());
+        return new LoginResult(
+                generated.token(), user.getId(), user.getDisplayName(), generated.expiresAt());
     }
 
     // Demo 體驗：建立不會登入的虛擬成員帳號，供 Demo 群組加入示範成員（line_user_id 帶 demo- 前綴，LINE 推播會略過）
     @Transactional
     public User createDemoMember(String displayName) {
-        return userRepository.save(new User(
-                DEMO_LINE_USER_ID_PREFIX + UUID.randomUUID(), displayName, LocalDateTime.now(clock)));
+        return userRepository.save(
+                new User(
+                        DEMO_LINE_USER_ID_PREFIX + UUID.randomUUID(),
+                        displayName,
+                        LocalDateTime.now(clock)));
     }
 
-    public record LoginResult(String token, Long userId, String displayName, Instant expiresAt) {
-    }
+    public record LoginResult(String token, Long userId, String displayName, Instant expiresAt) {}
 }

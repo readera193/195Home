@@ -16,8 +16,7 @@ public class ExpenseRecord {
     private Long lockedByMemberId;
     private LocalDateTime lockedAt;
 
-    public ExpenseRecord() {
-    }
+    public ExpenseRecord() {}
 
     public Long getId() {
         return id;
@@ -108,6 +107,8 @@ public class ExpenseRecord {
     }
 
     public boolean isLocked(LocalDateTime now, long lockTtlMinutes) {
-        return lockedByMemberId != null && lockedAt != null && lockedAt.plusMinutes(lockTtlMinutes).isAfter(now);
+        return lockedByMemberId != null
+                && lockedAt != null
+                && lockedAt.plusMinutes(lockTtlMinutes).isAfter(now);
     }
 }

@@ -10,5 +10,4 @@ public record ExpenseResponse(
         Long paymentAccountId,
         String paymentAccountName,
         Long authorMemberId,
-        boolean locked) {
-}
+        boolean locked) {}

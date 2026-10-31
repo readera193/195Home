@@ -2,18 +2,17 @@ package com.family195home.app.demo;
 
 import com.family195home.app.shared.ApiException;
 import com.family195home.app.shared.ErrorKind;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-
 import java.time.Clock;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 /**
- * Demo 體驗登入每次都會建立使用者、群組與數百筆支出，公開環境需要限流以免被腳本灌爆資料庫。
- * 固定時間窗內同時限制「單一來源」與「全站總量」；僅記憶體計數，單一 app-service 實例已足夠。
+ * Demo 體驗登入每次都會建立使用者、群組與數百筆支出，公開環境需要限流以免被腳本灌爆資料庫。 固定時間窗內同時限制「單一來源」與「全站總量」；僅記憶體計數，單一 app-service
+ * 實例已足夠。
  */
 @Component
 public class DemoLoginRateLimiter {
@@ -52,8 +51,8 @@ public class DemoLoginRateLimiter {
         }
         int clientCount = countsByClient.getOrDefault(clientKey, 0);
         if (clientCount >= maxPerClient || total >= maxTotal) {
-            throw new ApiException(ErrorKind.TOO_MANY_REQUESTS, "DEMO_LOGIN_RATE_LIMITED",
-                    "Demo 體驗登入次數過多，請稍後再試");
+            throw new ApiException(
+                    ErrorKind.TOO_MANY_REQUESTS, "DEMO_LOGIN_RATE_LIMITED", "Demo 體驗登入次數過多，請稍後再試");
         }
         countsByClient.put(clientKey, clientCount + 1);
         total++;

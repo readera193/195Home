@@ -1,10 +1,9 @@
 package com.family195home.notification.presentation;
 
-import java.time.Clock;
-import com.family195home.notification.infrastructure.client.AppServiceClient;
+import com.family195home.notification.application.MonthlySummaryFormatter;
 import com.family195home.notification.application.dto.BindingResult;
 import com.family195home.notification.application.dto.MonthlySummaryView;
-import com.family195home.notification.application.MonthlySummaryFormatter;
+import com.family195home.notification.infrastructure.client.AppServiceClient;
 import com.linecorp.bot.client.LineMessagingClient;
 import com.linecorp.bot.model.ReplyMessage;
 import com.linecorp.bot.model.event.Event;
@@ -14,10 +13,7 @@ import com.linecorp.bot.model.event.message.TextMessageContent;
 import com.linecorp.bot.model.message.TextMessage;
 import com.linecorp.bot.spring.boot.annotation.EventMapping;
 import com.linecorp.bot.spring.boot.annotation.LineMessageHandler;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import java.time.Clock;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
@@ -25,10 +21,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * LINE Webhook 事件處理（US5、US6）。簽章驗證由 line-bot-spring-boot 自動處理
- * （見 research.md 決策 2）。呼叫 app-service 一律透過 {@link AppServiceClient}。
+ * LINE Webhook 事件處理（US5、US6）。簽章驗證由 line-bot-spring-boot 自動處理 （見 research.md 決策 2）。呼叫 app-service
+ * 一律透過 {@link AppServiceClient}。
  */
 @LineMessageHandler
 public class LineWebhookController {
@@ -41,7 +39,10 @@ public class LineWebhookController {
     private final LineMessagingClient lineMessagingClient;
     private final Clock clock;
 
-    public LineWebhookController(AppServiceClient appServiceClient, LineMessagingClient lineMessagingClient, Clock clock) {
+    public LineWebhookController(
+            AppServiceClient appServiceClient,
+            LineMessagingClient lineMessagingClient,
+            Clock clock) {
         this.appServiceClient = appServiceClient;
         this.lineMessagingClient = lineMessagingClient;
         this.clock = clock;
@@ -67,10 +68,15 @@ public class LineWebhookController {
     /** Datetime Picker / Rich Menu 的 postback：取選到日期的年月（params.date），或 data 本身即 YYYY-MM。 */
     @EventMapping
     public void handlePostback(PostbackEvent event) {
-        String month = extractMonth(event.getPostbackContent().getData(), event.getPostbackContent().getParams(),
-                YearMonth.now(clock.withZone(ZoneId.of("Asia/Taipei"))));
+        String month =
+                extractMonth(
+                        event.getPostbackContent().getData(),
+                        event.getPostbackContent().getParams(),
+                        YearMonth.now(clock.withZone(ZoneId.of("Asia/Taipei"))));
         String lineUserId = event.getSource().getUserId();
-        reply(event.getReplyToken(), month == null ? FORMAT_HINT : determineReply(month, lineUserId));
+        reply(
+                event.getReplyToken(),
+                month == null ? FORMAT_HINT : determineReply(month, lineUserId));
     }
 
     /**
@@ -126,13 +132,16 @@ public class LineWebhookController {
             // FR-015：未加入任何家庭的帳號不得取得任何家庭支出資料
             return "此帳號尚未加入任何家庭，請先至平台以 LINE 登入並建立或加入家庭。";
         }
-        MonthlySummaryView summary = appServiceClient.getMonthlySummary(binding.get().familyGroupId(), month);
+        MonthlySummaryView summary =
+                appServiceClient.getMonthlySummary(binding.get().familyGroupId(), month);
         return MonthlySummaryFormatter.format(summary);
     }
 
     private void reply(String replyToken, String text) {
         try {
-            lineMessagingClient.replyMessage(new ReplyMessage(replyToken, List.of(new TextMessage(text)))).get();
+            lineMessagingClient
+                    .replyMessage(new ReplyMessage(replyToken, List.of(new TextMessage(text))))
+                    .get();
         } catch (Exception e) {
             // 回覆失敗不影響 Webhook 本身回應 LINE 平台（見 contracts/notification-service.md）
             log.warn("LINE 回覆訊息失敗", e);

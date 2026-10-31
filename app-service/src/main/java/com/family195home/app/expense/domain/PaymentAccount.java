@@ -11,10 +11,14 @@ public class PaymentAccount {
     private PaymentAccountStatus status;
     private LocalDateTime createdAt;
 
-    public PaymentAccount() {
-    }
+    public PaymentAccount() {}
 
-    public PaymentAccount(Long familyMemberId, Long familyGroupId, String name, PaymentAccountStatus status, LocalDateTime createdAt) {
+    public PaymentAccount(
+            Long familyMemberId,
+            Long familyGroupId,
+            String name,
+            PaymentAccountStatus status,
+            LocalDateTime createdAt) {
         this.familyMemberId = familyMemberId;
         this.familyGroupId = familyGroupId;
         this.name = name;

@@ -1,5 +1,13 @@
 package com.family195home.app.presentation.exception;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.family195home.app.shared.ApiException;
+import com.family195home.app.shared.ErrorKind;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.BeforeEach;
@@ -7,20 +15,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
-
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import com.family195home.app.shared.ApiException;
-import com.family195home.app.shared.ErrorKind;
 
 /** 驗證所有錯誤都以 application/problem+json 回應，且一律帶有穩定的 code 欄位。 */
 class GlobalExceptionHandlerTest {
@@ -31,10 +31,11 @@ class GlobalExceptionHandlerTest {
     void setUp() {
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
-        mockMvc = MockMvcBuilders.standaloneSetup(new ProbeController())
-                .setControllerAdvice(new GlobalExceptionHandler())
-                .setValidator(validator)
-                .build();
+        mockMvc =
+                MockMvcBuilders.standaloneSetup(new ProbeController())
+                        .setControllerAdvice(new GlobalExceptionHandler())
+                        .setValidator(validator)
+                        .build();
     }
 
     @Test
@@ -51,18 +52,27 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void everyErrorKind_mapsToExpectedHttpStatus() throws Exception {
-        mockMvc.perform(get("/probe/kind").param("kind", "BAD_REQUEST")).andExpect(status().isBadRequest());
-        mockMvc.perform(get("/probe/kind").param("kind", "UNAUTHORIZED")).andExpect(status().isUnauthorized());
-        mockMvc.perform(get("/probe/kind").param("kind", "FORBIDDEN")).andExpect(status().isForbidden());
-        mockMvc.perform(get("/probe/kind").param("kind", "NOT_FOUND")).andExpect(status().isNotFound());
-        mockMvc.perform(get("/probe/kind").param("kind", "CONFLICT")).andExpect(status().isConflict());
+        mockMvc.perform(get("/probe/kind").param("kind", "BAD_REQUEST"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/probe/kind").param("kind", "UNAUTHORIZED"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/probe/kind").param("kind", "FORBIDDEN"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/probe/kind").param("kind", "NOT_FOUND"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/probe/kind").param("kind", "CONFLICT"))
+                .andExpect(status().isConflict());
         mockMvc.perform(get("/probe/kind").param("kind", "GONE")).andExpect(status().isGone());
-        mockMvc.perform(get("/probe/kind").param("kind", "INTERNAL")).andExpect(status().isInternalServerError());
+        mockMvc.perform(get("/probe/kind").param("kind", "INTERNAL"))
+                .andExpect(status().isInternalServerError());
     }
 
     @Test
     void beanValidationFailure_returnsValidationErrorWithFieldList() throws Exception {
-        mockMvc.perform(post("/probe/validate").contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"\"}"))
+        mockMvc.perform(
+                        post("/probe/validate")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"name\":\"\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
@@ -107,8 +117,7 @@ class GlobalExceptionHandlerTest {
         }
 
         @PostMapping("/probe/validate")
-        void validate(@Valid @RequestBody Body body) {
-        }
+        void validate(@Valid @RequestBody Body body) {}
 
         @GetMapping("/probe/date")
         void date() {
@@ -121,6 +130,5 @@ class GlobalExceptionHandlerTest {
         }
     }
 
-    record Body(@NotBlank String name) {
-    }
+    record Body(@NotBlank String name) {}
 }

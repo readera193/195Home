@@ -9,5 +9,4 @@ public record MemberView(
         String status,
         String role,
         LocalDateTime joinedAt,
-        LocalDateTime leftAt) {
-}
+        LocalDateTime leftAt) {}
