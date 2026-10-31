@@ -32,4 +32,20 @@
         SELECT id, name, status, invite_code, created_at FROM family_groups WHERE invite_code = #{inviteCode}
     </select>
 
+    <select id="selectIdsCreatedBeforeWithOnlyPrefixedMembers" resultType="long">
+        SELECT g.id FROM family_groups g
+        WHERE g.created_at &lt; #{cutoff}
+          AND NOT EXISTS (
+              SELECT 1 FROM family_members m
+              JOIN users u ON u.id = m.user_id
+              WHERE m.family_group_id = g.id AND u.line_user_id NOT LIKE CONCAT(#{prefix}, '%'))
+        ORDER BY g.id
+        LIMIT #{limit}
+    </select>
+
+    <delete id="deleteByIds">
+        DELETE FROM family_groups WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </delete>
+
 </mapper>

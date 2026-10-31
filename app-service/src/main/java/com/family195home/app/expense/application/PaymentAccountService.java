@@ -120,6 +120,14 @@ public class PaymentAccountService {
         paymentAccountRepository.delete(account.getId());
     }
 
+    /** 刪除指定群組的所有支付帳戶（Demo 資料清理用）；呼叫前須先刪除參照這些帳戶的支出紀錄。 */
+    @Transactional
+    public void purgeByFamilyGroupIds(List<Long> familyGroupIds) {
+        if (!familyGroupIds.isEmpty()) {
+            paymentAccountRepository.deleteByFamilyGroupIds(familyGroupIds);
+        }
+    }
+
     private PaymentAccount requireAccountAsAdmin(Long accountId, Long callerUserId) {
         PaymentAccount account =
                 paymentAccountRepository

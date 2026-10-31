@@ -13,7 +13,9 @@ import {
 } from '../services/familyApi';
 import { getErrorMessage } from '../utils/apiError';
 import { confirmDialog, notifyError, promptText, selectOption } from '../utils/notify';
+import CopyButton from '../components/CopyButton';
 import InfoTip from '../components/InfoTip';
+import { SkeletonLines } from '../components/Skeleton';
 
 export default function FamilyGroupPage() {
   const queryClient = useQueryClient();
@@ -159,7 +161,7 @@ export default function FamilyGroupPage() {
   }
 
   if (isLoading) {
-    return <p className="empty">載入中...</p>;
+    return <SkeletonLines count={4} />;
   }
 
   if (myFamily?.familyGroupId) {
@@ -290,14 +292,17 @@ export default function FamilyGroupPage() {
               邀請碼 <InfoTip text="可重複使用、無時限，分享給家人即可加入。" />
             </dt>
             <dd>
-              <strong className="code-box">{myFamily.inviteCode}</strong>
+              <span className="code-row">
+                <strong className="code-box">{myFamily.inviteCode}</strong>
+                {myFamily.inviteCode && <CopyButton text={myFamily.inviteCode} />}
+              </span>
             </dd>
           </dl>
         </div>
 
         <h2>成員列表</h2>
         {membersLoading ? (
-          <p className="empty">載入中...</p>
+          <SkeletonLines count={3} />
         ) : (
           <>
             {renderTable(activeMembers)}

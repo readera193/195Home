@@ -17,4 +17,6 @@ public interface PaymentAccountRepository {
 
     /** status 為 null 時回傳所有狀態（對應 API 的 status=ALL）。 */
     List<PaymentAccount> findByGroupId(Long familyGroupId, PaymentAccountStatus status);
+
+    int deleteByFamilyGroupIds(List<Long> familyGroupIds);
 }

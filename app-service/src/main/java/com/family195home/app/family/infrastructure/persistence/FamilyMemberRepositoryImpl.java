@@ -57,4 +57,9 @@ public class FamilyMemberRepositoryImpl implements FamilyMemberRepository {
         return Optional.ofNullable(
                 mapper.selectEarliestOtherActiveMember(familyGroupId, excludeMemberId));
     }
+
+    @Override
+    public int deleteByGroupIds(List<Long> familyGroupIds) {
+        return mapper.deleteByGroupIds(familyGroupIds);
+    }
 }

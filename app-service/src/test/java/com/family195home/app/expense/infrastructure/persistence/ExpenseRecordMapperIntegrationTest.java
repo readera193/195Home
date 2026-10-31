@@ -101,9 +101,57 @@ class ExpenseRecordMapperIntegrationTest {
         int secondLock = expenseRecordMapper.tryLock(record.getId(), 2L, now, now.minusMinutes(5));
         assertThat(secondLock).isEqualTo(0);
 
-        expenseRecordMapper.releaseLock(record.getId());
+        assertThat(
+                        expenseRecordMapper.releaseLockIfHeldOrExpired(
+                                record.getId(), 1L, now.minusMinutes(5)))
+                .isEqualTo(1);
         ExpenseRecord afterRelease = expenseRecordMapper.selectById(record.getId());
         assertThat(afterRelease.getLockedByMemberId()).isNull();
+    }
+
+    @Test
+    void conditionalRelease_neverClearsAnotherMembersValidLock() {
+        FamilyGroup group =
+                new FamilyGroup(
+                        "條件釋放測試家庭", FamilyGroupStatus.ACTIVE, "ITCODE04", LocalDateTime.now());
+        familyGroupMapper.insert(group);
+        PaymentAccount account =
+                new PaymentAccount(
+                        1L, group.getId(), "現金", PaymentAccountStatus.ACTIVE, LocalDateTime.now());
+        paymentAccountMapper.insert(account);
+        LocalDateTime now = LocalDateTime.now();
+        ExpenseRecord record = new ExpenseRecord();
+        record.setFamilyGroupId(group.getId());
+        record.setPaymentAccountId(account.getId());
+        record.setAuthorMemberId(1L);
+        record.setAmount(100);
+        record.setNote("釋放鎖測試");
+        record.setOccurredAt(now);
+        record.setCreatedAt(now);
+        record.setUpdatedAt(now);
+        expenseRecordMapper.insert(record);
+
+        // 成員 1 的鎖已逾時，成員 2 重新取得鎖
+        LocalDateTime staleLockAt = now.minusMinutes(30);
+        expenseRecordMapper.tryLock(record.getId(), 1L, staleLockAt, staleLockAt.minusMinutes(5));
+        assertThat(expenseRecordMapper.tryLock(record.getId(), 2L, now, now.minusMinutes(5)))
+                .isEqualTo(1);
+
+        // 原持有者成員 1 以舊認知釋放：影響 0 列，成員 2 的鎖仍在
+        assertThat(
+                        expenseRecordMapper.releaseLockIfHeldOrExpired(
+                                record.getId(), 1L, now.minusMinutes(5)))
+                .isEqualTo(0);
+        assertThat(expenseRecordMapper.selectById(record.getId()).getLockedByMemberId())
+                .isEqualTo(2L);
+
+        // 成員 2 的鎖逾時後，其他成員即可清除
+        LocalDateTime later = now.plusMinutes(10);
+        assertThat(
+                        expenseRecordMapper.releaseLockIfHeldOrExpired(
+                                record.getId(), 1L, later.minusMinutes(5)))
+                .isEqualTo(1);
+        assertThat(expenseRecordMapper.selectById(record.getId()).getLockedByMemberId()).isNull();
     }
 
     @Test

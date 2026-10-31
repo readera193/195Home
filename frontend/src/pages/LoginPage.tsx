@@ -5,11 +5,13 @@ import { useAuth } from '../hooks/useAuth';
 import { getErrorMessage } from '../utils/apiError';
 import { notifyError } from '../utils/notify';
 import { buildAuthorizeUrl, getLineChannelId } from '../utils/lineLogin';
+import Icon from '../components/Icon';
 
 // 兩種登入並行：LINE 登入（有設定 VITE_LINE_CHANNEL_ID 才顯示，callback 見 LoginCallbackPage）、
 // Demo 體驗（後端 DEMO_LOGIN_ENABLED 開啟才顯示，一鍵建立隨機帳號）。
 export default function LoginPage() {
   const [demoEnabled, setDemoEnabled] = useState(false);
+  const [configLoaded, setConfigLoaded] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const auth = useAuth();
   const navigate = useNavigate();
@@ -18,7 +20,8 @@ export default function LoginPage() {
   useEffect(() => {
     getAuthConfig()
       .then((config) => setDemoEnabled(config.demoLoginEnabled))
-      .catch(() => setDemoEnabled(false));
+      .catch(() => setDemoEnabled(false))
+      .finally(() => setConfigLoaded(true));
   }, []);
 
   async function handleDemo() {
@@ -37,6 +40,13 @@ export default function LoginPage() {
   return (
     <div className="auth-wrap">
       <div className="auth-card">
+        <div className="auth-brand">
+          <span className="auth-logo">
+            <Icon name="home" size={30} />
+          </span>
+          <p className="auth-brand-name">家庭共享支出平台</p>
+          <p className="muted auth-brand-desc">與家人一起記錄、結算每月收支</p>
+        </div>
         <h1>登入</h1>
         <div className="auth-actions">
           {channelId && (
@@ -54,7 +64,7 @@ export default function LoginPage() {
             </button>
           )}
         </div>
-        {!channelId && !demoEnabled && <p>目前沒有可用的登入方式</p>}
+        {configLoaded && !channelId && !demoEnabled && <p>目前沒有可用的登入方式</p>}
       </div>
     </div>
   );

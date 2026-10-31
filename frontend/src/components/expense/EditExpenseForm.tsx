@@ -7,6 +7,7 @@ import {
 import { getErrorMessage } from '../../utils/apiError';
 import { validateAmountAndNote } from '../../utils/expenseValidation';
 import { notifyError } from '../../utils/notify';
+import Modal from '../Modal';
 
 interface EditExpenseFormProps {
   familyGroupId: number;
@@ -57,15 +58,17 @@ export default function EditExpenseForm({
   }
 
   return (
-    <form className="card" onSubmit={handleSubmit} aria-label="編輯支出">
+    <Modal label="編輯支出" onClose={onCancel} onSubmit={handleSubmit} busy={saving}>
       <h2>編輯支出</h2>
       <div className="field">
         <label htmlFor="editAmount">編輯金額</label>
         <input
           id="editAmount"
+          inputMode="numeric"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           required
+          autoFocus
         />
       </div>
       <div className="field">
@@ -96,12 +99,17 @@ export default function EditExpenseForm({
           onChange={(e) => setOccurredAt(e.target.value)}
         />
       </div>
-      <button type="submit" disabled={saving}>
+      <button type="submit" className="btn-block" disabled={saving}>
         儲存
-      </button>{' '}
-      <button type="button" className="btn-secondary" onClick={onCancel} disabled={saving}>
+      </button>
+      <button
+        type="button"
+        className="btn-secondary btn-block"
+        onClick={onCancel}
+        disabled={saving}
+      >
         取消
       </button>
-    </form>
+    </Modal>
   );
 }

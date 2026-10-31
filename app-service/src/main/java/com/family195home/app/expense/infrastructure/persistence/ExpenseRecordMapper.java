@@ -51,9 +51,15 @@ public interface ExpenseRecordMapper {
             @Param("now") LocalDateTime now,
             @Param("lockExpiredBefore") LocalDateTime lockExpiredBefore);
 
-    void releaseLock(@Param("id") Long id);
+    /** 僅當鎖由 callerMemberId 持有或已逾時（lockExpiredBefore 之前）才釋放；回傳影響列數。 */
+    int releaseLockIfHeldOrExpired(
+            @Param("id") Long id,
+            @Param("callerMemberId") Long callerMemberId,
+            @Param("lockExpiredBefore") LocalDateTime lockExpiredBefore);
 
     int countByPaymentAccountId(@Param("paymentAccountId") Long paymentAccountId);
 
     List<Long> selectUsedPaymentAccountIds(@Param("familyGroupId") Long familyGroupId);
+
+    int deleteByFamilyGroupIds(@Param("familyGroupIds") List<Long> familyGroupIds);
 }

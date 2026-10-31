@@ -40,6 +40,39 @@ const PATHS = {
       <path d="M16 16v-6" />
     </>
   ),
+  arrowUp: (
+    <>
+      <path d="M12 19V5" />
+      <path d="m5 12 7-7 7 7" />
+    </>
+  ),
+  arrowDown: (
+    <>
+      <path d="M12 5v14" />
+      <path d="m19 12-7 7-7-7" />
+    </>
+  ),
+  scale: (
+    <>
+      <path d="M12 3v18" />
+      <path d="M5 7h14" />
+      <path d="m5 7-3 7a3 3 0 0 0 6 0z" />
+      <path d="m19 7-3 7a3 3 0 0 0 6 0z" />
+    </>
+  ),
+  copy: (
+    <>
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15V6a2 2 0 0 1 2-2h9" />
+    </>
+  ),
+  check: <path d="m5 12.5 4.5 4.5L19 7.5" />,
+  inbox: (
+    <>
+      <path d="M3 13h5l1.5 3h5L16 13h5" />
+      <path d="M5.5 5h13L21 13v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6z" />
+    </>
+  ),
 } as const;
 
 export type IconName = keyof typeof PATHS;

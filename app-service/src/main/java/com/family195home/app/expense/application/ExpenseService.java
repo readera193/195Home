@@ -173,7 +173,10 @@ public class ExpenseService {
             throw new ApiException(
                     ErrorKind.FORBIDDEN, "LOCK_NOT_HELD_BY_CALLER", "此紀錄正由其他成員編輯中，無法解除鎖定");
         }
-        expenseRecordRepository.releaseLock(expenseId);
+        // 上面的檢查只為給出明確錯誤；真正的保證是條件式 UPDATE。影響 0 列代表檢查之後鎖已被他人取得或已釋放，
+        // 此時呼叫者已不持有鎖，取消編輯的目的已達成，不清除他人的鎖也不報錯
+        expenseRecordRepository.releaseLockIfHeldOrExpired(
+                expenseId, caller.memberId(), LocalDateTime.now(clock), lockTtlMinutes);
     }
 
     public boolean isCurrentlyLocked(ExpenseRecord record) {
@@ -246,6 +249,14 @@ public class ExpenseService {
             throw new ApiException(
                     ErrorKind.FORBIDDEN, "LOCK_NOT_HELD_BY_CALLER", "編輯鎖已失效，請重新取得後再操作");
         }
+    }
+
+    /** 刪除指定群組的所有支出紀錄（Demo 資料清理用），回傳刪除筆數。 */
+    @Transactional
+    public int purgeByFamilyGroupIds(List<Long> familyGroupIds) {
+        return familyGroupIds.isEmpty()
+                ? 0
+                : expenseRecordRepository.deleteByFamilyGroupIds(familyGroupIds);
     }
 
     // FR-003、FR-022：支付帳戶須存在、屬於同一群組且為啟用狀態；他組帳戶視為授權問題回傳 403

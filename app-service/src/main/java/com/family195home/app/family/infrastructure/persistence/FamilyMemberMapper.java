@@ -27,4 +27,6 @@ public interface FamilyMemberMapper {
     FamilyMember selectEarliestOtherActiveMember(
             @Param("familyGroupId") Long familyGroupId,
             @Param("excludeMemberId") Long excludeMemberId);
+
+    int deleteByGroupIds(@Param("familyGroupIds") List<Long> familyGroupIds);
 }

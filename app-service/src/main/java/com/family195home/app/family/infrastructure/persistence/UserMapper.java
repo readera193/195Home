@@ -1,6 +1,7 @@
 package com.family195home.app.family.infrastructure.persistence;
 
 import com.family195home.app.family.domain.User;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -19,4 +20,7 @@ public interface UserMapper {
     User selectById(@Param("id") Long id);
 
     List<User> selectAll();
+
+    int deleteOrphansByLineUserIdPrefix(
+            @Param("prefix") String prefix, @Param("cutoff") LocalDateTime cutoff);
 }

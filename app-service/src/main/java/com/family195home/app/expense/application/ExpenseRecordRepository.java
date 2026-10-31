@@ -44,11 +44,15 @@ public interface ExpenseRecordRepository {
     /** 條件式 UPDATE 取得鎖：僅當目前未鎖定或鎖已逾時才會成功，回傳影響列數（見 research.md 決策 3）。 */
     int tryLock(Long id, Long memberId, LocalDateTime now, long ttlMinutes);
 
-    void releaseLock(Long id);
+    /** 條件式 UPDATE 釋放鎖：僅當鎖由 callerMemberId 持有或已逾時才會清除，回傳影響列數。 */
+    int releaseLockIfHeldOrExpired(
+            Long id, Long callerMemberId, LocalDateTime now, long ttlMinutes);
 
     /** 該支付帳戶是否已被任何支出紀錄使用（FR-022）。 */
     boolean existsByPaymentAccountId(Long paymentAccountId);
 
     /** 該群組內已被任何支出紀錄使用的支付帳戶 id（FR-022，供判斷可否刪除）。 */
     Set<Long> findUsedPaymentAccountIds(Long familyGroupId);
+
+    int deleteByFamilyGroupIds(List<Long> familyGroupIds);
 }

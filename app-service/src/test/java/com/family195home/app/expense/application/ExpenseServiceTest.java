@@ -429,7 +429,8 @@ class ExpenseServiceTest {
 
         expenseService.unlock(500L, 7L);
 
-        verify(expenseRecordRepository).releaseLock(500L);
+        verify(expenseRecordRepository)
+                .releaseLockIfHeldOrExpired(eq(500L), eq(1L), any(), anyLong());
     }
 
     @Test
@@ -445,7 +446,8 @@ class ExpenseServiceTest {
                             assertThat(e.getKind()).isEqualTo(ErrorKind.FORBIDDEN);
                             assertThat(e.getCode()).isEqualTo("LOCK_NOT_HELD_BY_CALLER");
                         });
-        verify(expenseRecordRepository, never()).releaseLock(any());
+        verify(expenseRecordRepository, never())
+                .releaseLockIfHeldOrExpired(any(), any(), any(), anyLong());
     }
 
     @Test
@@ -455,7 +457,22 @@ class ExpenseServiceTest {
 
         expenseService.unlock(500L, 7L);
 
-        verify(expenseRecordRepository).releaseLock(500L);
+        verify(expenseRecordRepository)
+                .releaseLockIfHeldOrExpired(eq(500L), eq(1L), any(), anyLong());
+    }
+
+    @Test
+    void unlock_doesNotFailWhenLockTakenByOthersAfterCheck() {
+        // 讀到的是自己已逾時的舊鎖，檢查通過後他人搶到鎖：條件式 UPDATE 影響 0 列，不清除他人的鎖也不報錯
+        lockedRecord(1L, LocalDateTime.now().minusMinutes(30));
+        when(familyAccess.requireMember(10L, 7L)).thenReturn(new FamilyAccess.MemberRef(1L));
+        when(expenseRecordRepository.releaseLockIfHeldOrExpired(eq(500L), eq(1L), any(), anyLong()))
+                .thenReturn(0);
+
+        expenseService.unlock(500L, 7L);
+
+        verify(expenseRecordRepository)
+                .releaseLockIfHeldOrExpired(eq(500L), eq(1L), any(), anyLong());
     }
 
     @Test
@@ -465,7 +482,8 @@ class ExpenseServiceTest {
 
         expenseService.unlock(500L, 7L);
 
-        verify(expenseRecordRepository, never()).releaseLock(any());
+        verify(expenseRecordRepository, never())
+                .releaseLockIfHeldOrExpired(any(), any(), any(), anyLong());
     }
 
     @Test
@@ -479,7 +497,8 @@ class ExpenseServiceTest {
                 .isInstanceOfSatisfying(
                         ApiException.class,
                         e -> assertThat(e.getCode()).isEqualTo("NOT_GROUP_MEMBER"));
-        verify(expenseRecordRepository, never()).releaseLock(any());
+        verify(expenseRecordRepository, never())
+                .releaseLockIfHeldOrExpired(any(), any(), any(), anyLong());
     }
 
     @Test

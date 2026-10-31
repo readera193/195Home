@@ -24,4 +24,6 @@ public interface FamilyMemberRepository {
 
     /** 群組內 joinedAt 最早的其他在職成員（管理者自動轉移用，FR-029）。 */
     Optional<FamilyMember> findEarliestOtherActiveMember(Long familyGroupId, Long excludeMemberId);
+
+    int deleteByGroupIds(List<Long> familyGroupIds);
 }
