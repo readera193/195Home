@@ -1,6 +1,6 @@
 import Swal from 'sweetalert2';
 
-const PRIMARY = '#2563eb';
+const PRIMARY = '#4f46e5';
 const DANGER = '#dc2626';
 
 /** 錯誤提示（取代頁面內的 role="alert" 段落）。 */

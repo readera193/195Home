@@ -12,10 +12,16 @@ import {
 } from '../services/expenseApi';
 import { getErrorMessage } from '../utils/apiError';
 import { confirmDialog, notifyError, promptText } from '../utils/notify';
+import EmptyState from '../components/EmptyState';
+import Modal from '../components/Modal';
+import { SkeletonLines } from '../components/Skeleton';
 
 export default function PaymentAccountsPage() {
   const queryClient = useQueryClient();
-  const { data: myFamily } = useQuery({ queryKey: ['myFamily'], queryFn: getMyFamily });
+  const { data: myFamily, isLoading: familyLoading } = useQuery({
+    queryKey: ['myFamily'],
+    queryFn: getMyFamily,
+  });
   const familyGroupId = myFamily?.familyGroupId ?? undefined;
 
   const { data: accounts, isLoading } = useQuery({
@@ -97,6 +103,8 @@ export default function PaymentAccountsPage() {
     return runAdminAction(() => deleteAccount(accountId), '刪除支付帳戶失敗');
   }
 
+  if (familyLoading) return <SkeletonLines count={4} />;
+
   if (!familyGroupId) {
     return (
       <div className="card empty">
@@ -122,34 +130,25 @@ export default function PaymentAccountsPage() {
       {!isAdmin && <p className="notice notice-info">僅群組管理者可管理支付帳戶</p>}
 
       {showCreate && (
-        <div className="modal-backdrop" onClick={closeCreate}>
-          <form
-            className="card modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label="新增帳戶"
-            onClick={(e) => e.stopPropagation()}
-            onSubmit={handleCreate}
-          >
-            <h2>新增帳戶</h2>
-            <div className="field">
-              <label htmlFor="accountName">帳戶名稱</label>
-              <input
-                id="accountName"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                autoFocus
-              />
-            </div>
-            <button type="submit" className="btn-block">
-              新增
-            </button>
-            <button type="button" className="btn-secondary btn-block" onClick={closeCreate}>
-              取消
-            </button>
-          </form>
-        </div>
+        <Modal label="新增帳戶" onClose={closeCreate} onSubmit={handleCreate}>
+          <h2>新增帳戶</h2>
+          <div className="field">
+            <label htmlFor="accountName">帳戶名稱</label>
+            <input
+              id="accountName"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              autoFocus
+            />
+          </div>
+          <button type="submit" className="btn-block">
+            新增
+          </button>
+          <button type="button" className="btn-secondary btn-block" onClick={closeCreate}>
+            取消
+          </button>
+        </Modal>
       )}
 
       <label className="checkbox-label">
@@ -162,7 +161,19 @@ export default function PaymentAccountsPage() {
       </label>
 
       {isLoading ? (
-        <p className="empty">載入中...</p>
+        <SkeletonLines count={3} />
+      ) : visibleAccounts?.length === 0 ? (
+        <EmptyState
+          title="還沒有支付帳戶"
+          hint={isAdmin ? '建立第一個帳戶後，就能開始記錄支出。' : '請群組管理者先建立支付帳戶。'}
+          action={
+            isAdmin && (
+              <button type="button" onClick={openCreate}>
+                建立第一個帳戶
+              </button>
+            )
+          }
+        />
       ) : (
         <ul className="card list">
           {visibleAccounts?.map((account) => (

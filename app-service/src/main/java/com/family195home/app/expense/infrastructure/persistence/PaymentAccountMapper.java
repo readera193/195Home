@@ -18,4 +18,6 @@ public interface PaymentAccountMapper {
 
     List<PaymentAccount> selectByGroupId(
             @Param("familyGroupId") Long familyGroupId, @Param("status") String status);
+
+    int deleteByFamilyGroupIds(@Param("familyGroupIds") List<Long> familyGroupIds);
 }

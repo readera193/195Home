@@ -4,6 +4,7 @@ import { getErrorMessage } from '../../utils/apiError';
 import { validateAmountAndNote } from '../../utils/expenseValidation';
 import { notifyError } from '../../utils/notify';
 import InfoTip from '../InfoTip';
+import Modal from '../Modal';
 
 interface CreateExpenseDialogProps {
   familyGroupId: number;
@@ -56,67 +57,65 @@ export default function CreateExpenseDialog({
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <form
-        className="card modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label="新增支出"
-        onClick={(e) => e.stopPropagation()}
-        onSubmit={handleSubmit}
-      >
-        <h2>新增支出</h2>
-        <div className="field">
-          <div className="label-row">
-            <label htmlFor="amount">金額</label>
-            <InfoTip text="請輸入整數：正數為流入、負數為流出（例如 -350），0 表示無金額異動。不支援小數點。" />
-          </div>
-          <input id="amount" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+    <Modal label="新增支出" onClose={onClose} onSubmit={handleSubmit} busy={submitting}>
+      <h2>新增支出</h2>
+      <div className="field">
+        <div className="label-row">
+          <label htmlFor="amount">金額</label>
+          <InfoTip text="請輸入整數：正數為流入、負數為流出（例如 -350），0 表示無金額異動。不支援小數點。" />
         </div>
-        <div className="field">
-          <label htmlFor="note">說明</label>
-          <input id="note" value={note} onChange={(e) => setNote(e.target.value)} required />
-        </div>
-        <div className="field">
-          <label htmlFor="paymentAccountId">支付帳戶</label>
-          <select
-            id="paymentAccountId"
-            value={accountId}
-            onChange={(e) => setAccountId(e.target.value)}
-            required
-          >
-            <option value="">請選擇</option>
-            {activeAccounts?.map((account) => (
-              <option key={account.accountId} value={account.accountId}>
-                {account.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <div className="label-row">
-            <label htmlFor="occurredAt">日期時間</label>
-            <InfoTip text="留空則以現在時間記錄。" />
-          </div>
-          <input
-            id="occurredAt"
-            type="datetime-local"
-            value={occurredAt}
-            onChange={(e) => setOccurredAt(e.target.value)}
-          />
-        </div>
-        <button type="submit" className="btn-block" disabled={submitting}>
-          新增
-        </button>
-        <button
-          type="button"
-          className="btn-secondary btn-block"
-          onClick={onClose}
-          disabled={submitting}
+        <input
+          id="amount"
+          inputMode="numeric"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          required
+          autoFocus
+        />
+      </div>
+      <div className="field">
+        <label htmlFor="note">說明</label>
+        <input id="note" value={note} onChange={(e) => setNote(e.target.value)} required />
+      </div>
+      <div className="field">
+        <label htmlFor="paymentAccountId">支付帳戶</label>
+        <select
+          id="paymentAccountId"
+          value={accountId}
+          onChange={(e) => setAccountId(e.target.value)}
+          required
         >
-          取消
-        </button>
-      </form>
-    </div>
+          <option value="">請選擇</option>
+          {activeAccounts?.map((account) => (
+            <option key={account.accountId} value={account.accountId}>
+              {account.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="field">
+        <div className="label-row">
+          <label htmlFor="occurredAt">日期時間</label>
+          <InfoTip text="留空則以現在時間記錄。" />
+        </div>
+        <input
+          id="occurredAt"
+          type="datetime-local"
+          value={occurredAt}
+          onChange={(e) => setOccurredAt(e.target.value)}
+        />
+      </div>
+      <button type="submit" className="btn-block" disabled={submitting}>
+        新增
+      </button>
+      <button
+        type="button"
+        className="btn-secondary btn-block"
+        onClick={onClose}
+        disabled={submitting}
+      >
+        取消
+      </button>
+    </Modal>
   );
 }

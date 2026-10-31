@@ -15,8 +15,11 @@ import { monthBoundary } from '../utils/expenseValidation';
 import { confirmDialog, notifyError } from '../utils/notify';
 import CreateExpenseDialog from '../components/expense/CreateExpenseDialog';
 import EditExpenseForm from '../components/expense/EditExpenseForm';
+import { formatNumber } from '../utils/formatNumber';
 import ExpenseFilters, { type ExpenseFilterValues } from '../components/expense/ExpenseFilters';
 import ExpenseTable from '../components/expense/ExpenseTable';
+import EmptyState from '../components/EmptyState';
+import { SkeletonLines } from '../components/Skeleton';
 
 const PAGE_SIZE = 20;
 
@@ -161,7 +164,7 @@ export default function ExpenseListPage() {
   });
   const totalPages = expensePage?.totalPages ?? 0;
 
-  if (familyQuery.isLoading) return <p role="status">載入中...</p>;
+  if (familyQuery.isLoading) return <SkeletonLines count={5} />;
   if (familyQuery.isError)
     return (
       <div className="card" role="alert">
@@ -182,7 +185,7 @@ export default function ExpenseListPage() {
   }
 
   return (
-    <div>
+    <div className="page-wide">
       <div className="page-header page-header--row">
         <h1>支出紀錄</h1>
         <button type="button" onClick={() => setShowCreate(true)}>
@@ -218,7 +221,7 @@ export default function ExpenseListPage() {
       )}
 
       {isLoading ? (
-        <p className="empty">載入中...</p>
+        <SkeletonLines count={5} />
       ) : isError ? (
         <div className="card" role="alert">
           <p>無法載入支出紀錄，請重新載入。</p>
@@ -226,6 +229,16 @@ export default function ExpenseListPage() {
             重新載入
           </button>
         </div>
+      ) : expensePage && expensePage.items.length === 0 ? (
+        <EmptyState
+          title="沒有符合條件的支出紀錄"
+          hint="調整上方的篩選條件，或新增一筆支出。"
+          action={
+            <button type="button" onClick={() => setShowCreate(true)}>
+              立即新增
+            </button>
+          }
+        />
       ) : (
         <ExpenseTable
           expenses={expensePage?.items}
@@ -246,7 +259,8 @@ export default function ExpenseListPage() {
             上一頁
           </button>
           <span>
-            第 {page + 1} / {Math.max(totalPages, 1)} 頁（共 {expensePage.totalElements} 筆）
+            第 {page + 1} / {Math.max(totalPages, 1)} 頁（共{' '}
+            {formatNumber(expensePage.totalElements)} 筆）
           </span>
           <button
             type="button"

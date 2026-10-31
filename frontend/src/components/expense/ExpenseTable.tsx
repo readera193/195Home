@@ -1,4 +1,5 @@
 import type { ExpenseResponse } from '../../services/expenseApi';
+import { amountClass, formatNumber } from '../../utils/formatNumber';
 
 interface ExpenseTableProps {
   expenses?: ExpenseResponse[];
@@ -6,12 +7,6 @@ interface ExpenseTableProps {
   editingId?: number;
   onEdit: (expense: ExpenseResponse) => void;
   onDelete: (expense: ExpenseResponse) => void;
-}
-
-function amountClass(amount: number): string {
-  if (amount > 0) return 'positive';
-  if (amount < 0) return 'negative';
-  return '';
 }
 
 export default function ExpenseTable({ expenses, editingId, onEdit, onDelete }: ExpenseTableProps) {
@@ -43,33 +38,39 @@ export default function ExpenseTable({ expenses, editingId, onEdit, onDelete }: 
                   })}
                 </div>
               </td>
-              <td className="col-note">{expense.note}</td>
-              <td className={`num col-amount ${amountClass(expense.amount)}`}>{expense.amount}</td>
+              <td className="col-note">
+                {expense.note}
+                {expense.locked && editingId !== expense.expenseId && (
+                  <span className="badge badge-warning">編輯中</span>
+                )}
+              </td>
+              <td className={`num col-amount ${amountClass(expense.amount)}`}>
+                {formatNumber(expense.amount)}
+              </td>
               <td className="col-account">
                 <span className="badge">{expense.paymentAccountName}</span>
               </td>
               <td className="col-actions">
-                {expense.locked && editingId !== expense.expenseId && (
-                  <span className="badge">編輯中</span>
-                )}{' '}
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => onEdit(expense)}
-                  disabled={busy}
-                  aria-label={`編輯 ${expense.note}`}
-                >
-                  編輯
-                </button>{' '}
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => onDelete(expense)}
-                  disabled={busy}
-                  aria-label={`刪除 ${expense.note}`}
-                >
-                  刪除
-                </button>
+                <div className="actions">
+                  <button
+                    type="button"
+                    className="btn-secondary btn-sm"
+                    onClick={() => onEdit(expense)}
+                    disabled={busy}
+                    aria-label={`編輯 ${expense.note}`}
+                  >
+                    編輯
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-danger btn-sm"
+                    onClick={() => onDelete(expense)}
+                    disabled={busy}
+                    aria-label={`刪除 ${expense.note}`}
+                  >
+                    刪除
+                  </button>
+                </div>
               </td>
             </tr>
           ))}

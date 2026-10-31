@@ -53,7 +53,14 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 | 403 | `NOT_SELF` | 該操作限成員本人（離開群組） |
 | 404 | `GROUP_NOT_FOUND` / `ACCOUNT_NOT_FOUND` / `EXPENSE_NOT_FOUND` / `MEMBER_NOT_FOUND` | 資源不存在 |
 | 409 | `MEMBER_NOT_ACTIVE` | 目標成員目前不是「正常」狀態（離開／移出時） |
-| 500 | `NO_ELIGIBLE_ADMIN` | 管理者離開時找不到可接任者（資料異常，正常流程不會發生） |
+
+### 請求追蹤（`X-Request-Id`）
+
+每個請求都帶有 requestId：沿用呼叫端送來的 `X-Request-Id`（限英數字與 `._-`，最長 64 字元），沒有或格式不合法則自行產生 UUID。requestId 會寫入每行日誌，並一律於回應標頭 `X-Request-Id` 回傳，使用者回報問題時可憑此查日誌。notification-service 呼叫內部 API 時會轉送自己的 requestId，兩個服務的日誌因此可串接。
+
+### API 文件
+
+對外 API（不含 `/api/internal/**`）提供 OpenAPI 文件：Swagger UI 於 `/swagger-ui.html`，規格於 `/v3/api-docs`。
 
 ### 分頁
 
@@ -76,8 +83,9 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 ### `POST /api/auth/demo`
 - Request: 無 body
 - Response 200: 同 `POST /api/auth/line`；每次建立全新帳號（`lineUserId = "demo-<uuid>"`，`displayName = "使用者"`）
-- Errors: `404 DEMO_LOGIN_DISABLED`（未設定 `DEMO_LOGIN_ENABLED=true`）
-- 說明：登入同時建立範例家庭群組（`使用者的家 #<userId>`，帳號為管理者，另有爸爸、媽媽、小明、小美 4 位示範成員）、5 個支付帳戶、範例支出（隨機分配給各成員）；供展示環境免 LINE 體驗；Demo 帳號不會收到 LINE 月結推播。
+- Errors: `404 DEMO_LOGIN_DISABLED`（未設定 `DEMO_LOGIN_ENABLED=true`）、`429 DEMO_LOGIN_RATE_LIMITED`（同一來源 IP 每小時超過 `app.demo-login.max-per-client-per-hour`（預設 20）次，或全站每小時超過 `app.demo-login.max-total-per-hour`（預設 300）次；固定一小時時間窗、僅記憶體計數；來源 IP 依反向代理的 forwarded 標頭還原）
+- 說明：登入同時建立範例家庭群組（`使用者的家 #<userId>`，帳號為管理者，另有爸爸、媽媽、小明、小美 4 位示範成員）、5 個支付帳戶（現金、中信、國泰、三信、富邦）、範例支出（上月 1 日到今天，每天隨機 0–5 筆，隨機分配給各成員）；供展示環境免 LINE 體驗；Demo 帳號不會收到 LINE 月結推播。
+- 資料保留：啟用 Demo 的環境每小時清除一次建立超過 `app.demo-login.retention-hours`（預設 24）小時、且成員全為 Demo 帳號的群組（連同其支出紀錄、支付帳戶、成員紀錄；每次最多 50 個群組），以及已無任何群組成員身分的過期 Demo 帳號；有真實 LINE 使用者的群組不會被清除。各模組只刪除自己的資料表，由 demo 套件依「支出紀錄 → 支付帳戶 → 成員與群組 → 帳號」的順序協調。
 
 ### `GET /api/auth/config`
 - Response 200: `{ demoLoginEnabled: boolean }`，前端據此決定是否顯示 Demo 體驗按鈕
@@ -112,8 +120,8 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 ### `POST /api/families/{familyGroupId}/members/{memberId}/leave`
 - Header: `Authorization`（限本人）
 - Request: `{ newAdminMemberId?: number }`（ADMIN 且尚有其他在職成員時必填）
-- Response 200: `{ status: "LEFT", groupStatus: "ACTIVE" | "DISSOLVED", newAdminMemberId?: number }`
-- Errors: `403 NOT_SELF`、`409 MEMBER_NOT_ACTIVE`、`400 NEW_ADMIN_REQUIRED`、`400 CANNOT_TRANSFER_TO_SELF`
+- Response 200: `{ status: "LEFT", familyGroupStatus: "ACTIVE" | "DISSOLVED", newAdminMemberId: number | null }`
+- Errors: `403 NOT_SELF`、`404 MEMBER_NOT_FOUND`、`409 MEMBER_NOT_ACTIVE`、`400 NEW_ADMIN_REQUIRED`、`400 CANNOT_TRANSFER_TO_SELF`
 - 邏輯：若為唯一在職成員 → 群組 `DISSOLVED`（FR-018）；若為 ADMIN 且尚有其他在職成員 → 必須指定 `newAdminMemberId` 並轉移 ADMIN（FR-029）；離開者 `role` 重設為 `MEMBER`（FR-033）
 
 ### `POST /api/families/{familyGroupId}/transfer-admin`
@@ -142,19 +150,22 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 
 ## 支付帳戶（公開 API）
 
+本節所有成功回應的帳戶結構皆為 `{ accountId, familyMemberId, name, status: "ACTIVE"|"DISABLED", deletable: boolean }`（以下簡稱「帳戶結構」）：`familyMemberId` 為建立者（管理者）的成員 id；`deletable` 表示該帳戶從未被任何支出紀錄使用、可真正刪除（FR-022），前端僅在 `deletable` 為 true 時顯示「刪除」。以 `accountId` 操作的端點，帳戶不存在時回 `404 ACCOUNT_NOT_FOUND`。
+
 ### `POST /api/accounts`
 - Header: `Authorization`（限該群組 ADMIN，否則 `403 NOT_GROUP_ADMIN`，FR-003）
 - Request: `{ familyGroupId, name }`（`familyMemberId` 由 JWT 解出的呼叫者身分決定，不由前端傳入）
-- Response 201: `{ accountId, name, status: "ACTIVE" }`（FR-003）
+- Response 201: 帳戶結構（`status: "ACTIVE"`、`deletable: true`，FR-003）
+- Errors: `403 NOT_GROUP_MEMBER`、`403 NOT_GROUP_ADMIN`、`404 GROUP_NOT_FOUND`、`409 GROUP_DISSOLVED`（FR-018）
 
 ### `GET /api/accounts?familyGroupId=&status=ACTIVE|DISABLED|ALL`
-- Header: `Authorization`
-- Response 200: `[{ accountId, familyMemberId, name, status, deletable }]`（`deletable`：該帳戶從未被任何支出紀錄使用，可真正刪除，FR-022；前端僅在 `deletable` 為 true 時顯示「刪除」）
+- Header: `Authorization`（呼叫者須為該群組在職成員，否則 `403 NOT_GROUP_MEMBER`，FR-017）
+- Response 200: 帳戶結構陣列，依建立時間排序；`status` 省略或為 `ALL` 時回傳所有狀態
 
 ### `PUT /api/accounts/{accountId}`
 - Header: `Authorization`（限該群組 ADMIN）
 - Request: `{ name }`
-- Response 200: `{ accountId, name, status }`
+- Response 200: 帳戶結構
 - Errors: `403 NOT_GROUP_ADMIN`
 
 ### `DELETE /api/accounts/{accountId}`
@@ -164,20 +175,20 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 
 ### `POST /api/accounts/{accountId}/disable`
 - Header: `Authorization`（限該群組 ADMIN，否則 `403 NOT_GROUP_ADMIN`）
-- Response 200: `{ accountId, status: "DISABLED" }`（FR-022，僅軟停用，不可真正刪除）
+- Response 200: 帳戶結構（`status: "DISABLED"`；FR-022，僅軟停用，不可真正刪除）
 
 ### `POST /api/accounts/{accountId}/enable`
 - Header: `Authorization`（限該群組 ADMIN，否則 `403 NOT_GROUP_ADMIN`）
-- Response 200: `{ accountId, status: "ACTIVE" }`（FR-022，重新啟用已停用帳戶；已是 `ACTIVE` 時冪等回傳 200）
+- Response 200: 帳戶結構（`status: "ACTIVE"`；FR-022，重新啟用已停用帳戶；已是 `ACTIVE` 時冪等回傳 200）
 - Errors: `403 NOT_GROUP_ADMIN`、`409 GROUP_DISSOLVED`（群組已解散，FR-018）
 
 ## 支出紀錄（公開 API）
 
 ### `POST /api/expenses`
 - Header: `Authorization`
-- Request: `{ familyGroupId, paymentAccountId, amount: number, note: string, occurredAt?: string }`（`authorMemberId` 由 JWT 解出的呼叫者身分決定）
+- Request: `{ familyGroupId, paymentAccountId, amount: number, note: string, occurredAt?: string }`（`authorMemberId` 由 JWT 解出的呼叫者身分決定；`note` 必填、最長 500 字，超過為 `400 VALIDATION_ERROR`）
 - Response 201: `{ expenseId, amount, note, occurredAt, paymentAccountId, paymentAccountName, authorMemberId, locked }`
-- Errors: `400 AMOUNT_MUST_BE_INTEGER`、`400 NOTE_REQUIRED`、`400 PAYMENT_ACCOUNT_REQUIRED`、`409 GROUP_DISSOLVED`（FR-016、FR-018）
+- Errors: `400 AMOUNT_MUST_BE_INTEGER`、`400 AMOUNT_OUT_OF_RANGE`（超出 32 位元整數範圍）、`400 NOTE_REQUIRED`、`400 PAYMENT_ACCOUNT_REQUIRED`、`403 NOT_GROUP_MEMBER`、`403 ACCOUNT_NOT_IN_GROUP`（支付帳戶屬於其他群組）、`404 GROUP_NOT_FOUND`、`404 ACCOUNT_NOT_FOUND`、`409 ACCOUNT_DISABLED`（帳戶已停用，FR-022）、`409 GROUP_DISSOLVED`（FR-016、FR-018）
 - 邏輯：`occurredAt` 未提供時使用伺服器當下時間（FR-005）
 
 ### `GET /api/expenses?familyGroupId=&paymentAccountId=&authorMemberId=&startDate=YYYY-MM-DD&endDate=YYYY-MM-DD&page=&size=`
@@ -196,7 +207,7 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 - Header: `Authorization`（須已持有鎖）；Query `familyGroupId`（必填，用於驗證操作者與紀錄皆屬於該群組）
 - Request: `{ amount, note, occurredAt, paymentAccountId }`
 - Response 200: `{ expenseId, ... }`（成功後自動釋放鎖）
-- Errors: `403 LOCK_NOT_HELD_BY_CALLER`、`403 NOT_GROUP_MEMBER`（非該群組在職成員，FR-017）、`403 EXPENSE_NOT_IN_GROUP`（紀錄不屬於該群組）、`400 AMOUNT_MUST_BE_INTEGER` 等同新增驗證規則
+- Errors: `403 LOCK_NOT_HELD_BY_CALLER`（未持有鎖，或鎖已逾時並被他人取得；檢查鎖與寫入為同一個條件式 UPDATE）、`403 NOT_GROUP_MEMBER`（非該群組在職成員，FR-017）、`403 EXPENSE_NOT_IN_GROUP`（紀錄不屬於該群組）、`404 EXPENSE_NOT_FOUND`、`400 AMOUNT_MUST_BE_INTEGER`／`400 AMOUNT_OUT_OF_RANGE`／`400 VALIDATION_ERROR` 等同新增驗證規則；更換為其他支付帳戶時另檢查 `ACCOUNT_NOT_FOUND`／`ACCOUNT_NOT_IN_GROUP`／`ACCOUNT_DISABLED`（沿用原帳戶時不檢查，已停用帳戶的歷史紀錄仍可編輯其他欄位）
 
 ### `DELETE /api/expenses/{expenseId}?familyGroupId=`
 - Header: `Authorization`；Query `familyGroupId`（必填）（須已持有鎖；群組任一在職成員皆可鎖定後刪除，FR-019）
@@ -218,14 +229,18 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
     "familyGroupId": 1,
     "month": "2026-09",
     "accounts": [
-      { "paymentAccountId": 1, "paymentAccountName": "現金", "netAmount": -1500 },
-      { "paymentAccountId": 2, "paymentAccountName": "銀行帳戶", "netAmount": 30000 }
+      { "paymentAccountId": 1, "paymentAccountName": "現金", "incomeAmount": 0, "expenseAmount": 1500, "netAmount": -1500 },
+      { "paymentAccountId": 2, "paymentAccountName": "銀行帳戶", "incomeAmount": 30000, "expenseAmount": 0, "netAmount": 30000 }
     ],
+    "totalIncomeAmount": 30000,
+    "totalExpenseAmount": 1500,
     "totalNetAmount": 28500
   }
   ```
-- 邏輯：statistics 模組直接呼叫 expense 模組取得該月全部紀錄，依 `paymentAccountId` 加總 `amount`；當月無紀錄時回傳空陣列與 `totalNetAmount: 0`（FR-011，非錯誤或空白畫面）
-- `totalNetAmount` MUST 等於該月所有支出紀錄金額加總（SC-004）
+- 欄位：`incomeAmount` 為該帳戶當月正數金額加總、`expenseAmount` 為負數金額的絕對值加總（兩者皆為正數），`netAmount = incomeAmount − expenseAmount`；`total*` 為所有帳戶加總。`accounts[]` 只列出當月有紀錄的帳戶；帳戶已被刪除時 `paymentAccountName` 為 `null`（前端顯示「已刪除帳戶」）
+- 邏輯：statistics 模組直接呼叫 expense 模組取得該月全部紀錄，依 `paymentAccountId` 分別加總收入與支出；當月無紀錄時回傳空陣列，且所有 `total*` 皆為 0（FR-011，非錯誤或空白畫面）
+- `totalNetAmount` MUST 等於該月所有支出紀錄金額加總，且等於 `totalIncomeAmount − totalExpenseAmount`（SC-004）
+- Errors: `403 NOT_GROUP_MEMBER`（FR-017）、`400 INVALID_DATE_FORMAT`（`month` 非 `YYYY-MM`）
 
 ## 內部 API（僅供 notification-service 呼叫，`X-Internal-Token` 驗證）
 
@@ -244,5 +259,5 @@ app-service 內部 family/expense/statistics 模組間的呼叫（例如 expense
 
 ### `GET /api/internal/statistics/monthly?familyGroupId=&month=YYYY-MM`
 - Header: `X-Internal-Token`
-- Response：格式同公開版 `GET /api/statistics/monthly`
+- Response：格式同公開版 `GET /api/statistics/monthly`（notification-service 只讀取各帳戶與全月的 `netAmount`／`totalNetAmount`，忽略其他欄位）
 - 用途：notification-service 於每月排程通知與 LINE 關鍵字查詢時取得指定家庭的月結彙總；此情境已由 notification-service 依發話者的 LINE 身分決定家庭歸屬，故不再重複驗證呼叫者屬於該家庭

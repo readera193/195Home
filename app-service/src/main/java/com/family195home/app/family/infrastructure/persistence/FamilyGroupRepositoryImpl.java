@@ -2,6 +2,8 @@ package com.family195home.app.family.infrastructure.persistence;
 
 import com.family195home.app.family.application.FamilyGroupRepository;
 import com.family195home.app.family.domain.FamilyGroup;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Repository;
 
@@ -38,5 +40,17 @@ public class FamilyGroupRepositoryImpl implements FamilyGroupRepository {
     @Override
     public Optional<FamilyGroup> findByInviteCode(String inviteCode) {
         return Optional.ofNullable(mapper.selectByInviteCode(inviteCode));
+    }
+
+    @Override
+    public List<Long> findIdsCreatedBeforeWithOnlyPrefixedMembers(
+            String lineUserIdPrefix, LocalDateTime cutoff, int limit) {
+        return mapper.selectIdsCreatedBeforeWithOnlyPrefixedMembers(
+                lineUserIdPrefix, cutoff, limit);
+    }
+
+    @Override
+    public int deleteByIds(List<Long> ids) {
+        return mapper.deleteByIds(ids);
     }
 }

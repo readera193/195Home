@@ -2,6 +2,7 @@ package com.family195home.app.family.infrastructure.persistence;
 
 import com.family195home.app.family.application.UserRepository;
 import com.family195home.app.family.domain.User;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Repository;
@@ -44,5 +45,10 @@ public class UserRepositoryImpl implements UserRepository {
     @Override
     public List<User> findAll() {
         return userMapper.selectAll();
+    }
+
+    @Override
+    public int deleteOrphansByLineUserIdPrefix(String lineUserIdPrefix, LocalDateTime cutoff) {
+        return userMapper.deleteOrphansByLineUserIdPrefix(lineUserIdPrefix, cutoff);
     }
 }

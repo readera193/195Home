@@ -20,7 +20,7 @@ docker compose up -d --build
 
 > 日常開發建議只用 Docker 跑 MySQL、前後端在本機執行，步驟見根目錄 [README.md](../../README.md)「本機開發」。
 
-> docker-compose 以 `SPRING_PROFILES_ACTIVE=dev` 啟動（使用 `application-dev.yml` 的開發用預設機密）；不經 Docker 直接啟動時請加上 profile：`./mvnw spring-boot:run -Dspring-boot.run.profiles=dev`。手動測試 API 可使用 `app-service/http/app-service.http`（VS Code REST Client）。
+> docker-compose 以 `SPRING_PROFILES_ACTIVE=dev` 啟動（使用 `application-dev.yml` 的開發用預設機密）；不經 Docker 直接啟動時請加上 profile：`./mvnw spring-boot:run -Dspring-boot.run.profiles=dev`。手動測試 API 可使用 `app-service/http/app-service.http`（VS Code REST Client），或開啟 Swagger UI `http://localhost:8080/swagger-ui.html`（先呼叫 `POST /api/auth/demo` 取得 token，再按 Authorize 貼上）。
 
 > 系統為 2 個服務（app-service、notification-service），無獨立的 gateway 進程；前端、家庭/支出/統計 API 皆經由 app-service 單一入口存取。
 
@@ -56,8 +56,9 @@ docker compose up -d --build
 ### US4：查看基本統計
 
 1. 呼叫 `GET /api/statistics/monthly?familyGroupId=&month=2026-09`
-2. **預期結果**：`accounts[]` 各帳戶 `netAmount` 加總等於 `totalNetAmount`，且等於該月所有支出紀錄金額加總（可對照 US3 列表結果驗證，SC-004）
-3. 切換至尚無資料的月份 → 預期 `totalNetAmount: 0`，非錯誤
+2. **預期結果**：`accounts[]` 各帳戶 `netAmount` 加總等於 `totalNetAmount`，且等於該月所有支出紀錄金額加總（可對照 US3 列表結果驗證，SC-004）；每個帳戶 `netAmount = incomeAmount − expenseAmount`，且 `totalNetAmount = totalIncomeAmount − totalExpenseAmount`
+3. 切換至尚無資料的月份 → 預期 `accounts: []`、所有 `total*` 皆為 0，非錯誤
+4. 網頁：登入後首頁即為月結統計，切換月份選擇器時收入／支出／結餘、支出占比、收入占比與各帳戶結餘隨之更新；開啟 `/statistics` 會導回首頁
 
 ### US5：每月自動 LINE 通知（需真實 LINE 帳號）
 
@@ -73,6 +74,7 @@ docker compose up -d --build
 2. **預期結果**：收到 2026-07 依支付帳戶彙總的回覆內容
 3. 傳送不符合格式的訊息（如 `hello`）→ 預期收到格式提示
 4. 以尚未登入過平台、或未加入任何家庭的 LINE 帳號傳送 `2026-07` → 預期收到「尚未加入任何家庭」提示，不含任何家庭資料
+5. Rich Menu（需先執行 `scripts/setup-line-richmenu.ps1` 建立選單）：點選「本月」「上月」→ 預期分別收到當月與上月的匯總；點選「其他月份」並選擇日期 → 預期收到該日期所在月份的匯總
 
 ## 執行測試
 

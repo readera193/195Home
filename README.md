@@ -5,23 +5,24 @@
 家庭成員共同記帳、篩選查看、統計月結，並透過 LINE Bot 收到每月支出匯總或主動查詢。
 
 **線上 Demo**：https://p01--app-service--pxrw8nyd5f89.code.run/ （登入頁點「Demo 體驗」即可，免帳號）
+
 **API 文件**：https://p01--app-service--pxrw8nyd5f89.code.run/swagger-ui.html
 
 ## 畫面預覽
 
-| 支出紀錄（篩選、分頁） | 編輯支出（先取得編輯鎖） |
+| 首頁 | 支出紀錄（篩選、分頁） |
 |---|---|
-| ![支出紀錄](docs/screenshots/03-expenses.png) | ![編輯支出](docs/screenshots/05-edit-expense.png) |
+| ![首頁](docs/screenshots/02-home.png) | ![支出紀錄](docs/screenshots/03-expenses.png) |
 
-| 月結統計 | 家庭群組與成員 |
+| 編輯支出（先取得編輯鎖） | 家庭群組與成員 |
 |---|---|
-| ![月結統計](docs/screenshots/06-statistics.png) | ![家庭群組](docs/screenshots/07-family.png) |
+| ![編輯支出](docs/screenshots/05-edit-expense.png) | ![家庭群組](docs/screenshots/07-family.png) |
 
-支援手機版面（RWD）：
+支援手機版面（RWD），並可透過 LINE Bot 的 Rich Menu（本月／上月／其他月份）或輸入 `YYYY-MM` 查詢家庭支出匯總：
 
-| 支出紀錄（手機） | 家庭群組（手機） |
-|---|---|
-| <img src="docs/screenshots/10-mobile-expenses.png" width="260"> | <img src="docs/screenshots/11-mobile-family.png" width="260"> |
+| 支出紀錄（手機） | 家庭群組（手機） | LINE Bot 查詢支出 |
+|---|---|---|
+| <img src="docs/screenshots/10-mobile-expenses.png" width="260"> | <img src="docs/screenshots/11-mobile-family.png" width="260"> | <img src="docs/screenshots/12-line-bot.jpg" width="260"> |
 
 ## 系統架構
 

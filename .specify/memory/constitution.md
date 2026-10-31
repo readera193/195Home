@@ -1,12 +1,3 @@
-<!--
-Sync Impact Report
-- Version: 3.0.1（PATCH：文字澄清，不影響語意）
-- 本檔依「決策過程與決策結果的記錄範圍」規定，僅記錄當下最新結論，不保留被取代的舊版說明
-- 本次調整：原則 IV 測試範例「LINE 綁定唯一性」改為「LINE 身分對應成員」（平台改以 LINE 身分登入，
-  無獨立綁定流程）；原則 VI 的 Rationale 移除服務數量變更的歷史敘述；本 Sync Impact Report 精簡為現況
-- Templates 狀態：.specify/templates/{plan,spec,tasks,checklist}-template.md 皆為通用範本，無需變更
--->
-
 # 家庭共享支出平台 Constitution
 
 ## Core Principles

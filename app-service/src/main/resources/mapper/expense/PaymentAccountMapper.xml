@@ -39,4 +39,9 @@
         ORDER BY created_at ASC
     </select>
 
+    <delete id="deleteByFamilyGroupIds">
+        DELETE FROM payment_accounts WHERE family_group_id IN
+        <foreach collection="familyGroupIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </delete>
+
 </mapper>

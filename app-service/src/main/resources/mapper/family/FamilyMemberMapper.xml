@@ -62,4 +62,9 @@
         LIMIT 1
     </select>
 
+    <delete id="deleteByGroupIds">
+        DELETE FROM family_members WHERE family_group_id IN
+        <foreach collection="familyGroupIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </delete>
+
 </mapper>

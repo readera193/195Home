@@ -20,8 +20,8 @@
 
 ## 4. 統計資料計算策略（FR-011）
 
-- **Decision**: statistics 模組不建立獨立資料表，每次請求時在 app-service 進程內**直接呼叫 expense 模組的 service 層方法**（Java 方法呼叫，非網路請求）取得指定月份、指定家庭的支出紀錄，於記憶體中依支付帳戶彙總淨額後回傳，不做持久化快取。
-- **Rationale**: statistics 與 expense 同屬 app-service 一個進程，不需跨進程呼叫，直接方法呼叫更簡單、無序列化與網路延遲開銷；家庭規模資料量小（單一家庭每月約數十至數百筆紀錄），仍可滿足 SC-003（篩選 2 秒內顯示）與統計頁效能需求，同時避免快取層與資料同步一致性問題，符合原則 VI 簡潔優先。
+- **Decision**: statistics 模組不建立獨立資料表，每次請求時在 app-service 進程內**直接呼叫 expense 模組的 service 層方法**（Java 方法呼叫，非網路請求）取得指定月份、指定家庭的支出紀錄，於記憶體中依支付帳戶分別加總收入（正數）、支出（負數取絕對值）與淨額後回傳，不做持久化快取。網頁的月結統計位於首頁（收入／支出／結餘與各帳戶占比），LINE 訊息只使用淨額。
+- **Rationale**: statistics 與 expense 同屬 app-service 一個進程，不需跨進程呼叫，直接方法呼叫更簡單、無序列化與網路延遲開銷；家庭規模資料量小（單一家庭每月約數十至數百筆紀錄），仍可滿足 SC-003（篩選 2 秒內顯示）與首頁統計的效能需求，同時避免快取層與資料同步一致性問題，符合原則 VI 簡潔優先。收入、支出於同一次彙總算出，前端不必自行從明細計算。
 
 ## 5. 設定管理方式
 
@@ -36,11 +36,11 @@
 ## 7. 身份驗證與服務間信任機制（FR-024）
 
 - **Decision**:
-  - 平台以 **LINE 身分登入**（FR-024），無密碼：`POST /api/auth/line` 帶入 `code`，由 `family/application/LineLoginClient`（port）換取 `LineProfile(lineUserId, displayName)`；首次登入自動建立 `users` 紀錄，之後登入同步 LINE 暱稱（`users.display_name_customized` 為 true，即本人或管理者編輯過名稱者除外，FR-031）。實作為 `LineOAuthLoginClient`（以授權碼向 LINE 換 access token 再取 profile，失敗回 `401 LINE_LOGIN_FAILED`；channel 設定 `LINE_LOGIN_CHANNEL_ID`／`LINE_LOGIN_CHANNEL_SECRET`／`LINE_LOGIN_REDIRECT_URI` 缺少即啟動失敗）。前端有設定 `VITE_LINE_CHANNEL_ID` 時導向 LINE 授權頁（帶 `state` 防 CSRF），回呼 `/login/callback` 驗證 state 後以授權碼登入；未設定則不顯示 LINE 登入按鈕。另提供 **Demo 體驗登入**（`POST /api/auth/demo`，無需輸入，建立 `lineUserId = "demo-<uuid>"`、顯示名稱「使用者」的隨機帳號），由 `app.demo-login.enabled`（環境變數 `DEMO_LOGIN_ENABLED`，dev 預設開啟、其餘預設關閉）控制，前端以 `GET /api/auth/config` 判斷是否顯示；月結推播略過 `demo-` 開頭的帳號。真實 LINE Login channel 與 Messaging API channel 須屬同一個 LINE Provider，userId 才一致。
+  - 平台以 **LINE 身分登入**（FR-024），無密碼：`POST /api/auth/line` 帶入 `code`，由 `family/application/LineLoginClient`（port）換取 `LineProfile(lineUserId, displayName)`；首次登入自動建立 `users` 紀錄，之後登入同步 LINE 暱稱（`users.display_name_customized` 為 true，即本人或管理者編輯過名稱者除外，FR-031）。實作為 `LineOAuthLoginClient`（以授權碼向 LINE 換 access token 再取 profile，失敗回 `401 LINE_LOGIN_FAILED`；channel 設定 `LINE_LOGIN_CHANNEL_ID`／`LINE_LOGIN_CHANNEL_SECRET`／`LINE_LOGIN_REDIRECT_URI` 缺少即啟動失敗）。前端有設定 `VITE_LINE_CHANNEL_ID` 時導向 LINE 授權頁（帶 `state` 防 CSRF），回呼 `/login/callback` 驗證 state 後以授權碼登入；未設定則不顯示 LINE 登入按鈕。另提供 **Demo 體驗登入**（`POST /api/auth/demo`，無需輸入，建立 `lineUserId = "demo-<uuid>"`、顯示名稱「使用者」的隨機帳號），由 `app.demo-login.enabled`（環境變數 `DEMO_LOGIN_ENABLED`，dev 預設開啟、其餘預設關閉）控制，前端以 `GET /api/auth/config` 判斷是否顯示；月結推播略過 `demo-` 開頭的帳號。公開展示環境的防護：`DemoLoginRateLimiter` 以固定一小時時間窗、記憶體計數限制每個來源 IP 與全站的 Demo 登入次數（超過回 `429 DEMO_LOGIN_RATE_LIMITED`；單一 app-service 實例不需分散式計數，`server.forward-headers-strategy=framework` 還原反向代理後的真實 IP）；`DemoDataCleanupScheduler` 每小時清除超過保留時間的 Demo 資料，刪除由 family、expense 模組各自提供的方法完成，demo 套件只協調順序（原則 I）。真實 LINE Login channel 與 Messaging API channel 須屬同一個 LINE Provider，userId 才一致。
   - 登入成功後由 app-service 核發 **JWT**（HS256，簽章密鑰為 app-service 自身設定），Claim 包含 `sub`(userId)、`displayName`、`iat`、`exp`（有效期 2 小時）。
   - 前端後續請求以 `Authorization: Bearer <JWT>` 帶入；app-service 內建 Spring Security filter **本地驗證**簽章與過期時間，驗證失敗回傳 `401`（Problem Details 格式，`code = UNAUTHORIZED`，見決策 13）。**無獨立 Gateway 進程**——app-service 本身就是驗證與業務邏輯的唯一入口。
   - 分層：登入簽發透過 `family/application/TokenIssuer`（port）抽象，`infrastructure/security/JwtTokenProvider` 為其 adapter，`UserService` 不直接依賴 infrastructure；本地驗證由 Spring Security filter（`JwtAuthFilter`）直接使用 `JwtTokenProvider`。
-  - 家庭成員角色（ADMIN/MEMBER）與在職狀態屬於可變動狀態，不放入 JWT claim；expense、statistics 模組需要判斷「當下角色/是否仍在職」時（例如編輯他人支出紀錄、月結統計歸屬驗證），**直接呼叫 family 模組的 service 方法**確認（同進程方法呼叫），避免已被踢出或角色已轉移的成員在 JWT 到期前仍持有舊權限。
+  - 家庭成員角色（ADMIN/MEMBER）與在職狀態屬於可變動狀態，不放入 JWT claim；expense、statistics 模組需要判斷「當下角色/是否仍在職」時（例如編輯他人支出紀錄、月結統計歸屬驗證），**透過 family 模組對外的 port `FamilyAccess` 確認**（`requireMember`／`requireAdmin` 驗證在職成員／管理者並回傳成員 id，`groupState` 回傳群組狀態；由 `FamilyService` 實作，同進程方法呼叫），其他模組不依賴 family 的 domain 型別，也避免已被踢出或角色已轉移的成員在 JWT 到期前仍持有舊權限。
   - notification-service 自身的維運端點 `/api/notifications/**` 同樣以 `X-Internal-Token` 保護（`HandlerInterceptor`，常數時間比較），避免通知紀錄（含 LINE userId）被匿名讀取；LINE Webhook 仍由 `X-Line-Signature` 驗證。
   - notification-service 呼叫 app-service 的內部端點（取得所有在職成員的 LINE 身分清單、依 LINE userId 查詢所屬家庭、查詢月結彙總）**無平台使用者 JWT**，改以服務間共用密鑰 Header `X-Internal-Token` 驗證呼叫來源為受信任的服務；此為系統中唯一保留的跨進程身分驗證機制。
   - 登出僅為前端捨棄 token 的客戶端行為；JWT 為無狀態設計，本階段不提供伺服器端強制註銷機制（如黑名單），屬可接受的簡化。
@@ -48,8 +48,8 @@
 
 ## 8. 每月排程觸發機制（FR-013）
 
-- **Decision**: notification-service 使用 Spring 內建 `@Scheduled(cron = "0 0 23 L * ?")` 觸發每月最後一天 23:00 的通知流程。
-- **Rationale**: Spring 5.3+ 原生支援 cron 表達式中的 `L`（月最後一天），無需引入 Quartz 等額外排程框架。
+- **Decision**: notification-service 使用 Spring 內建 `@Scheduled(cron = "0 0 23 L * ?", zone = "Asia/Taipei")` 觸發每月最後一天台灣時間 23:00 的通知流程；兩個服務的容器皆以 `-Duser.timezone=Asia/Taipei` 啟動，使自然月邊界與支出預設日期一致採台灣時間。推播失敗的重試間隔為線性遞增（`app.notification.retry-backoff-ms` × 已嘗試次數）。
+- **Rationale**: Spring 5.3+ 原生支援 cron 表達式中的 `L`（月最後一天），無需引入 Quartz 等額外排程框架；明確指定時區可避免容器預設 UTC 造成推播時間與月份邊界偏移；短暫等待後重試可提高 LINE API 暫時性錯誤的成功率，且月結推播為每月一次的批次，等待成本可忽略。
 
 ## 9. 前端資料串接方式
 
@@ -84,8 +84,13 @@
 
 ## 15. 前端工具鏈與開發輔助
 
-- **Decision**: 前端採 ESLint 9（flat config，`typescript-eslint` + `react-hooks` + `react-refresh`），tsconfig 拆為 `tsconfig.app.json`（`src/`、`tests/`）與 `tsconfig.node.json`（`vite.config.ts`），`npm run build` 以 `tsc -b` 型別檢查；CI 依序執行 `npm ci` → `lint` → `build` → `test`。後端兩個服務提供 Maven Wrapper（`mvnw`），本機、CI 與文件指令一律使用 `./mvnw`。開發輔助檔：`app-service/http/app-service.http`（REST Client 手動測試）、`.vscode/tasks.json` 與 `extensions.json`（共用，其餘 `.vscode/` 內容不納入版控）、根目錄 `TESTING.md`（測試分類、profile、Migration 規則）。
-- **Rationale**: lint 與型別檢查納入 CI 可擋下 `any` 濫用等問題；Maven Wrapper 固定建置版本，消除「我的電腦可以、CI 不行」；`.http` 與 tasks 讓新加入者以最少步驟操作與驗證系統（呼應 constitution 原則 VII 的低門檻精神）。
+- **Decision**: 前端採 ESLint 9（flat config，`typescript-eslint` + `react-hooks` + `react-refresh`）與 Prettier，tsconfig 拆為 `tsconfig.app.json`（`src/`、`tests/`）與 `tsconfig.node.json`（`vite.config.ts`），`npm run build` 以 `tsc -b` 型別檢查；CI 依序執行 `npm ci` → `lint` → `format:check` → `build` → `test`。後端兩個服務提供 Maven Wrapper（`mvnw`），本機、CI 與文件指令一律使用 `./mvnw`；程式碼格式以 Spotless（google-java-format AOSP 風格）統一，`./mvnw spotless:apply` 自動排版。app-service 以 springdoc-openapi 產生對外 API 文件（`/swagger-ui.html`、`/v3/api-docs`，排除 `/api/internal/**`）。開發輔助檔：`app-service/http/app-service.http`（REST Client 手動測試）、`.vscode/tasks.json` 與 `extensions.json`（共用，其餘 `.vscode/` 內容不納入版控）、根目錄 `TESTING.md`（測試分類、profile、Migration 規則）、`docs/`（開發說明與 ADR）、`scripts/setup-line-richmenu.ps1`（以 Messaging API 建立 LINE Rich Menu）。
+- **Rationale**: lint、格式與型別檢查納入 CI 可擋下 `any` 濫用等問題，並讓 diff 只呈現實質變更；Maven Wrapper 固定建置版本，消除「我的電腦可以、CI 不行」；OpenAPI 文件與 `.http`、tasks 讓新加入者以最少步驟操作與驗證系統（呼應 constitution 原則 VII 的低門檻精神）。
+
+## 16. 請求追蹤（requestId）
+
+- **Decision**: 兩個服務各有 `RequestIdFilter`（最先執行）：沿用呼叫端的 `X-Request-Id`（限 `[A-Za-z0-9._-]{1,64}`，避免日誌注入），否則產生 UUID；寫入 MDC，日誌格式以 `%X{requestId}` 帶出，並回傳於回應標頭。notification-service 呼叫 app-service 時轉送目前的 requestId；每月排程沒有請求，每次執行產生 `monthly-<YYYY-MM>-<8 碼>` 作為 run id。
+- **Rationale**: 只有兩個服務，不需要引入分散式追蹤系統；以標準 MDC 與一個 HTTP 標頭即可把同一次操作跨服務的日誌串起來，使用者回報問題時也能憑回應標頭的 requestId 查詢，符合原則 VI。
 
 ---
 

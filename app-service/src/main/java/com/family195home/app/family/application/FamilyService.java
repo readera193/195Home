@@ -293,6 +293,23 @@ public class FamilyService implements FamilyAccess {
         return member;
     }
 
+    /** 建立於 cutoff 之前、且成員全是 Demo 帳號的群組 id（有真實 LINE 使用者加入的群組不會被選中），最多 limit 筆。 */
+    @Transactional(readOnly = true)
+    public List<Long> findExpiredDemoGroupIds(LocalDateTime cutoff, int limit) {
+        return familyGroupRepository.findIdsCreatedBeforeWithOnlyPrefixedMembers(
+                UserService.DEMO_LINE_USER_ID_PREFIX, cutoff, limit);
+    }
+
+    /** 刪除群組及其成員紀錄（Demo 資料清理用）；呼叫前須先清除其他模組參照這些群組的資料。 */
+    @Transactional
+    public void purgeGroups(List<Long> familyGroupIds) {
+        if (familyGroupIds.isEmpty()) {
+            return;
+        }
+        familyMemberRepository.deleteByGroupIds(familyGroupIds);
+        familyGroupRepository.deleteByIds(familyGroupIds);
+    }
+
     private String generateUniqueInviteCode() {
         String code;
         do {

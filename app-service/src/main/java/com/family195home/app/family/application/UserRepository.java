@@ -1,6 +1,7 @@
 package com.family195home.app.family.application;
 
 import com.family195home.app.family.domain.User;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,4 +19,7 @@ public interface UserRepository {
     Optional<User> findById(Long id);
 
     List<User> findAll();
+
+    /** 刪除 line_user_id 以 prefix 開頭、建立於 cutoff 之前、且已無任何群組成員身分的帳號（Demo 資料清理用）。 */
+    int deleteOrphansByLineUserIdPrefix(String lineUserIdPrefix, LocalDateTime cutoff);
 }

@@ -41,4 +41,9 @@ public class PaymentAccountRepositoryImpl implements PaymentAccountRepository {
     public List<PaymentAccount> findByGroupId(Long familyGroupId, PaymentAccountStatus status) {
         return mapper.selectByGroupId(familyGroupId, status == null ? null : status.name());
     }
+
+    @Override
+    public int deleteByFamilyGroupIds(List<Long> familyGroupIds) {
+        return mapper.deleteByFamilyGroupIds(familyGroupIds);
+    }
 }

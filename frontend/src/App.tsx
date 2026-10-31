@@ -9,7 +9,6 @@ import HomePage from './pages/HomePage';
 import FamilyGroupPage from './pages/FamilyGroupPage';
 import PaymentAccountsPage from './pages/PaymentAccountsPage';
 import ExpenseListPage from './pages/ExpenseListPage';
-import StatisticsPage from './pages/StatisticsPage';
 
 export default function App() {
   return (
@@ -31,7 +30,7 @@ export default function App() {
             <Route path="/accounts" element={<PaymentAccountsPage />} />
             <Route path="/expenses/new" element={<Navigate to="/expenses" replace />} />
             <Route path="/expenses" element={<ExpenseListPage />} />
-            <Route path="/statistics" element={<StatisticsPage />} />
+            <Route path="/statistics" element={<Navigate to="/" replace />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

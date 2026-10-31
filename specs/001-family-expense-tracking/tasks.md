@@ -78,14 +78,14 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 - [X] T016 [P] [US1] 建立 FamilyGroup 資料模型（POJO）、repository 介面與 MyBatis Mapper（`name` 全系統唯一、`status` ACTIVE/DISSOLVED、`inviteCode`）於 `app-service/src/main/java/com/family195home/app/family/domain/FamilyGroup.java`、`application/FamilyGroupRepository.java`、`infrastructure/persistence/FamilyGroupRepositoryImpl.java`、`infrastructure/persistence/FamilyGroupMapper.java`、`resources/mapper/family/FamilyGroupMapper.xml`
 - [X] T017 [P] [US1] 建立 FamilyMember 資料模型（POJO）、repository 介面與 MyBatis Mapper（`status` ACTIVE/LEFT/REMOVED、`role` ADMIN/MEMBER、`joinedAt`/`leftAt`）於 `app-service/src/main/java/com/family195home/app/family/domain/FamilyMember.java`、`application/FamilyMemberRepository.java`、`infrastructure/persistence/FamilyMemberRepositoryImpl.java`、`infrastructure/persistence/FamilyMemberMapper.java`、`resources/mapper/family/FamilyMemberMapper.xml`
-- [X] T018 [US1] 實作 FamilyService 建立群組邏輯：群組名稱唯一性檢查（重複回傳 `409 GROUP_NAME_TAKEN`，FR-001）、建立者自動成為 `ADMIN`；加入群組邏輯：邀請碼驗證（`404 INVALID_INVITE_CODE`）、群組已解散拒絕（`409 GROUP_DISSOLVED`）、單一在職群組限制（已屬於群組者拒絕，`409 ALREADY_IN_A_GROUP`，FR-026）；若使用者對該群組已存在一筆 `status=REMOVED` 的 FamilyMember 紀錄則拒絕並回傳 `403 MEMBER_REMOVED`（FR-030）；若已存在 `status=LEFT` 的紀錄，加入時重複使用該筆紀錄並將狀態恢復為 `ACTIVE`（`role` 維持原值或預設 `MEMBER`），保留原歷史支出紀錄歸屬，不建立新的 FamilyMember（FR-025）於 `app-service/src/main/java/com/family195home/app/family/application/FamilyService.java`（依賴 T016、T017）
-- [X] T019 [US1] 實作離開群組邏輯：唯一在職成員離開 → 群組標記 `DISSOLVED`（FR-018）；`ADMIN` 離開且尚有其他在職成員 → 自動將 `ADMIN` 轉移給群組內 `joinedAt` 最早的其他在職成員（FR-029）於 `FamilyService.java`
+- [X] T018 [US1] 實作 FamilyService 建立群組邏輯：群組名稱唯一性檢查（重複回傳 `409 GROUP_NAME_TAKEN`，FR-001）、建立者自動成為 `ADMIN`；加入群組邏輯：邀請碼驗證（`404 INVALID_INVITE_CODE`）、群組已解散拒絕（`409 GROUP_DISSOLVED`）、單一在職群組限制（已屬於群組者拒絕，`409 ALREADY_IN_A_GROUP`，FR-026）；若使用者對該群組已存在一筆 `status=REMOVED` 的 FamilyMember 紀錄則拒絕並回傳 `403 MEMBER_REMOVED`（FR-030）；若已存在 `status=LEFT` 的紀錄，加入時重複使用該筆紀錄並將狀態恢復為 `ACTIVE`（重新加入後 `role` 為 `MEMBER`，FR-033），保留原歷史支出紀錄歸屬，不建立新的 FamilyMember（FR-025）於 `app-service/src/main/java/com/family195home/app/family/application/FamilyService.java`（依賴 T016、T017）
+- [X] T019 [US1] 實作離開群組邏輯：唯一在職成員離開 → 群組標記 `DISSOLVED`（FR-018）；`ADMIN` 離開且尚有其他在職成員 → 須指定一位其他在職成員接任（FR-029，見 T107）於 `FamilyService.java`
 - [X] T020 [US1] 實作移出成員（kick）邏輯：限該群組 `ADMIN` 呼叫，否則回傳 `403 NOT_GROUP_ADMIN`；被移出成員狀態變更為 `REMOVED`（FR-028）；另實作 `restoreEligibility`：限 `ADMIN` 將 `REMOVED` 成員恢復為 `LEFT`，非 `REMOVED` 者回傳 `409 MEMBER_NOT_REMOVED`（FR-030）於 `FamilyService.java`
-- [X] T021 [US1] 實作 `FamilyService` 內部方法 `assertMemberAuthorized(familyGroupId, callerUserId, requiredRole)`：同進程 Java 方法呼叫，供 expense、statistics 模組直接呼叫確認呼叫者當下角色與在職狀態（FR-019），未授權時拋出對應例外供上層轉換為 HTTP 錯誤碼
-- [X] T022 [P] [US1] 實作 `POST /api/families`、`POST /api/families/join`、`GET /api/families/{id}/members?includeLeft=`（已離開成員標示保留於清單，FR-021；呼叫 `assertMemberAuthorized` 確認呼叫者本身即為該 `{id}` 家庭群組成員，否則回傳 `403`，FR-017）、`POST .../{memberId}/leave`、`POST .../{memberId}/kick`、`POST .../{memberId}/restore-eligibility` 端點於 `app-service/src/main/java/com/family195home/app/family/presentation/FamilyController.java`（依賴 T018、T019、T020、T021）
-- [X] T023 [P] [US1] 單元測試：群組名稱唯一性、單一在職群組限制（FR-026）、唯一成員離開解散群組（FR-018）、管理者自動轉移（FR-029）、kick 權限判斷與狀態變為 `REMOVED`（FR-028）、被移出成員以邀請碼加入被拒絕且管理者恢復資格後方可重新加入（FR-030）、已離開成員以邀請碼重新加入後狀態恢復為 `ACTIVE` 且沿用原 FamilyMember id（FR-025）、`assertMemberAuthorized` 各角色情境於 `app-service/src/test/java/com/family195home/app/family/application/FamilyServiceTest.java`
-- [X] T024 [P] [US1] 前端建立家庭群組頁面（建立群組表單、顯示邀請碼/邀請連結、輸入邀請碼加入）於 `frontend/src/pages/FamilyGroupPage.tsx`
-- [X] T025 [P] [US1] 前端成員列表（已併入家庭群組頁，見 T098；顯示在職成員與可收合的「已不在群組」區（已封鎖/已退出）、管理者可移出成員與「解除封鎖」被移出成員、本人可離開群組）於 `frontend/src/pages/FamilyGroupPage.tsx`
+- [X] T021 [US1] 實作 family 模組對外的授權 port `FamilyAccess`（`requireMember(familyGroupId, callerUserId)`／`requireAdmin(...)` 回傳成員 id、`groupState(familyGroupId)` 回傳群組狀態），由 `FamilyService` 實作：同進程 Java 方法呼叫，供 expense、statistics 模組確認呼叫者當下角色與在職狀態（FR-019），未授權時拋出 `403 NOT_GROUP_MEMBER`／`NOT_GROUP_ADMIN` 供上層轉換為 HTTP 錯誤碼
+- [X] T022 [P] [US1] 實作 `POST /api/families`、`POST /api/families/join`、`GET /api/families/{id}/members?includeLeft=`（已離開成員標示保留於清單，FR-021；呼叫 `FamilyAccess` 確認呼叫者本身即為該 `{id}` 家庭群組成員，否則回傳 `403`，FR-017）、`POST .../{memberId}/leave`、`POST .../{memberId}/kick`、`POST .../{memberId}/restore-eligibility` 端點於 `app-service/src/main/java/com/family195home/app/family/presentation/FamilyController.java`（依賴 T018、T019、T020、T021）
+- [X] T023 [P] [US1] 單元測試：群組名稱唯一性、單一在職群組限制（FR-026）、唯一成員離開解散群組（FR-018）、管理者自動轉移（FR-029）、kick 權限判斷與狀態變為 `REMOVED`（FR-028）、被移出成員以邀請碼加入被拒絕且管理者恢復資格後方可重新加入（FR-030）、已離開成員以邀請碼重新加入後狀態恢復為 `ACTIVE` 且沿用原 FamilyMember id（FR-025）、`FamilyAccess` 各角色情境於 `app-service/src/test/java/com/family195home/app/family/application/FamilyServiceTest.java`
+- [X] T024 [P] [US1] 前端建立家庭群組頁面（建立群組表單、顯示邀請碼並可一鍵複製、輸入邀請碼加入）於 `frontend/src/pages/FamilyGroupPage.tsx`
+- [X] T025 [P] [US1] 前端成員列表（位於家庭群組頁；顯示在職成員與可收合的「已不在群組」區（已封鎖/已退出）、管理者可移出成員與「解除封鎖」被移出成員、本人可離開群組）於 `frontend/src/pages/FamilyGroupPage.tsx`
 - [X] T026 [US1] 前端封裝家庭群組相關 API 呼叫於 `frontend/src/services/familyApi.ts`（依賴 T014 的 apiClient）
 
 **Checkpoint**: User Story 1 應可獨立完整運作與測試
@@ -103,13 +103,13 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 - [X] T027 [P] [US2] 建立 PaymentAccount 資料模型（POJO）、repository 介面與 MyBatis Mapper（`status` ACTIVE/DISABLED）於 `app-service/src/main/java/com/family195home/app/expense/domain/PaymentAccount.java`、`application/PaymentAccountRepository.java`、`infrastructure/persistence/PaymentAccountRepositoryImpl.java`、`infrastructure/persistence/PaymentAccountMapper.java`、`resources/mapper/expense/PaymentAccountMapper.xml`
 - [X] T028 [P] [US2] 建立 ExpenseRecord 資料模型（POJO）、repository 介面與 MyBatis Mapper（含 `amount`、`note`、`occurredAt`、`lockedByMemberId`、`lockedAt` 欄位）於 `app-service/src/main/java/com/family195home/app/expense/domain/ExpenseRecord.java`、`application/ExpenseRecordRepository.java`、`infrastructure/persistence/ExpenseRecordRepositoryImpl.java`、`infrastructure/persistence/ExpenseRecordMapper.java`、`resources/mapper/expense/ExpenseRecordMapper.xml`
 - [X] T029 [US2] 實作 PaymentAccountService：建立／改名支付帳戶（限 `ADMIN`，一般成員回傳 `403 NOT_GROUP_ADMIN`，FR-003，群組已解散時拒絕建立並回傳 `409 GROUP_DISSOLVED`，FR-018）、軟停用與刪除邏輯（限 `ADMIN`；`DISABLED` 後不可供新支出選用，且不允許真正刪除已使用過的帳戶，FR-022）於 `app-service/src/main/java/com/family195home/app/expense/application/PaymentAccountService.java`（依賴 T027）
-- [X] T030 [P] [US2] 實作 `POST /api/accounts`、`GET /api/accounts?familyGroupId=&status=`（呼叫 `assertMemberAuthorized` 確認呼叫者屬於 `familyGroupId`，否則回傳 `403`，FR-017）、`PUT /api/accounts/{id}`、`DELETE /api/accounts/{id}`（未使用過才可刪，否則 `409 ACCOUNT_IN_USE`）、`POST /api/accounts/{id}/disable` 端點（皆限 `ADMIN`）於 `app-service/src/main/java/com/family195home/app/expense/presentation/PaymentAccountController.java`（依賴 T021、T029）
+- [X] T030 [P] [US2] 實作 `POST /api/accounts`、`GET /api/accounts?familyGroupId=&status=`（呼叫 `FamilyAccess` 確認呼叫者屬於 `familyGroupId`，否則回傳 `403`，FR-017）、`PUT /api/accounts/{id}`、`DELETE /api/accounts/{id}`（未使用過才可刪，否則 `409 ACCOUNT_IN_USE`）、`POST /api/accounts/{id}/disable` 端點（皆限 `ADMIN`）於 `app-service/src/main/java/com/family195home/app/expense/presentation/PaymentAccountController.java`（依賴 T021、T029）
 - [X] T031 [US2] 實作 ExpenseService 新增邏輯：金額須為整數且可正可負可零（非整數回傳 `400 AMOUNT_MUST_BE_INTEGER`，FR-016）、說明與支付帳戶必填驗證（`400 NOTE_REQUIRED`/`400 PAYMENT_ACCOUNT_REQUIRED`）、未指定日期時預設伺服器當下時間（FR-005）、群組已解散拒絕新增（`409 GROUP_DISSOLVED`，FR-018）於 `app-service/src/main/java/com/family195home/app/expense/application/ExpenseService.java`（依賴 T028）
 - [X] T032 [US2] 實作併發編輯鎖定邏輯：以條件式 UPDATE（`locked_by_member_id IS NULL OR locked_at < now-5min`）取得鎖、`POST /api/expenses/{id}/lock`（取得失敗回傳 `409 RECORD_LOCKED`）、`POST /api/expenses/{id}/unlock`（FR-027，見 research.md 決策 3）於 `ExpenseService.java`
-- [X] T033 [US2] 實作編輯/刪除邏輯：直接呼叫 T021 建立的 `FamilyService.assertMemberAuthorized(...)` 方法（同進程呼叫，非 HTTP）確認操作者為該群組在職成員（管理者與一般成員權限相同，不限新增者本人，FR-019）、須已持有鎖方可操作（未持有回傳 `403 LOCK_NOT_HELD_BY_CALLER`）、`PUT /api/expenses/{id}`（成功後自動釋放鎖）、`DELETE /api/expenses/{id}` 於 `ExpenseService.java`（依賴 T021、T032）
+- [X] T033 [US2] 實作編輯/刪除邏輯：直接呼叫 T021 建立的 `FamilyAccess.requireMember(...)` 方法（同進程呼叫，非 HTTP）確認操作者為該群組在職成員（管理者與一般成員權限相同，不限新增者本人，FR-019）、須已持有鎖方可操作（未持有回傳 `403 LOCK_NOT_HELD_BY_CALLER`）、`PUT /api/expenses/{id}`（成功後自動釋放鎖）、`DELETE /api/expenses/{id}` 於 `ExpenseService.java`（依賴 T021、T032）
 - [X] T034 [P] [US2] 實作 `POST /api/expenses` 建立端點於 `app-service/src/main/java/com/family195home/app/expense/presentation/ExpenseController.java`（依賴 T031）
 - [X] T035 [US2] 實作 `PUT /api/expenses/{id}`、`DELETE /api/expenses/{id}`、`POST /api/expenses/{id}/lock`、`POST /api/expenses/{id}/unlock` 端點於 `ExpenseController.java`（依賴 T032、T033）
-- [X] T036 [P] [US2] 單元測試：金額整數與正負零驗證（FR-016）、併發鎖定取得與釋放邏輯（FR-027）、編輯/刪除權限判斷（群組任一在職成員皆可、非成員拒絕，FR-019，含呼叫 `assertMemberAuthorized` 的整合行為）於 `app-service/src/test/java/com/family195home/app/expense/application/ExpenseServiceTest.java`
+- [X] T036 [P] [US2] 單元測試：金額整數與正負零驗證（FR-016）、併發鎖定取得與釋放邏輯（FR-027）、編輯/刪除權限判斷（群組任一在職成員皆可、非成員拒絕，FR-019，含呼叫 `FamilyAccess` 的整合行為）於 `app-service/src/test/java/com/family195home/app/expense/application/ExpenseServiceTest.java`
 - [X] T037 [P] [US2] 前端支付帳戶管理頁面（管理者可建立、改名、停用、刪除支付帳戶，一般成員僅檢視）於 `frontend/src/pages/PaymentAccountsPage.tsx`
 - [X] T038 [P] [US2] 前端新增支出表單（金額、說明、支付帳戶、日期，含前端整數驗證與必填提示），內嵌於 `frontend/src/pages/ExpenseListPage.tsx`
 - [X] T039 [US2] 前端封裝支出相關 API 呼叫於 `frontend/src/services/expenseApi.ts`（依賴 T014 的 apiClient）
@@ -126,7 +126,7 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 ### Implementation for User Story 3
 
-- [X] T040 [US3] 實作 `GET /api/expenses?familyGroupId=&paymentAccountId=&authorMemberId=&month=` 列表與篩選邏輯（`paymentAccountId`、`authorMemberId` 可單獨或同時套用，FR-008/FR-009/FR-010；家庭範圍隔離：呼叫 T021 的 `assertMemberAuthorized` 確認呼叫者屬於 `familyGroupId`，否則回傳 `403`，FR-017）於 `app-service/src/main/java/com/family195home/app/expense/presentation/ExpenseController.java` 與 `ExpenseService.java`（依賴 T021、T034）
+- [X] T040 [US3] 實作 `GET /api/expenses?familyGroupId=&paymentAccountId=&authorMemberId=&month=` 列表與篩選邏輯（`paymentAccountId`、`authorMemberId` 可單獨或同時套用，FR-008/FR-009/FR-010；家庭範圍隔離：呼叫 T021 的 `FamilyAccess` 確認呼叫者屬於 `familyGroupId`，否則回傳 `403`，FR-017）於 `app-service/src/main/java/com/family195home/app/expense/presentation/ExpenseController.java` 與 `ExpenseService.java`（依賴 T021、T034）
 - [X] T041 [P] [US3] 前端支出紀錄列表頁面（顯示家庭內所有成員紀錄、支付帳戶篩選下拉、成員篩選下拉，含已離開成員標示）於 `frontend/src/pages/ExpenseListPage.tsx`
 - [X] T042 [US3] 前端 `expenseApi.ts` 擴充篩選查詢參數支援（依賴 T039、T040）
 
@@ -138,14 +138,14 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 **Goal**: 成員可查看依支付帳戶彙總的月結淨額統計，並可透過月份選擇器查看任一過去月份
 
-**Independent Test**: 家庭中已有本月多筆不同支付帳戶的支出紀錄後，開啟統計頁面，驗證各帳戶淨額加總等於本月所有紀錄金額總和
+**Independent Test**: 家庭中已有本月多筆不同支付帳戶的支出紀錄後，開啟首頁月結統計，驗證各帳戶淨額加總等於本月所有紀錄金額總和
 
 ### Implementation for User Story 4
 
-- [X] T043 [US4] 實作 StatisticsService：同進程直接呼叫 `ExpenseService` 取得指定家庭、指定月份的支出紀錄（Java 方法呼叫，見 research.md 決策 4），依 `paymentAccountId` 加總 `amount` 為 `netAmount`，當月無資料時回傳空陣列與 `totalNetAmount: 0`（非錯誤或空白畫面，FR-011）於 `app-service/src/main/java/com/family195home/app/statistics/application/StatisticsService.java`（依賴 T040）
-- [X] T044 [P] [US4] 實作 `GET /api/statistics/monthly?familyGroupId=&month=` 公開端點（呼叫 T021 的 `assertMemberAuthorized` 確認呼叫者屬於該家庭群組，FR-017）於 `app-service/src/main/java/com/family195home/app/statistics/presentation/StatisticsController.java`（依賴 T043、T021）
+- [X] T043 [US4] 實作 StatisticsService：同進程直接呼叫 `ExpenseService` 取得指定家庭、指定月份的支出紀錄（Java 方法呼叫，見 research.md 決策 4），依 `paymentAccountId` 分別加總收入 `incomeAmount`、支出 `expenseAmount`（絕對值）與淨額 `netAmount`，並計算全月 `totalIncomeAmount`／`totalExpenseAmount`／`totalNetAmount`；當月無資料時回傳空陣列與全部為 0 的合計（非錯誤或空白畫面，FR-011）於 `app-service/src/main/java/com/family195home/app/statistics/application/StatisticsService.java`（依賴 T040）
+- [X] T044 [P] [US4] 實作 `GET /api/statistics/monthly?familyGroupId=&month=` 公開端點（呼叫 T021 的 `FamilyAccess` 確認呼叫者屬於該家庭群組，FR-017）於 `app-service/src/main/java/com/family195home/app/statistics/presentation/StatisticsController.java`（依賴 T043、T021）
 - [X] T045 [P] [US4] 單元測試：各帳戶彙總淨額加總等於當月支出紀錄總和（SC-004）、無資料月份回傳 0 而非錯誤於 `app-service/src/test/java/com/family195home/app/statistics/application/StatisticsServiceTest.java`
-- [X] T046 [P] [US4] 前端統計頁面（月份選擇器、各支付帳戶淨額列表、總計）於 `frontend/src/pages/StatisticsPage.tsx`
+- [X] T046 [P] [US4] 前端首頁月結統計（月份選擇器、收入／支出／結餘、支出占比、收入占比、各帳戶結餘；`/statistics` 導回首頁）於 `frontend/src/pages/HomePage.tsx`
 - [X] T047 [US4] 前端封裝統計 API 呼叫於 `frontend/src/services/statisticsApi.ts`（依賴 T014 的 apiClient）
 
 **Checkpoint**: 核心記帳、查看、統計功能（User Story 1-4）應皆可獨立運作，構成完整可用產品
@@ -162,7 +162,7 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 - [X] T050 [US5] 實作 `LineBindingService`：依 LINE userId 查詢其目前所屬家庭的在職成員（FR-015）、列出所有家庭的在職成員及其 LINE userId（供月結排程），身分直接由 `users.line_user_id` 對應在職 `family_members` 推得，無獨立綁定資料表，於 `app-service/src/main/java/com/family195home/app/family/application/LineBindingService.java`
 - [X] T052 [US5] 實作 `GET /api/internal/line-bindings/by-line-user/{lineUserId}`、`GET /api/internal/line-bindings` 兩個內部端點（受 T013 的 `X-Internal-Token` filter 保護，僅供 notification-service 呼叫）於 `app-service/src/main/java/com/family195home/app/family/presentation/LineBindingController.java`（依賴 T050）
-- [X] T053 [US5] 實作 `GET /api/internal/statistics/monthly` 內部端點（略過 `assertMemberAuthorized` 呼叫，家庭歸屬已由 notification-service 依發話者的 LINE 身分決定）於 `app-service/src/main/java/com/family195home/app/statistics/presentation/StatisticsController.java`（依賴 T043、T013）
+- [X] T053 [US5] 實作 `GET /api/internal/statistics/monthly` 內部端點（略過 `FamilyAccess` 呼叫，家庭歸屬已由 notification-service 依發話者的 LINE 身分決定）於 `app-service/src/main/java/com/family195home/app/statistics/presentation/StatisticsController.java`（依賴 T043、T013）
 - [X] T054 [P] [US5] 單元測試：LINE 身分對應在職成員（未登入過／已離開者查無結果）、列出所有在職成員於 `app-service/src/test/java/com/family195home/app/family/application/LineBindingServiceTest.java`；LINE 登入建立帳號與沿用既有帳號並同步暱稱於 `UserServiceTest.java`
 - [X] T055 [P] [US5] 建立 NotificationLog 資料模型（POJO）、repository 介面與 MyBatis Mapper 於 `notification-service/src/main/java/com/family195home/notification/domain/NotificationLog.java`、`application/NotificationLogRepository.java`、`infrastructure/persistence/NotificationLogRepositoryImpl.java`、`infrastructure/persistence/NotificationLogMapper.java`、`resources/mapper/NotificationLogMapper.xml`
 - [X] T056 [US5] 實作呼叫 app-service 內部 API 的 WebClient client 元件（請求自動帶入 `X-Internal-Token` Header，app-service base URL 由環境變數設定，本機為 docker-compose 服務名稱，正式環境為 Northflank 內部網域，見 research.md 決策 6）於 `notification-service/src/main/java/com/family195home/notification/infrastructure/client/AppServiceClient.java`
@@ -209,22 +209,22 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 **Purpose**: 統一錯誤模型、補上分頁、強化設定與開發體驗；對應 research.md 決策 5、12、13、14、15。各項皆已含測試。
 
-- [X] T073 [P] app-service 統一錯誤模型：`GlobalExceptionHandler` 改為繼承 `ResponseEntityExceptionHandler`，所有錯誤輸出 RFC 9457 Problem Details（`application/problem+json`，含 `code`，驗證失敗另含 `errors[]`）；新增 `ProblemDetails` 工廠，移除 `ErrorResponse`；補上 `DateTimeParseException`→400 `INVALID_DATE_FORMAT`、未預期例外→500 `INTERNAL_ERROR`（不洩漏細節）；保留 `ApiException`／`ErrorKind`，**不引入 Result 型別**，`ApiException`／`ErrorKind` 位於 `app-service/src/main/java/com/family195home/app/shared/`，`GlobalExceptionHandler`／`ProblemDetails` 位於 `.../app/presentation/exception/`，測試 `GlobalExceptionHandlerTest.java`（research.md 決策 13）
+- [X] T073 [P] app-service 統一錯誤模型：`GlobalExceptionHandler` 繼承 `ResponseEntityExceptionHandler`，所有錯誤輸出 RFC 9457 Problem Details（`application/problem+json`，含 `code`，驗證失敗另含 `errors[]`）；`ProblemDetails` 工廠；`DateTimeParseException`→400 `INVALID_DATE_FORMAT`、未預期例外→500 `INTERNAL_ERROR`（不洩漏細節）；業務錯誤以 `ApiException`／`ErrorKind` 傳遞，**不引入 Result 型別**，`ApiException`／`ErrorKind` 位於 `app-service/src/main/java/com/family195home/app/shared/`，`GlobalExceptionHandler`／`ProblemDetails` 位於 `.../app/presentation/exception/`，測試 `GlobalExceptionHandlerTest.java`（research.md 決策 13）
 - [X] T074 [P] Security 層 401／403 回傳 Problem Details：新增 `ProblemDetailAuthHandlers`（`AuthenticationEntryPoint` + `AccessDeniedHandler`）並於 `SecurityConfig` 註冊，於 `app-service/src/main/java/com/family195home/app/infrastructure/security/`，測試 `SecurityErrorResponseTest.java`（`@WebMvcTest`）
-- [X] T075 notification-service 對齊錯誤契約：`ErrorBody` 改讀 Problem Details 的 `code`／`detail`（忽略其餘欄位），錯誤解析抽為 `AppServiceClient.parseError` 並補測試 `AppServiceClientErrorParsingTest.java`；`spring.mvc.problemdetails.enabled=true` 使框架層錯誤格式一致
-- [X] T076 前端錯誤處理對齊：新增 `frontend/src/utils/apiError.ts`（`getErrorMessage`／`getErrorCode`）取代各頁面 `err.response?.data?.message`，移除 `catch (err: any)`；補測試 `frontend/tests/apiError.test.ts`、更新 `LoginPage.test.tsx`
+- [X] T075 notification-service 錯誤契約：`ErrorBody` 讀取 Problem Details 的 `code`／`detail`（忽略其餘欄位），錯誤解析位於 `AppServiceClient.parseError`，測試 `AppServiceClientErrorParsingTest.java`；`spring.mvc.problemdetails.enabled=true` 使框架層錯誤格式一致
+- [X] T076 前端錯誤處理：各頁面統一以 `frontend/src/utils/apiError.ts`（`getErrorMessage`／`getErrorCode`）解析錯誤，`catch` 不使用 `any`；測試 `frontend/tests/apiError.test.ts`、`LoginPage.test.tsx`
 - [X] T077 支出列表分頁（後端）：新增 `shared/PagedResult`、`ExpenseService.listPage`（`page`／`size` 驗證，上限 100，違規 `400 INVALID_PAGE_PARAMS`）、`ExpenseRecordRepository.findPageByFilter`／`countByFilter`、`ExpenseRecordMapper.xml`（共用 `filterWhere`、`ORDER BY occurred_at DESC, id DESC`、`LIMIT/OFFSET`）、`ExpenseController` 回傳分頁結構；statistics 仍走不分頁的 `list`（research.md 決策 14）
 - [X] T078 支出列表分頁（前端）：`expenseApi.listExpenses` 回傳 `PagedResponse`，`ExpenseListPage.tsx` 加上上一頁／下一頁與頁數資訊（切換篩選回第一頁；分頁列載入後一律顯示，僅一頁或無資料時按鈕停用、頁數顯示 1 / 1），測試 `frontend/tests/ExpenseListPage.test.tsx`
 - [X] T079 設定依 profile 拆分：兩個服務各自 `application.yml`（無機密預設值）＋ `application-dev.yml`／`application-prod.yml`＋測試 `application-test.yml`；Dockerfile 預設 `SPRING_PROFILES_ACTIVE=prod`、`docker-compose.yml` 覆寫為 `dev`；整合測試加 `@ActiveProfiles("test")`（research.md 決策 5）
 - [X] T080 [P] 整合測試補分頁 SQL：`ExpenseRecordMapperIntegrationTest` 新增 `pageQuery_ordersNewestFirstWithStableTieBreakAndCountsAll`（Testcontainers，需 Docker）
-- [X] T081 [P] 兩個服務加入 Maven Wrapper（`mvnw`、`mvnw.cmd`、`.mvn/wrapper/`，Maven 3.9.9，only-script 型）與根目錄 `.gitattributes`（`mvnw` 固定 LF）；CI 改用 `./mvnw -B verify`，使 T007、quickstart 描述的 `./mvnw` 指令成真
-- [X] T082 [P] 前端工具鏈：新增 `eslint.config.js`（ESLint 9 flat config）、`npm run lint`；tsconfig 拆為 `tsconfig.app.json`／`tsconfig.node.json`（`vite.config.ts` 改由 `vitest/config` 匯入以通過型別檢查）；CI `frontend` job 改為 `npm ci` → `lint` → `build` → `test`；Dockerfile 前端 stage 改用 `npm ci`
+- [X] T081 [P] 兩個服務加入 Maven Wrapper（`mvnw`、`mvnw.cmd`、`.mvn/wrapper/`，Maven 3.9.9，only-script 型）與根目錄 `.gitattributes`（`mvnw` 固定 LF）；CI 使用 `./mvnw -B verify`
+- [X] T082 [P] 前端工具鏈：新增 `eslint.config.js`（ESLint 9 flat config）、`npm run lint`；tsconfig 分為 `tsconfig.app.json`／`tsconfig.node.json`（`vite.config.ts` 由 `vitest/config` 匯入以通過型別檢查）；CI `frontend` job 依序執行 `npm ci` → `lint` → `format:check` → `build` → `test`；Dockerfile 前端 stage 使用 `npm ci`
 - [X] T083 [P] 開發輔助：`app-service/http/app-service.http`（REST Client）、`.vscode/tasks.json`／`extensions.json`（`.gitignore` 僅放行這兩個檔）、根目錄 `TESTING.md`（測試分類、profile、Migration 規則）；README 同步更新
-- [X] T084 規格書同步：spec.md（第八輪澄清、FR-007／SC-003、US3 情境 5、Assumptions）、contracts（共通約定、分頁、補齊 `familyGroupId` query 與漏列的錯誤代碼）、research.md（決策 5、12、13、14、15）、plan.md、quickstart.md（修正 `X-Internal-Token` 筆誤與測試指令）
-- [X] T085 修正 `unlock` 缺少授權：`ExpenseService.unlock(expenseId, callerUserId)` 驗證呼叫者為紀錄所屬群組在職成員，且鎖仍有效時僅持有者可釋放（`403 LOCK_NOT_HELD_BY_CALLER`），紀錄不存在回 `404 EXPENSE_NOT_FOUND`，未鎖定／已逾時冪等；測試 `ExpenseServiceTest`（FR-017、FR-027）
+- [X] T084 規格書涵蓋錯誤模型與分頁：spec.md（第八輪澄清、FR-007／SC-003、US3 情境 5、Assumptions）、contracts（共通約定、分頁、`familyGroupId` query 與完整錯誤代碼）、research.md（決策 5、12、13、14、15）、plan.md、quickstart.md（`X-Internal-Token` 與測試指令）
+- [X] T085 `unlock` 授權：`ExpenseService.unlock(expenseId, callerUserId)` 驗證呼叫者為紀錄所屬群組在職成員，且鎖仍有效時僅持有者可釋放（`403 LOCK_NOT_HELD_BY_CALLER`），紀錄不存在回 `404 EXPENSE_NOT_FOUND`，未鎖定／已逾時冪等；測試 `ExpenseServiceTest`（FR-017、FR-027）
 - [X] T086 [P] 保護 notification-service 維運端點：新增 `config/InternalTokenInterceptor`、`WebConfig`，`/api/notifications/**` 須帶 `X-Internal-Token`（常數時間比較，401 回 Problem Details），測試 `InternalTokenInterceptorTest.java`（research.md 決策 7）
-- [X] T087 [P] 消除支出列表 N+1：`ExpenseController.list` 每次請求只查一次群組帳戶清單並以 Map 對應 `paymentAccountName`，不再逐筆 `findById`
-- [X] T088 規格書同步：contracts（unlock 授權與錯誤、logs 的 `X-Internal-Token`、`paymentAccountName` 說明）、spec.md 邊界情境（鎖的釋放規則）、research.md 決策 3、7、plan.md
+- [X] T087 [P] 支出列表避免 N+1：`ExpenseController.list` 每次請求只查一次群組帳戶清單並以 Map 對應 `paymentAccountName`
+- [X] T088 規格書涵蓋 unlock 授權與維運端點保護：contracts（unlock 授權與錯誤、logs 的 `X-Internal-Token`、`paymentAccountName` 說明）、spec.md 邊界情境（鎖的釋放規則）、research.md 決策 3、7、plan.md
 
 ---
 
@@ -232,12 +232,12 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 
 **Purpose**: 帳號改為 LINE 身分登入（FR-024）、前端共用版面與 SPA 路由支援；對應 research.md 決策 7、9。
 
-- [X] T089 以 LINE 登入取代 Email + 密碼與綁定碼流程：新增 Flyway `V2__line_login.sql`（移除 `line_binding_codes`、`line_bindings` 與 `users.email`／`password_hash`，新增 `users.line_user_id`／`display_name`）、`LineLoginClient`／`LineProfile` port、`POST /api/auth/line`（原 `DevLineLoginClient` 假登入已於 T098 移除）；移除 `PasswordEncoderConfig`、註冊頁、綁定頁與相關 DTO／Mapper
+- [X] T089 LINE 身分登入：Flyway `V2__line_login.sql`（`users` 以 `line_user_id`／`display_name` 識別，無 email、密碼與綁定資料表）、`LineLoginClient`／`LineProfile` port、`POST /api/auth/line`
 - [X] T090 [P] 新增 `config/SpaFallbackConfig`：前端 BrowserRouter 路由（如 `/login`）直接開啟或重新整理時回傳 `index.html`（`api/`、`actuator/` 路徑除外）
-- [X] T091 [P] 前端共用版面與樣式：`components/Layout.tsx`（導覽列、登出）、`components/InfoTip.tsx`（說明 tooltip）、`styles.css`，各頁面套用；新增支出表單併入 `ExpenseListPage`
+- [X] T091 [P] 前端共用版面與樣式：`components/Layout.tsx`（導覽列、登出）、`components/InfoTip.tsx`（說明 tooltip）、`styles.css`，各頁面套用；新增支出表單位於 `ExpenseListPage`
 - [X] T092 [P] 本機開發體驗：README 「本機開發」兩種方式（只跑 MySQL＋前後端本機執行／全 Docker）、`.vscode/tasks.json` 一鍵啟動、`~/.195home/*.yml` 選用覆蓋檔、`vite.config.ts` 將 `/api` proxy 到 8080
-- [X] T093 實作真實 LINE Login：新增 `LineLoginClient` 的 prod adapter（以授權碼向 LINE 換取 profile）、前端登入頁改為導向 LINE 授權頁並於 callback 以授權碼呼叫 `POST /api/auth/line`；目前 prod profile 沒有 `LineLoginClient` 實作，app-service 無法於 prod 啟動（research.md 決策 7）
-- [X] T094 前端支出編輯／刪除：於 `ExpenseListPage` 提供編輯、刪除操作，串接既有 `lockExpense`／`updateExpense`／`deleteExpense`／`unlockExpense`（`expenseApi.ts` 已封裝），並顯示「紀錄目前正被編輯中」提示（FR-019、FR-027；後端端點已完成）
+- [X] T093 真實 LINE Login：`LineLoginClient` 的 adapter `LineOAuthLoginClient`（以授權碼向 LINE 換取 profile），前端登入頁導向 LINE 授權頁，`LoginCallbackPage` 以授權碼呼叫 `POST /api/auth/line`（research.md 決策 7）
+- [X] T094 前端支出編輯／刪除：於 `ExpenseListPage` 提供編輯、刪除操作，串接 `expenseApi.ts` 的 `lockExpense`／`updateExpense`／`deleteExpense`／`unlockExpense`，並顯示「紀錄目前正被編輯中」提示（FR-019、FR-027）
 
 ---
 
@@ -250,7 +250,7 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 - **User Stories (Phase 3-8)**：皆依賴 Foundational 完成後才可開始
   - US1、US2（P1）可平行開發（app-service 內不同套件模組：family vs expense，檔案互不重疊）
   - US3、US4（P2）依賴 US2 的 ExpenseRecord/PaymentAccount 端點已存在（T034、T030），故需在 US2 完成後開始
-  - US5、US6（P3）依賴 US1（FamilyMember/`assertMemberAuthorized`）與 US4（StatisticsService）已完成；US6 的月份查詢建立於 notification-service 的 Webhook 控制器與 `AppServiceClient` 之上（T061 依賴 T056），為序列相依
+  - US5、US6（P3）依賴 US1（FamilyMember/`FamilyAccess`）與 US4（StatisticsService）已完成；US6 的月份查詢建立於 notification-service 的 Webhook 控制器與 `AppServiceClient` 之上（T061 依賴 T056），為序列相依
 - **Polish (Phase 9)**：依賴所有欲交付的 User Story 完成
 
 ### User Story Dependencies
@@ -259,7 +259,7 @@ description: "Task list for 家庭共享支出平台 - 核心記帳與統計功�
 - **US2 (P1)**：Foundational 完成後即可開始，無其他 Story 相依（可與 US1 平行）
 - **US3 (P2)**：需 US2 的 `POST /api/expenses`、`POST /api/accounts` 端點已存在才有資料可篩選
 - **US4 (P2)**：需 US2 的 ExpenseRecord 資料存在，StatisticsService 同進程呼叫 ExpenseService
-- **US5 (P3)**：需 US1 的 FamilyMember/`assertMemberAuthorized`、US4 的 StatisticsService 已完成
+- **US5 (P3)**：需 US1 的 FamilyMember/`FamilyAccess`、US4 的 StatisticsService 已完成
 - **US6 (P3)**：需 US5 的 LINE Webhook 控制器（`LineWebhookController.java`）已建立，於同檔案上擴充查詢分支
 
 ### Within Each User Story
@@ -341,44 +341,65 @@ Task: "前端成員列表頁面於 frontend/src/pages/FamilyGroupPage.tsx"
 
 ## Phase 12: Convergence
 
-**Purpose**: 由 `/speckit-converge` 比對 spec／plan／tasks 與現況程式碼後發現的剩餘缺口。
+**Purpose**: LINE 月份查詢的錯誤處理，以及 family、expense 模組的 Mapper 整合測試。
 
-- [X] T095 `LineWebhookController.handleMonthQuery` 補上月份有效性檢查（如 `2026-13` 符合 `\d{4}-\d{2}` 但非合法年月，應回覆格式提示）並攔截 `AppServiceClient` 呼叫失敗，一律回覆使用者可讀訊息而非不回應；於 `LineWebhookControllerTest` 補測試 per US6/AC4, FR-014 (partial)
-- [X] T096 補上 app-service family 模組（`FamilyGroupMapper`、`FamilyMemberMapper`：`selectByGroupId` 排序、`selectActiveByUserId`、`countActiveByGroupId`）與 `PaymentAccountMapper` 的 Mapper 整合測試於 `app-service/src/test/java/com/family195home/app/{family,expense}/infrastructure/persistence/`，目前僅 `ExpenseRecordMapperIntegrationTest` per T071 (partial)
+- [X] T095 `LineWebhookController.handleMonthQuery` 月份有效性檢查（如 `2026-13` 符合 `\d{4}-\d{2}` 但非合法年月，回覆格式提示），並攔截 `AppServiceClient` 呼叫失敗，一律回覆使用者可讀訊息；測試 `LineWebhookControllerTest` per US6/AC4, FR-014
+- [X] T096 app-service family 模組（`FamilyGroupMapper`、`FamilyMemberMapper`：`selectByGroupId` 排序、`selectActiveByUserId`、`countActiveByGroupId`）與 `PaymentAccountMapper` 的 Mapper 整合測試於 `app-service/src/test/java/com/family195home/app/{family,expense}/infrastructure/persistence/` per T071
 
 ## Phase 13: Convergence
 
-**Purpose**: 由 `/speckit-converge` 再次比對後發現的剩餘缺口。
+**Purpose**: 台灣時區、Demo 體驗登入、支出日期區間篩選與前端導覽圖示。
 
-- [X] T097 明確指定台灣時區：`MonthlyNotificationScheduler` 的 `@Scheduled` 加上 `zone = "Asia/Taipei"`，並將 notification-service、app-service 的容器／JVM 預設時區設為 `Asia/Taipei`（Dockerfile 或 docker-compose `TZ`），使「每月最後一天 23:00」發送時間與自然月邊界、支出預設日期皆以台灣時間計算；補上時區相關測試 per FR-013, SC-005 (partial)
-- [X] T098 以 Demo 體驗登入取代 dev 假登入：新增 `POST /api/auth/demo`（`UserService.loginAsDemo`、`demo/DemoLoginService` 建立群組、5 個支付帳戶（現金、中信、國泰、三信、富邦）與範例支出（上月 1 日到今天，每天隨機 0–5 筆））與 `GET /api/auth/config`，由 `app.demo-login.enabled`（`DEMO_LOGIN_ENABLED`）控制；移除 `DevLineLoginClient`，`LineOAuthLoginClient` 不再限 prod；`LineBindingService` 推播略過 `demo-` 帳號；前端登入頁並行顯示 LINE 登入／Demo 體驗；合併 `docker-compose.line.yml` 進 `docker-compose.yml`；成員列表併入 `FamilyGroupPage` 並移除 `MembersPage` per FR-024
-- [X] T099 支出列表改為起訖日期區間篩選：`GET /api/expenses` 以 `startDate`／`endDate` 取代 `month`（新增 `INVALID_DATE_RANGE`），前端預設本月並改為「新增支出」彈窗 per FR-007
+- [X] T097 明確指定台灣時區：`MonthlyNotificationScheduler` 的 `@Scheduled` 加上 `zone = "Asia/Taipei"`，並將 notification-service、app-service 的容器／JVM 預設時區設為 `Asia/Taipei`（Dockerfile 或 docker-compose `TZ`），使「每月最後一天 23:00」發送時間與自然月邊界、支出預設日期皆以台灣時間計算；含時區相關測試 per FR-013, SC-005
+- [X] T098 Demo 體驗登入：`POST /api/auth/demo`（`UserService.loginAsDemo`、`demo/DemoLoginService` 建立群組、5 個支付帳戶（現金、中信、國泰、三信、富邦）與範例支出（上月 1 日到今天，每天隨機 0–5 筆））與 `GET /api/auth/config`，由 `app.demo-login.enabled`（`DEMO_LOGIN_ENABLED`）控制；`LineOAuthLoginClient` 適用所有 profile；`LineBindingService` 推播略過 `demo-` 帳號；前端登入頁並行顯示 LINE 登入／Demo 體驗；LINE 相關設定位於單一 `docker-compose.yml`；成員列表位於 `FamilyGroupPage` per FR-024
+- [X] T099 支出列表起訖日期區間篩選：`GET /api/expenses` 以 `startDate`／`endDate` 篩選（錯誤代碼 `INVALID_DATE_RANGE`），前端預設本月，新增支出為彈窗 per FR-007
 - [X] T100 前端導覽圖示化（新增 `components/Icon.tsx`，Layout／HomePage 改用 SVG 圖示）；Testcontainers 升級至 1.21.4，並於 app-service、notification-service 測試資源加入 `docker-java.properties`（`api.version=1.44`，相容 Docker Engine 29）
 
 ## Phase 14: Convergence
 
-**Purpose**: 由 `/speckit-converge` 再次比對後發現的剩餘缺口（支付帳戶可重新啟用，2026-10-20 第十輪 Clarification）。
+**Purpose**: 支付帳戶重新啟用（2026-10-20 第十輪 Clarification）。
 
-- [X] T101 後端新增重新啟用支付帳戶：`PaymentAccountService.enable`（限 `ADMIN`，一般成員回傳 `403 NOT_GROUP_ADMIN`；群組已解散回傳 `409 GROUP_DISSOLVED`；已是 `ACTIVE` 時冪等成功）與 `POST /api/accounts/{accountId}/enable`（`PaymentAccountController`），於 `PaymentAccountServiceTest` 與 Controller 測試補上對應案例 per FR-022 (missing)
-- [X] T102 前端支付帳戶頁：`expenseApi.ts` 新增 `enableAccount`，`PaymentAccountsPage.tsx` 對「已停用」帳戶顯示「啟用」按鈕（僅管理者可見，成功後重新載入清單），補上前端測試 per FR-022 (missing)
+- [X] T101 後端重新啟用支付帳戶：`PaymentAccountService.enable`（限 `ADMIN`，一般成員回傳 `403 NOT_GROUP_ADMIN`；群組已解散回傳 `409 GROUP_DISSOLVED`；已是 `ACTIVE` 時冪等成功）與 `POST /api/accounts/{accountId}/enable`（`PaymentAccountController`）；測試 `PaymentAccountServiceTest` 與 Controller 測試 per FR-022
+- [X] T102 前端支付帳戶頁：`expenseApi.ts` 新增 `enableAccount`，`PaymentAccountsPage.tsx` 對「已停用」帳戶顯示「啟用」按鈕（僅管理者可見，成功後重新載入清單），含前端測試 per FR-022
 
 ## Phase 15: Convergence
 
-**Purpose**: 由 `/speckit-converge` 再次比對後發現的剩餘缺口（支付帳戶管理頁操作互斥與已停用帳戶顯示開關，2026-10-20 第十輪 Clarification）。
+**Purpose**: 支付帳戶管理頁的操作互斥與已停用帳戶顯示開關（2026-10-20 第十輪 Clarification）。
 
-- [X] T103 後端 `GET /api/accounts` 回應新增 `deletable`（帳戶從未被任何支出紀錄使用）：於 `PaymentAccountResponse`、`PaymentAccountController`（必要時 `PaymentAccountService`／repository 批次查詢，避免 N+1）計算並回傳，補測試 per US2/AC7, FR-022 (missing)
-- [X] T104 前端支付帳戶頁：「刪除」僅在 `deletable` 為 true 時顯示、「停用／啟用」依狀態互斥；新增「顯示已停用帳戶」開關（預設關閉，僅前端過濾）；`expenseApi.ts` 的 `PaymentAccountResponse` 補 `deletable`，更新 `frontend/tests/PaymentAccountsPage.test.tsx` per US2/AC6, US2/AC7 (missing)
+- [X] T103 後端 `GET /api/accounts` 回應含 `deletable`（帳戶從未被任何支出紀錄使用）：於 `PaymentAccountResponse`、`PaymentAccountController`（必要時 `PaymentAccountService`／repository 批次查詢，避免 N+1）計算並回傳，含測試 per US2/AC7, FR-022
+- [X] T104 前端支付帳戶頁：「刪除」僅在 `deletable` 為 true 時顯示、「停用／啟用」依狀態互斥；新增「顯示已停用帳戶」開關（預設關閉，僅前端過濾）；`expenseApi.ts` 的 `PaymentAccountResponse` 含 `deletable`；測試 `frontend/tests/PaymentAccountsPage.test.tsx` per US2/AC6, US2/AC7
 
 ## Phase 16: 成員顯示名稱編輯
 
 **Purpose**: 2026-10-25 第十一輪 Clarification（FR-031）。
 
 - [X] T105 後端新增編輯顯示名稱：Flyway `V3__user_display_name_customized.sql`（`users.display_name_customized`）、`User`／`UserMapper`／`UserRepository.renameDisplayName`、`FamilyService.renameMember`（本人或 ADMIN）、`PUT /api/families/{id}/members/{memberId}/display-name`（`RenameMemberRequest`）；`UserService.loginWithLine` 對已自訂者不覆蓋 LINE 暱稱；於 `FamilyServiceTest`、`UserServiceTest` 補測試 per US1/AC6, US1/AC7, FR-031
-- [X] T106 前端：`familyApi.ts` 新增 `renameMember`，`FamilyGroupPage.tsx` 成員列表加入「編輯」按鈕（一般成員僅自己、管理者所有未被移出成員）；`PaymentAccountsPage.tsx` 原「改名」按鈕改名為「編輯」 per FR-031
+- [X] T106 前端：`familyApi.ts` 新增 `renameMember`，`FamilyGroupPage.tsx` 成員列表加入「編輯」按鈕（一般成員僅自己、管理者所有未被移出成員）；`PaymentAccountsPage.tsx` 的修改按鈕名稱為「編輯」 per FR-031
 
----
+## Phase 16b: 管理者轉移與成員角色顯示
 
-**Purpose**: 2026-10-25 第十二輪 Clarification（FR-029 修訂、FR-032、FR-033）。
+**Purpose**: 2026-10-25 第十二輪 Clarification（FR-029、FR-032、FR-033）。
 
 - [X] T107 後端：`FamilyService.leave` 新增 `newAdminMemberId`（管理者離開須指定接任者，離開者 role 重設為 `MEMBER`）、新增 `transferAdmin`、`POST /transfer-admin` 端點與 `LeaveRequest`／`TransferAdminRequest` DTO，並補 `FamilyServiceTest`（FR-029、FR-032、FR-033）
 - [X] T108 前端：`familyApi.ts` 新增 `transferAdmin` 並讓 `leaveGroup` 帶入接任者，`notify.ts` 新增 `selectOption`，`FamilyGroupPage.tsx` 管理者離開時須選擇接任者、成員列表新增「設為管理者」按鈕、非「正常」成員的角色欄顯示「—」（FR-029、FR-032、FR-033）
+
+## Phase 17: Convergence
+
+**Purpose**: Demo 資料清理的模組邊界（T109），以及規格書與現況程式碼對齊的項目（T110–T117）。
+
+- [X] T109 Demo 資料清理遵守模組資料自主權：由 family（`FamilyService.findExpiredDemoGroupIds`／`purgeGroups`、`UserService.purgeOrphanDemoUsers`）、expense（`ExpenseService`／`PaymentAccountService.purgeByFamilyGroupIds`）模組各自的 service／repository／Mapper 刪除自己的資料表，`DemoDataCleanupService` 僅協調呼叫順序、不持有 Mapper；測試 `DemoDataCleanupServiceTest`（呼叫順序）、`DemoDataCleanupIntegrationTest` per Constitution I
+- [X] T110 規格書涵蓋月結統計：spec.md FR-011／US4／Key Entities「月支出統計」含收入合計、支出合計（皆為正數）與淨額；contracts `GET /api/statistics/monthly` 與內部版回應含 `incomeAmount`／`expenseAmount`／`totalIncomeAmount`／`totalExpenseAmount`；data-model `MonthlyAccountSummary` 含上述欄位；plan.md 前端結構為統計位於首頁（`HomePage`：月份選擇器、收入／支出／結餘 KPI、支出占比、收入占比、各帳戶結餘），`/statistics` 導回首頁；LINE 訊息只顯示淨額 per FR-011, US4/AC1, plan: frontend structure
+- [X] T111 規格書涵蓋合約回應結構：contracts `POST .../leave` 回應欄位為 `familyGroupStatus`；管理者離開須指定接任者，無 `NO_ELIGIBLE_ADMIN` 錯誤；`POST /api/accounts`、`PUT`、`disable`、`enable` 回應結構為 `{ accountId, familyMemberId, name, status, deletable }` per contracts/app-service.md, FR-029
+- [X] T112 規格書涵蓋 LINE Rich Menu 與 postback 查詢：spec.md FR-014／US6 與 contracts/notification-service.md 描述 postback 事件——Rich Menu「本月」「上月」（`month=current`／`month=previous`，以台灣時區換算）、「其他月份」Datetime Picker（取 `params.date` 年月）、data 本身為 `YYYY-MM`；無法解析時回覆格式提示；plan.md 結構含 `scripts/setup-line-richmenu.ps1` per FR-014, US6
+- [X] T113 規格書涵蓋 Demo 體驗的防護：spec.md FR-024 與 contracts `POST /api/auth/demo` 描述限流（每 IP 每小時 20 次、全站每小時 300 次，超過回 `429 DEMO_LOGIN_RATE_LIMITED`，僅記憶體計數）與過期資料清理（啟用 Demo 時每小時執行，刪除建立超過 `app.demo-login.retention-hours`（預設 24 小時）且成員全為 Demo 帳號的群組及孤立 Demo 帳號）；research.md 決策 7 一致 per FR-024
+- [X] T114 規格書涵蓋欄位上限與錯誤代碼：spec.md FR-016 與 contracts 載明說明 `note` 最長 500 字（`400 VALIDATION_ERROR`）、金額超出整數範圍回 `400 AMOUNT_OUT_OF_RANGE`；contracts `POST`／`PUT /api/expenses` 的 Errors 含 `ACCOUNT_DISABLED`／`ACCOUNT_NOT_IN_GROUP` per FR-016
+- [X] T115 邀請機制僅提供邀請碼：spec.md FR-002、FR-025、FR-030、US1/AC2、Key Entities 與 tasks.md T024 均只描述邀請碼，決策記錄於第十三輪 Clarifications per FR-002, US1/AC2
+- [X] T116 規格書涵蓋橫切基礎設施：plan.md Technical Context／Testing 與 research.md 決策 15 描述 springdoc OpenAPI（`/swagger-ui.html`、`/v3/api-docs`，排除 `/api/internal/**`）、`X-Request-Id` requestId（兩服務 `RequestIdFilter` + MDC 日誌格式、notification-service 轉送給 app-service、月結排程以 `monthly-<YYYY-MM>-<id>` 為 run id）、Spotless（google-java-format AOSP）與 Prettier（CI `format:check`）、月結推播重試間隔（`app.notification.retry-backoff-ms`，線性遞增）；contracts 共通約定含 `X-Request-Id` 回應標頭 per plan: Technical Context
+- [X] T117 規格書涵蓋 plan.md 原始碼結構：app-service 結構含 `demo/`（DemoLoginService、DemoLoginRateLimiter、DemoDataCleanup*）、`infrastructure/logging/`、`config/OpenApiConfig`；以 family 模組對外 port `FamilyAccess`（`requireMember`／`requireAdmin`／`groupState`）描述模組間授權入口（tasks.md 各任務一致使用此名稱）；frontend 結構含 `components/{Modal,Skeleton,EmptyState,CopyButton}`、`components/expense/`、`pages/LoginCallbackPage`、`utils/{formatNumber,lineLogin,notify,expenseValidation}`，導覽列含首頁入口 per plan: Project Structure
+
+## Phase 18: Convergence
+
+**Purpose**: statistics 模組遵守資料自主權，以及月結統計的 `month` 參數驗證。
+
+- [X] T118 CRITICAL：`StatisticsService` 不再直接依賴 expense 模組的 `PaymentAccountRepository`，改呼叫 `PaymentAccountService.nameById(familyGroupId)` 一次取得帳戶名稱對照（同時消除逐帳戶 `findById` 的 N+1），並同步更新 `StatisticsServiceTest` per Constitution I (contradicts)
+- [X] T119 `GET /api/statistics/monthly` 與 `GET /api/internal/statistics/monthly` 對空白 `month` 回傳 `400 INVALID_DATE_FORMAT`（目前空字串會彙總全部歷史紀錄），於 `StatisticsController` 或 `StatisticsService` 驗證並補測試 per FR-011, contracts/app-service.md (partial)

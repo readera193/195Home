@@ -22,7 +22,13 @@ WHERE id = ? AND locked_by_member_id = ?
 
 -- 刪除：仍持有鎖才會刪除
 DELETE FROM expense_records WHERE id = ? AND locked_by_member_id = ?
+
+-- 取消編輯（釋放鎖）：自己持有或鎖已逾時才清除，不會清掉他人剛取得的鎖
+UPDATE expense_records SET locked_by_member_id = NULL, locked_at = NULL
+WHERE id = ? AND (locked_by_member_id = ? OR locked_at < ?)
 ```
+
+釋放鎖影響 0 列時不報錯：代表呼叫者已不持有鎖（已被他人取得或已釋放），取消編輯的目的已達成。
 
 影響筆數為 1 才算成功；0 代表鎖已不在呼叫者手上，回 403 `LOCK_NOT_HELD_BY_CALLER`。Service 仍會先做一次檢查，是為了在多數情況下給出明確的錯誤，真正的保證來自條件式 SQL。
 

@@ -88,5 +88,11 @@ public class UserService {
                         LocalDateTime.now(clock)));
     }
 
+    /** 刪除建立於 cutoff 之前、已無任何群組成員身分的 Demo 帳號，回傳刪除筆數。 */
+    @Transactional
+    public int purgeOrphanDemoUsers(LocalDateTime cutoff) {
+        return userRepository.deleteOrphansByLineUserIdPrefix(DEMO_LINE_USER_ID_PREFIX, cutoff);
+    }
+
     public record LoginResult(String token, Long userId, String displayName, Instant expiresAt) {}
 }

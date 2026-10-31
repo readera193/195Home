@@ -35,4 +35,11 @@
         SELECT id, line_user_id, display_name, display_name_customized, created_at FROM users
     </select>
 
+    <delete id="deleteOrphansByLineUserIdPrefix">
+        DELETE FROM users
+        WHERE line_user_id LIKE CONCAT(#{prefix}, '%')
+          AND created_at &lt; #{cutoff}
+          AND NOT EXISTS (SELECT 1 FROM family_members m WHERE m.user_id = users.id)
+    </delete>
+
 </mapper>

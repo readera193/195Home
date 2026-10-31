@@ -40,7 +40,7 @@ describe('LoginPage', () => {
 
     await waitFor(() => expect(userApi.getAuthConfig).toHaveBeenCalled());
     expect(screen.queryByRole('button')).toBeNull();
-    expect(screen.getByText('目前沒有可用的登入方式')).toBeInTheDocument();
+    expect(await screen.findByText('目前沒有可用的登入方式')).toBeInTheDocument();
   });
 
   it('設定 VITE_LINE_CHANNEL_ID 時顯示 LINE 登入按鈕', async () => {

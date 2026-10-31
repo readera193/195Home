@@ -130,7 +130,13 @@ public class ExpenseRecordRepositoryImpl implements ExpenseRecordRepository {
     }
 
     @Override
-    public void releaseLock(Long id) {
-        mapper.releaseLock(id);
+    public int releaseLockIfHeldOrExpired(
+            Long id, Long callerMemberId, LocalDateTime now, long ttlMinutes) {
+        return mapper.releaseLockIfHeldOrExpired(id, callerMemberId, now.minusMinutes(ttlMinutes));
+    }
+
+    @Override
+    public int deleteByFamilyGroupIds(List<Long> familyGroupIds) {
+        return mapper.deleteByFamilyGroupIds(familyGroupIds);
     }
 }

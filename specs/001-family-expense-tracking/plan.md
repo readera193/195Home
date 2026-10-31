@@ -14,7 +14,7 @@
 
 **Language/Version**: Java 17（app-service、notification-service，Spring Boot 3.5.x）；TypeScript 5.x + React 18（前端，建置後併入 app-service）
 
-**Primary Dependencies**: Spring Boot Web / Validation、MyBatis（`mybatis-spring-boot-starter`，資料庫存取層採 repository 介面 + RepositoryImpl adapter + MyBatis Mapper 分層）、Flyway（`flyway-mysql`，schema migration）、Spring Security + `jjwt`（JWT 簽發與本地驗證，於 app-service 內完成，無獨立 Gateway 進程；無密碼，以 LINE 身分登入）、Spring Boot Actuator（健康檢查）、MySQL Connector/J（`mysql-connector-j`）、line-bot-sdk-java（LINE Messaging API 官方 SDK，僅 notification-service 使用）；前端：React Router、Axios、TanStack Query (React Query)、ESLint 9（typescript-eslint）。錯誤回應格式採 Spring 6 內建的 RFC 9457 Problem Details（`ProblemDetail`），業務錯誤以 Exception 丟出，不引入 `Result<T>`（見 research.md 決策 13）。後端兩個服務皆附 Maven Wrapper（`mvnw`）。**不使用** Spring Cloud Gateway、Spring Cloud Config Server（見 constitution v3.0.1 技術範疇與邊界）。
+**Primary Dependencies**: Spring Boot Web / Validation、MyBatis（`mybatis-spring-boot-starter`，資料庫存取層採 repository 介面 + RepositoryImpl adapter + MyBatis Mapper 分層）、Flyway（`flyway-mysql`，schema migration）、Spring Security + `jjwt`（JWT 簽發與本地驗證，於 app-service 內完成，無獨立 Gateway 進程；無密碼，以 LINE 身分登入）、Spring Boot Actuator（健康檢查）、MySQL Connector/J（`mysql-connector-j`）、line-bot-sdk-java（LINE Messaging API 官方 SDK，僅 notification-service 使用）、springdoc-openapi（app-service 對外 API 文件）、Spotless（google-java-format AOSP，後端排版）；前端：React Router、Axios、TanStack Query (React Query)、SweetAlert2（確認框與錯誤提示）、ESLint 9（typescript-eslint）、Prettier。錯誤回應格式採 Spring 6 內建的 RFC 9457 Problem Details（`ProblemDetail`），業務錯誤以 Exception 丟出，不引入 `Result<T>`（見 research.md 決策 13）。後端兩個服務皆附 Maven Wrapper（`mvnw`）。**不使用** Spring Cloud Gateway、Spring Cloud Config Server（見 constitution v3.0.1 技術範疇與邊界）。
 
 **Storage**: MySQL（單一執行個體，Docker 容器：官方 `mysql` image，例如 `mysql:8.x`）；依服務資料自主權切分為 2 個 schema——`appdb`（app-service 專用，family/expense/statistics 模組各自擁有獨立資料表，不跨模組共用表）、`notificationdb`（notification-service 專用）；statistics 模組不建立獨立資料表，於 app-service 進程內即時呼叫 expense 模組的 service 方法彙總
 
@@ -28,7 +28,7 @@
 
 **Constraints**: 金額僅接受整數（可正可負可零，不支援小數點）；同一支出紀錄同時僅允許一人編輯（DB 層邏輯鎖，5 分鐘 TTL 避免永久鎖死）；單一幣別（新台幣）；一使用者僅能同時屬於一個家庭群組；LINE 身分（userId）即登入身分，每個 LINE 帳號對應一個平台帳號；app-service、notification-service 的資源需求（vCPU/記憶體）MUST 落在 Northflank Sandbox 免費方案的 2 個 service 額度內，資料庫 MUST 使用該方案的 1 個免費 database（見 constitution v3.0.1 技術範疇與邊界）
 
-**Scale/Scope**: 6 個 User Story、28 項功能需求、appdb 5 個核心實體（users、family_groups、family_members、payment_accounts、expense_records）＋ notificationdb 1 個（notification_logs）；單一家庭群組規模的資料量（每月數十至數百筆支出紀錄）
+**Scale/Scope**: 6 個 User Story、31 項功能需求、appdb 5 個核心實體（users、family_groups、family_members、payment_accounts、expense_records）＋ notificationdb 1 個（notification_logs）；單一家庭群組規模的資料量（每月數十至數百筆支出紀錄）
 
 ## Constitution Check
 
@@ -74,6 +74,7 @@ app-service/                       # 單一 Spring Boot 應用：family + expens
 ├── src/main/java/.../app/
 │   ├── family/                    # 使用者帳號（LINE 身分）、家庭群組、成員、邀請碼、LINE 身分對應成員查詢
 │   │   ├── application/           # Service（用例）+ repository 介面 + LineLoginClient／TokenIssuer（port）
+│   │   │                          # + FamilyAccess（對其他模組公開的授權 port：requireMember／requireAdmin／groupState）
 │   │   ├── domain/                # 純 POJO 資料模型
 │   │   ├── infrastructure/
 │   │   │   ├── line/              # LineLoginClient 的 adapter（LineOAuthLoginClient）
@@ -81,17 +82,20 @@ app-service/                       # 單一 Spring Boot 應用：family + expens
 │   │   └── presentation/          # Controller
 │   │       └── dto/               # Request / Response
 │   ├── expense/                   # 支付帳戶、支出紀錄（含併發編輯鎖定）；結構同 family
-│   ├── statistics/                # 依支付帳戶彙總月結淨額（直接呼叫 expense 模組 application，無獨立資料表，故無 infrastructure）
+│   ├── statistics/                # 依支付帳戶彙總月結收入／支出／淨額（直接呼叫 expense 模組 application，無獨立資料表，故無 infrastructure）
 │   │   ├── application/
 │   │   ├── domain/
 │   │   └── presentation/
 │   │       └── dto/
+│   ├── demo/                      # Demo 體驗：DemoLoginService（建立帳號與範例資料）、DemoLoginRateLimiter（限流）、
+│   │                              # DemoDataCleanupService／Scheduler（過期資料清理）；只呼叫 family、expense 的 service，不持有 Mapper
 │   ├── presentation/
 │   │   └── exception/             # GlobalExceptionHandler、ProblemDetails（Problem Details 輸出）
 │   ├── infrastructure/
-│   │   └── security/              # JWT 簽發（實作 family 的 TokenIssuer port）/本地驗證、`X-Internal-Token` 驗證、401/403 的 Problem Details 輸出
+│   │   ├── security/              # JWT 簽發（實作 family 的 TokenIssuer port）/本地驗證、`X-Internal-Token` 驗證、401/403 的 Problem Details 輸出
+│   │   └── logging/               # RequestIdFilter（`X-Request-Id` + MDC）
 │   ├── shared/                    # 跨模組共用：ApiException/ErrorKind、PagedResult、AuthenticatedUser
-│   └── config/                    # Spring Boot 標準設定類別（SecurityConfig、SpaFallbackConfig）
+│   └── config/                    # Spring Boot 標準設定類別（SecurityConfig、SpaFallbackConfig、OpenApiConfig）
 ├── src/main/resources/
 │   ├── application.yml            # 共用設定，不含機密預設值
 │   ├── application-dev.yml        # 本機開發預設值（docker-compose 使用）
@@ -116,7 +120,7 @@ notification-service/              # LINE Bot 整合：Webhook、每月排程推
 │   ├── presentation/              # Controller（LINE Webhook、通知紀錄）
 │   │   ├── dto/
 │   │   └── scheduler/             # 每月推播排程
-│   └── config/                    # InternalTokenInterceptor（保護 /api/notifications/**）、WebConfig
+│   └── config/                    # InternalTokenInterceptor（保護 /api/notifications/**）、WebConfig、RequestIdFilter
 ├── src/main/resources/
 │   ├── application.yml            # 共用設定，不含機密預設值
 │   ├── application-dev.yml / application-prod.yml
@@ -129,19 +133,26 @@ notification-service/              # LINE Bot 整合：Webhook、每月排程推
 
 frontend/                          # React + TypeScript 前端（獨立開發用專案）
 ├── src/
-│   ├── components/                # Layout（共用導覽列）、Icon（SVG 圖示）、ProtectedRoute、InfoTip
-│   ├── pages/                     # 登入、首頁、家庭群組（建立/加入/邀請碼）、成員列表（併入家庭群組頁）、支付帳戶、支出紀錄（新增＋列表＋日期區間／帳戶／成員篩選＋分頁）、統計頁
+│   ├── components/                # Layout（共用導覽列，含首頁入口）、Icon（SVG 圖示）、ProtectedRoute、InfoTip、
+│   │                              # Modal、Skeleton（載入骨架）、EmptyState、CopyButton（複製邀請碼）
+│   │   └── expense/               # CreateExpenseDialog、EditExpenseForm、ExpenseFilters、ExpenseTable
+│   ├── pages/                     # 登入（LoginPage）與 LINE 登入回呼（LoginCallbackPage）、首頁（月結統計：月份選擇器、收入／支出／結餘、
+│   │                              # 支出占比、收入占比、各帳戶結餘；`/statistics` 導回首頁）、家庭群組（建立/加入/邀請碼，併入成員列表）、
+│   │                              # 支付帳戶、支出紀錄（新增彈窗＋列表＋日期區間／帳戶／成員篩選＋分頁＋編輯／刪除）
 │   ├── services/                  # API 客戶端（同源呼叫 app-service，無需經過任何閘道）
-│   ├── utils/                     # apiError：從 Problem Details 取出 detail / code
-│   └── hooks/
+│   ├── utils/                     # apiError（從 Problem Details 取出 detail / code）、notify（SweetAlert2 對話框）、
+│   │                              # expenseValidation、formatNumber（千分位）、lineLogin（授權網址與 state）
+│   └── hooks/                     # useAuth
 ├── tests/
 ├── eslint.config.js               # ESLint 9 flat config
 └── tsconfig.json / tsconfig.app.json / tsconfig.node.json
 
 docker-compose.yml                 # 一鍵啟動：MySQL + app-service + notification-service
-.github/workflows/ci.yml           # PR/push 觸發：後端 matrix（`./mvnw verify`）＋前端（lint → build → test，並上傳 dist 產物）
+.github/workflows/ci.yml           # PR/push 觸發：後端 matrix（`./mvnw verify`）＋前端（lint → format:check → build → test，並上傳 dist 產物）
 .github/workflows/cd.yml           # build image → push GHCR → 觸發 Northflank 部署 app-service、notification-service
 .vscode/{tasks.json,extensions.json}  # 共用的 VS Code tasks 與推薦擴充套件
+scripts/                           # init-notificationdb.sh（建立 notificationdb）、setup-line-richmenu.ps1（建立 LINE Rich Menu）
+docs/                              # DEVELOPMENT.md（開發說明）、adr/（架構決策紀錄）
 TESTING.md                         # 測試分類、執行方式、profile、Migration 規則
 README.md
 ```

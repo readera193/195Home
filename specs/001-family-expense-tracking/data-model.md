@@ -117,10 +117,14 @@ schema 定義對應 `app-service/src/main/resources/db/migration/`（Flyway migr
 | familyGroupId | BIGINT | |
 | yearMonth | VARCHAR(7) | 格式 `YYYY-MM` |
 | paymentAccountId | BIGINT | |
-| paymentAccountName | VARCHAR(100) | 供顯示用（含已停用帳戶名稱） |
-| netAmount | BIGINT | 該帳戶當月淨額（收入－支出加總） |
+| paymentAccountName | VARCHAR(100) | 供顯示用（含已停用帳戶名稱；帳戶已刪除時為 null） |
+| incomeAmount | BIGINT | 該帳戶當月正數金額加總（收入） |
+| expenseAmount | BIGINT | 該帳戶當月負數金額的絕對值加總（支出，以正數表示） |
+| netAmount | BIGINT | 該帳戶當月淨額 = incomeAmount − expenseAmount |
 
-彙總來源：statistics 模組直接呼叫 expense 模組的 service 方法取得該月所有紀錄後於記憶體彙總（同進程方法呼叫，見 research.md 決策 4）。各帳戶淨額加總 MUST 等於該月所有支出紀錄金額總和（SC-004）。
+另含全月合計 `totalIncomeAmount`、`totalExpenseAmount`、`totalNetAmount`（各帳戶加總）。
+
+彙總來源：statistics 模組直接呼叫 expense 模組的 service 方法取得該月所有紀錄後於記憶體彙總（同進程方法呼叫，見 research.md 決策 4）。各帳戶淨額加總 MUST 等於該月所有支出紀錄金額總和，且 `totalNetAmount = totalIncomeAmount − totalExpenseAmount`（SC-004）。
 
 ---
 
@@ -166,3 +170,5 @@ schema 定義對應 `notification-service/src/main/resources/db/migration/`（Fl
 ```
 
 模組間參照（`familyMemberId`、`familyGroupId`）僅為數值型別欄位，不建立跨模組資料表 FK；資料一致性與存在性驗證由呼叫方模組的 service 層於呼叫對方模組 service 方法時確認（例如 expense 模組新增支出前呼叫 family 模組確認 `familyMemberId` 屬於有效在職成員）。notification-service 對 app-service 的參照則透過 `contracts/app-service.md` 定義的內部 REST API 取得，同樣不建立跨資料庫 FK，一致性由 app-service 於回應時保證。
+
+**Demo 資料清理**：過期 Demo 資料的刪除同樣遵守「各模組只操作自己的資料表」——family 模組提供查詢過期 Demo 群組、刪除成員與群組、刪除孤立 Demo 帳號的方法，expense 模組提供依群組刪除支出紀錄與支付帳戶的方法；`demo` 套件的 `DemoDataCleanupService` 只負責依「支出紀錄 → 支付帳戶 → 成員與群組 → 帳號」的順序呼叫，本身不持有任何 Mapper（見 contracts/app-service.md `POST /api/auth/demo`）。
