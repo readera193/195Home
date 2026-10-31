@@ -3,14 +3,19 @@ package com.family195home.notification.infrastructure.client;
 import com.family195home.notification.application.dto.BindingResult;
 import com.family195home.notification.application.dto.LineBindingView;
 import com.family195home.notification.application.dto.MonthlySummaryView;
+import com.family195home.notification.config.RequestIdFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Optional;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.ClientRequest;
+import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.core.publisher.Mono;
 
 /**
  * 呼叫 app-service 內部 API（/api/internal/**）的唯一元件，帶入 X-Internal-Token 共用密鑰 （見
@@ -31,7 +36,23 @@ public class AppServiceClient {
                 WebClient.builder()
                         .baseUrl(baseUrl)
                         .defaultHeader("X-Internal-Token", internalToken)
+                        .filter(requestIdPropagation())
                         .build());
+    }
+
+    /** 把目前請求（或排程）的 requestId 轉送給 app-service，讓兩個服務的日誌可以串起來。 */
+    static ExchangeFilterFunction requestIdPropagation() {
+        return ExchangeFilterFunction.ofRequestProcessor(
+                request -> {
+                    String requestId = MDC.get(RequestIdFilter.MDC_KEY);
+                    if (requestId == null) {
+                        return Mono.just(request);
+                    }
+                    return Mono.just(
+                            ClientRequest.from(request)
+                                    .header(RequestIdFilter.HEADER_NAME, requestId)
+                                    .build());
+                });
     }
 
     /** 供測試注入自訂 WebClient（例如以 ExchangeFunction 模擬回應）。 */

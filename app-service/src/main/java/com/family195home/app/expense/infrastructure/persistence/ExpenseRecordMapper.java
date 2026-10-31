@@ -11,9 +11,14 @@ public interface ExpenseRecordMapper {
 
     void insert(ExpenseRecord record);
 
-    void update(ExpenseRecord record);
+    /** 僅當鎖仍由 lockHolderMemberId 持有時才更新，並於同一個 UPDATE 釋放鎖；回傳影響列數。 */
+    int updateIfLockHeld(
+            @Param("record") ExpenseRecord record,
+            @Param("lockHolderMemberId") Long lockHolderMemberId);
 
-    void deleteById(@Param("id") Long id);
+    /** 僅當鎖仍由 lockHolderMemberId 持有時才刪除；回傳影響列數。 */
+    int deleteByIdIfLockHeld(
+            @Param("id") Long id, @Param("lockHolderMemberId") Long lockHolderMemberId);
 
     ExpenseRecord selectById(@Param("id") Long id);
 

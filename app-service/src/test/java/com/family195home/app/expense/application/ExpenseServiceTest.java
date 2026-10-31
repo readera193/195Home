@@ -44,6 +44,11 @@ class ExpenseServiceTest {
                         5L,
                         Clock.systemDefaultZone());
         when(familyAccess.groupState(10L)).thenReturn(FamilyAccess.GroupState.ACTIVE);
+        // 預設任何人皆為成員，且 memberId 與 userId 相同；個別測試可覆寫
+        when(familyAccess.requireMember(anyLong(), anyLong()))
+                .thenAnswer(inv -> new FamilyAccess.MemberRef(inv.getArgument(1)));
+        when(expenseRecordRepository.updateIfLockHeld(any(), anyLong())).thenReturn(1);
+        when(expenseRecordRepository.deleteIfLockHeld(anyLong(), anyLong())).thenReturn(1);
         stubAccount(100L, 10L, PaymentAccountStatus.ACTIVE);
         stubAccount(200L, 10L, PaymentAccountStatus.ACTIVE);
     }
@@ -112,7 +117,7 @@ class ExpenseServiceTest {
                 .isInstanceOfSatisfying(
                         ApiException.class,
                         e -> assertThat(e.getCode()).isEqualTo("ACCOUNT_NOT_IN_GROUP"));
-        verify(expenseRecordRepository, never()).update(any());
+        verify(expenseRecordRepository, never()).updateIfLockHeld(any(), any());
     }
 
     @Test
@@ -285,7 +290,7 @@ class ExpenseServiceTest {
 
         expenseService.delete(10L, 1L, 5L);
 
-        verify(expenseRecordRepository).delete(1L);
+        verify(expenseRecordRepository).deleteIfLockHeld(1L, 2L);
     }
 
     @Test
@@ -321,7 +326,8 @@ class ExpenseServiceTest {
                 expenseService.update(10L, 1L, 5L, 200L, new BigDecimal("-500"), "更新後備註", null);
 
         assertThat(result.getAmount()).isEqualTo(-500);
-        verify(expenseRecordRepository).releaseLock(1L);
+        // 更新與釋放鎖是同一個條件式 UPDATE，以持鎖成員（管理者 memberId=1）為條件
+        verify(expenseRecordRepository).updateIfLockHeld(any(), eq(1L));
     }
 
     private FamilyMember member(Long memberId, Long userId, MemberRole role) {
@@ -353,7 +359,7 @@ class ExpenseServiceTest {
                 .thenReturn(List.of(record));
 
         PagedResult<ExpenseRecord> result =
-                expenseService.listPage(10L, null, null, start, end, 1, 20);
+                expenseService.listPage(10L, 1L, null, null, start, end, 1, 20);
 
         assertThat(result.items()).containsExactly(record);
         assertThat(result.page()).isEqualTo(1);
@@ -364,19 +370,20 @@ class ExpenseServiceTest {
 
     @Test
     void listPage_rejectsInvalidPageParams() {
-        assertThatThrownBy(() -> expenseService.listPage(10L, null, null, null, null, -1, 20))
+        assertThatThrownBy(() -> expenseService.listPage(10L, 1L, null, null, null, null, -1, 20))
                 .isInstanceOfSatisfying(
                         ApiException.class,
                         e -> {
                             assertThat(e.getKind()).isEqualTo(ErrorKind.BAD_REQUEST);
                             assertThat(e.getCode()).isEqualTo("INVALID_PAGE_PARAMS");
                         });
-        assertThatThrownBy(() -> expenseService.listPage(10L, null, null, null, null, 0, 0))
+        assertThatThrownBy(() -> expenseService.listPage(10L, 1L, null, null, null, null, 0, 0))
                 .isInstanceOf(ApiException.class);
         assertThatThrownBy(
                         () ->
                                 expenseService.listPage(
                                         10L,
+                                        1L,
                                         null,
                                         null,
                                         null,
@@ -393,6 +400,7 @@ class ExpenseServiceTest {
                         () ->
                                 expenseService.listPage(
                                         10L,
+                                        1L,
                                         null,
                                         null,
                                         LocalDate.of(2026, 9, 30),
@@ -482,5 +490,71 @@ class ExpenseServiceTest {
                 .isInstanceOfSatisfying(
                         ApiException.class,
                         e -> assertThat(e.getCode()).isEqualTo("EXPENSE_NOT_FOUND"));
+    }
+
+    @Test
+    void create_rejectsNonMemberBeforeAnyWrite() {
+        when(familyAccess.requireMember(10L, 77L))
+                .thenThrow(new ApiException(ErrorKind.FORBIDDEN, "NOT_GROUP_MEMBER", "非成員"));
+
+        assertThatThrownBy(() -> expenseService.create(10L, 77L, 100L, BigDecimal.TEN, "備註", null))
+                .isInstanceOfSatisfying(
+                        ApiException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("NOT_GROUP_MEMBER"));
+        verify(expenseRecordRepository, never()).save(any());
+    }
+
+    @Test
+    void listPage_rejectsNonMemberBeforeQuerying() {
+        when(familyAccess.requireMember(10L, 77L))
+                .thenThrow(new ApiException(ErrorKind.FORBIDDEN, "NOT_GROUP_MEMBER", "非成員"));
+
+        assertThatThrownBy(() -> expenseService.listPage(10L, 77L, null, null, null, null, 0, 20))
+                .isInstanceOfSatisfying(
+                        ApiException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("NOT_GROUP_MEMBER"));
+        verifyNoInteractions(expenseRecordRepository);
+    }
+
+    @Test
+    void lock_rejectsNonMemberBeforeTryingToLock() {
+        when(familyAccess.requireMember(10L, 77L))
+                .thenThrow(new ApiException(ErrorKind.FORBIDDEN, "NOT_GROUP_MEMBER", "非成員"));
+
+        assertThatThrownBy(() -> expenseService.lock(10L, 1L, 77L))
+                .isInstanceOfSatisfying(
+                        ApiException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("NOT_GROUP_MEMBER"));
+        verify(expenseRecordRepository, never()).tryLock(anyLong(), anyLong(), any(), anyLong());
+    }
+
+    @Test
+    void update_rejectsWhenLockLostBetweenCheckAndWrite() {
+        // 檢查時鎖仍屬於呼叫者，但寫入前鎖已逾時被他人取得 => 條件式 UPDATE 影響 0 列，不可覆寫
+        ExpenseRecord record = expenseRecord(1L, 10L, 100L);
+        record.setLockedByMemberId(5L);
+        record.setLockedAt(LocalDateTime.now());
+        when(expenseRecordRepository.findById(1L)).thenReturn(Optional.of(record));
+        when(expenseRecordRepository.updateIfLockHeld(any(), eq(5L))).thenReturn(0);
+
+        assertThatThrownBy(
+                        () -> expenseService.update(10L, 1L, 5L, 100L, BigDecimal.TEN, "備註", null))
+                .isInstanceOfSatisfying(
+                        ApiException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("LOCK_NOT_HELD_BY_CALLER"));
+    }
+
+    @Test
+    void delete_rejectsWhenLockLostBetweenCheckAndWrite() {
+        ExpenseRecord record = expenseRecord(1L, 10L, 100L);
+        record.setLockedByMemberId(5L);
+        record.setLockedAt(LocalDateTime.now());
+        when(expenseRecordRepository.findById(1L)).thenReturn(Optional.of(record));
+        when(expenseRecordRepository.deleteIfLockHeld(1L, 5L)).thenReturn(0);
+
+        assertThatThrownBy(() -> expenseService.delete(10L, 1L, 5L))
+                .isInstanceOfSatisfying(
+                        ApiException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("LOCK_NOT_HELD_BY_CALLER"));
     }
 }

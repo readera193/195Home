@@ -31,8 +31,8 @@ public class ExpenseRecordRepositoryImpl implements ExpenseRecordRepository {
     }
 
     @Override
-    public void update(ExpenseRecord record) {
-        mapper.update(record);
+    public int updateIfLockHeld(ExpenseRecord record, Long lockHolderMemberId) {
+        return mapper.updateIfLockHeld(record, lockHolderMemberId);
     }
 
     @Override
@@ -46,8 +46,8 @@ public class ExpenseRecordRepositoryImpl implements ExpenseRecordRepository {
     }
 
     @Override
-    public void delete(Long id) {
-        mapper.deleteById(id);
+    public int deleteIfLockHeld(Long id, Long lockHolderMemberId) {
+        return mapper.deleteByIdIfLockHeld(id, lockHolderMemberId);
     }
 
     @Override

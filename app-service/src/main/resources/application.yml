@@ -33,6 +33,11 @@ management:
       exposure:
         include: health,info
 
+logging:
+  pattern:
+    # 每行日誌帶上 requestId（見 RequestIdFilter）；沒有請求的背景工作則為空
+    level: "%5p [%X{requestId:-}]"
+
 app:
   jwt:
     secret: ${JWT_SECRET}

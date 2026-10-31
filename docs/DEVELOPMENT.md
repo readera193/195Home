@@ -179,10 +179,18 @@ config/                     # Spring 設定類別
 ## 已知限制與取捨
 
 - **併發的「先查後寫」**：加入／建立群組、群組名稱與邀請碼都是先查再寫，併發時可能漏過檢查；資料庫的唯一約束會兜底，並由 `GlobalExceptionHandler` 把 `DuplicateKeyException` 轉成 409。尚未對「每位使用者同時只能有一個在職成員身分」建立資料庫層約束。
-- **編輯鎖**：取得鎖用條件式 `UPDATE`（5 分鐘 TTL），但 `update`／`delete` 是「先檢查鎖再寫入」，鎖逾時的瞬間存在很小的競態窗口；改進方向見 [ADR 0003](adr/0003-expense-edit-lock.md)。
+- **編輯鎖**：取得鎖、更新、刪除都是條件式 SQL（5 分鐘 TTL），不使用分散式鎖；TTL 到期後若鎖尚未被他人取得，原持有者仍可寫入。細節見 [ADR 0003](adr/0003-expense-edit-lock.md)。
 - **分頁使用 `OFFSET`**：家庭資料量下足夠，資料量大時應改用 keyset 分頁。
 - **Demo 登入**：在單一交易內逐筆新增上百筆範例支出，並以記憶體計數限流（重啟歸零、多實例不共用）；單一實例與目前流量下足夠。
 - **Token 存在 `localStorage`**：容易受 XSS 影響，但改用 HttpOnly Cookie 需另行處理 CSRF，對此規模屬過度設計。
 - **JWT 無法由伺服器撤銷**：登出只是前端丟棄 token，有效期 2 小時。
 - **`ExpenseRecord` 偏向資料物件**：鎖與金額規則多半在 Service；不做大規模重構，之後可逐步把規則移進領域物件。
 - **程式碼格式**：後端以 spotless 套用 google-java-format（AOSP 風格），`./mvnw spotless:apply` 可自動格式化，格式化的 commit 已列入 `.git-blame-ignore-revs`；前端以 Prettier 統一格式（`npm run format`），CI 以 `npm run format:check` 檢查。
+
+## 日誌與 requestId
+
+- 兩個服務都有 `RequestIdFilter`：請求若帶 `X-Request-Id`（限英數與 `._-`、最長 64 字元，避免日誌注入）就沿用，否則產生 UUID；寫入 MDC，並放進回應標頭 `X-Request-Id`。
+- 日誌格式以 `logging.pattern.level` 輸出 `[requestId]`；沒有請求的背景工作則為空的 `[]`。
+- notification-service 呼叫 app-service 會轉送 requestId；每月推播排程每次執行會指定 `monthly-<年月>-<8碼>` 作為 id。
+- 使用者回報問題時，請對方提供回應標頭中的 `X-Request-Id`，即可在日誌中找到該請求，以及它在另一個服務留下的紀錄。
+- 需要 JSON 結構化日誌時，可在 prod 設定 `logging.structured.format.console`（Spring Boot 3.5 內建，會自動帶出 MDC）。

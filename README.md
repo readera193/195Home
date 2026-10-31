@@ -104,10 +104,11 @@ sequenceDiagram
 ## 設計重點
 
 - **兩個服務、單一資料庫**：LINE Bot 與主要業務分開部署，服務間只有一條帶內部密鑰的同步 REST（[ADR 0002](docs/adr/0002-two-services-sync-rest.md)）。
-- **併發編輯鎖**：以條件式 `UPDATE` 取得鎖並設 TTL，不引入分散式鎖元件；update/delete 的剩餘時間窗與改進方向有明確記錄（[ADR 0003](docs/adr/0003-expense-edit-lock.md)）。
+- **併發編輯鎖**：以條件式 `UPDATE` 取得鎖並設 TTL，不引入分散式鎖元件；取得鎖、更新與刪除都是原子的條件式 SQL（[ADR 0003](docs/adr/0003-expense-edit-lock.md)）。
 - **顯式 SQL**：MyBatis + Flyway，搭配 port/adapter 分層（[ADR 0001](docs/adr/0001-mybatis-over-jpa.md)）。
 - **無密碼登入與本地驗證 JWT**：角色與在職狀態不進 token，避免舊權限殘留（[ADR 0004](docs/adr/0004-auth-line-login-jwt.md)）。
 - **容錯排程**：每月推播對每位成員獨立處理，單一成員失敗只記錄 FAILED，不中斷整批。
+- **可追蹤的日誌**：每個請求有 `requestId`（沿用 `X-Request-Id` 或自動產生，回應標頭也會帶回），每行日誌都輸出它；notification-service 呼叫 app-service 時會轉送，月結排程每次執行也有自己的 id，跨服務的一次操作可以用同一個 id 查到。
 - **可測試的時間**：兩個服務都注入 `Clock`，不直接呼叫 `now()`。
 
 ## 更多文件

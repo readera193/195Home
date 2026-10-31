@@ -44,6 +44,7 @@ class DemoLoginServiceTest {
         when(familyService.createGroup(7L, "使用者的家 #7")).thenReturn(group);
         FamilyMember member = new FamilyMember();
         member.setId(30L);
+        member.setUserId(7L);
         when(familyService.getMyMembership(7L)).thenReturn(Optional.of(member));
         group.setInviteCode("INVITE");
         AtomicLong nextUserId = new AtomicLong(200L);
@@ -59,6 +60,7 @@ class DemoLoginServiceTest {
                         inv -> {
                             FamilyMember joined = new FamilyMember();
                             joined.setId(inv.<Long>getArgument(0) + 1000L);
+                            joined.setUserId(inv.<Long>getArgument(0));
                             return joined;
                         });
         when(accountService.create(eq(20L), eq(7L), any()))
