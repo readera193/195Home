@@ -19,7 +19,10 @@ export interface ExpenseResponse {
   locked: boolean;
 }
 
-export function createAccount(familyGroupId: number, name: string): Promise<PaymentAccountResponse> {
+export function createAccount(
+  familyGroupId: number,
+  name: string,
+): Promise<PaymentAccountResponse> {
   return apiClient.post('/accounts', { familyGroupId, name }).then((res) => res.data);
 }
 
@@ -82,8 +85,13 @@ export function listExpenses(params: ListExpensesParams): Promise<PagedResponse<
   return apiClient.get('/expenses', { params }).then((res) => res.data);
 }
 
-export function lockExpense(expenseId: number, familyGroupId: number): Promise<{ expenseId: number }> {
-  return apiClient.post(`/expenses/${expenseId}/lock`, null, { params: { familyGroupId } }).then((res) => res.data);
+export function lockExpense(
+  expenseId: number,
+  familyGroupId: number,
+): Promise<{ expenseId: number }> {
+  return apiClient
+    .post(`/expenses/${expenseId}/lock`, null, { params: { familyGroupId } })
+    .then((res) => res.data);
 }
 
 export function unlockExpense(expenseId: number): Promise<void> {
@@ -101,5 +109,7 @@ export function updateExpense(
 }
 
 export function deleteExpense(expenseId: number, familyGroupId: number): Promise<void> {
-  return apiClient.delete(`/expenses/${expenseId}`, { params: { familyGroupId } }).then(() => undefined);
+  return apiClient
+    .delete(`/expenses/${expenseId}`, { params: { familyGroupId } })
+    .then(() => undefined);
 }

@@ -79,7 +79,12 @@ export default function CreateExpenseDialog({
         </div>
         <div className="field">
           <label htmlFor="paymentAccountId">支付帳戶</label>
-          <select id="paymentAccountId" value={accountId} onChange={(e) => setAccountId(e.target.value)} required>
+          <select
+            id="paymentAccountId"
+            value={accountId}
+            onChange={(e) => setAccountId(e.target.value)}
+            required
+          >
             <option value="">請選擇</option>
             {activeAccounts?.map((account) => (
               <option key={account.accountId} value={account.accountId}>
@@ -103,7 +108,12 @@ export default function CreateExpenseDialog({
         <button type="submit" className="btn-block" disabled={submitting}>
           新增
         </button>
-        <button type="button" className="btn-secondary btn-block" onClick={onClose} disabled={submitting}>
+        <button
+          type="button"
+          className="btn-secondary btn-block"
+          onClick={onClose}
+          disabled={submitting}
+        >
           取消
         </button>
       </form>

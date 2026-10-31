@@ -27,7 +27,9 @@ export default function PaymentAccountsPage() {
   const [name, setName] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [showDisabled, setShowDisabled] = useState(false);
-  const visibleAccounts = showDisabled ? accounts : accounts?.filter((account) => account.status === 'ACTIVE');
+  const visibleAccounts = showDisabled
+    ? accounts
+    : accounts?.filter((account) => account.status === 'ACTIVE');
 
   function openCreate() {
     setName('');
@@ -61,7 +63,14 @@ export default function PaymentAccountsPage() {
   }
 
   async function handleDisable(accountId: number) {
-    if (!(await confirmDialog({ title: '確定要停用此支付帳戶嗎？', text: '停用後將無法用於新的支出。', confirmText: '停用' }))) return;
+    if (
+      !(await confirmDialog({
+        title: '確定要停用此支付帳戶嗎？',
+        text: '停用後將無法用於新的支出。',
+        confirmText: '停用',
+      }))
+    )
+      return;
     return runAdminAction(() => disableAccount(accountId), '停用支付帳戶失敗');
   }
 
@@ -76,7 +85,15 @@ export default function PaymentAccountsPage() {
   }
 
   async function handleDelete(accountId: number) {
-    if (!(await confirmDialog({ title: '確定要刪除此支付帳戶嗎？', text: '僅限從未被使用過的帳戶。', confirmText: '刪除', danger: true }))) return;
+    if (
+      !(await confirmDialog({
+        title: '確定要刪除此支付帳戶嗎？',
+        text: '僅限從未被使用過的帳戶。',
+        confirmText: '刪除',
+        danger: true,
+      }))
+    )
+      return;
     return runAdminAction(() => deleteAccount(accountId), '刪除支付帳戶失敗');
   }
 
@@ -117,7 +134,13 @@ export default function PaymentAccountsPage() {
             <h2>新增帳戶</h2>
             <div className="field">
               <label htmlFor="accountName">帳戶名稱</label>
-              <input id="accountName" value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
+              <input
+                id="accountName"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                autoFocus
+              />
             </div>
             <button type="submit" className="btn-block">
               新增
@@ -130,7 +153,11 @@ export default function PaymentAccountsPage() {
       )}
 
       <label className="checkbox-label">
-        <input type="checkbox" checked={showDisabled} onChange={(e) => setShowDisabled(e.target.checked)} />
+        <input
+          type="checkbox"
+          checked={showDisabled}
+          onChange={(e) => setShowDisabled(e.target.checked)}
+        />
         顯示已停用帳戶
       </label>
 
@@ -148,20 +175,32 @@ export default function PaymentAccountsPage() {
               </span>
               {isAdmin && (
                 <span className="actions">
-                  <button className="btn-secondary btn-sm" onClick={() => handleRename(account.accountId, account.name)}>
+                  <button
+                    className="btn-secondary btn-sm"
+                    onClick={() => handleRename(account.accountId, account.name)}
+                  >
                     編輯
                   </button>
                   {account.status === 'ACTIVE' ? (
-                    <button className="btn-secondary btn-sm" onClick={() => handleDisable(account.accountId)}>
+                    <button
+                      className="btn-secondary btn-sm"
+                      onClick={() => handleDisable(account.accountId)}
+                    >
                       停用
                     </button>
                   ) : (
-                    <button className="btn-secondary btn-sm" onClick={() => handleEnable(account.accountId)}>
+                    <button
+                      className="btn-secondary btn-sm"
+                      onClick={() => handleEnable(account.accountId)}
+                    >
                       啟用
                     </button>
                   )}
                   {account.deletable && (
-                    <button className="btn-danger btn-sm" onClick={() => handleDelete(account.accountId)}>
+                    <button
+                      className="btn-danger btn-sm"
+                      onClick={() => handleDelete(account.accountId)}
+                    >
                       刪除
                     </button>
                   )}

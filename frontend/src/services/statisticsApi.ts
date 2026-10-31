@@ -13,6 +13,11 @@ export interface MonthlySummaryResponse {
   totalNetAmount: number;
 }
 
-export function getMonthlySummary(familyGroupId: number, month: string): Promise<MonthlySummaryResponse> {
-  return apiClient.get('/statistics/monthly', { params: { familyGroupId, month } }).then((res) => res.data);
+export function getMonthlySummary(
+  familyGroupId: number,
+  month: string,
+): Promise<MonthlySummaryResponse> {
+  return apiClient
+    .get('/statistics/monthly', { params: { familyGroupId, month } })
+    .then((res) => res.data);
 }

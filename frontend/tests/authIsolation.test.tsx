@@ -6,11 +6,13 @@ import { AuthProvider, useAuth } from '../src/hooks/useAuth';
 
 function SessionControls() {
   const auth = useAuth();
-  return <>
-    <span>{auth.isAuthenticated ? '已登入' : '未登入'}</span>
-    <button onClick={() => auth.login('user-b-token')}>登入 B</button>
-    <button onClick={auth.logout}>登出</button>
-  </>;
+  return (
+    <>
+      <span>{auth.isAuthenticated ? '已登入' : '未登入'}</span>
+      <button onClick={() => auth.login('user-b-token')}>登入 B</button>
+      <button onClick={auth.logout}>登出</button>
+    </>
+  );
 }
 
 describe('切換使用者的資料隔離', () => {
@@ -19,7 +21,13 @@ describe('切換使用者的資料隔離', () => {
     const client = new QueryClient();
     client.setQueryData(['myFamily'], { familyGroupId: 10, inviteCode: 'PRIVATE-A' });
     client.setQueryData(['expenses', 10], { items: [{ note: 'A 的支出' }] });
-    render(<QueryClientProvider client={client}><AuthProvider><SessionControls /></AuthProvider></QueryClientProvider>);
+    render(
+      <QueryClientProvider client={client}>
+        <AuthProvider>
+          <SessionControls />
+        </AuthProvider>
+      </QueryClientProvider>,
+    );
 
     fireEvent.click(screen.getByText('登出'));
     expect(screen.getByText('未登入')).toBeInTheDocument();

@@ -16,7 +16,12 @@ interface ExpenseFiltersProps {
   onChange: (patch: Partial<ExpenseFilterValues>) => void;
 }
 
-export default function ExpenseFilters({ values, accounts, members, onChange }: ExpenseFiltersProps) {
+export default function ExpenseFilters({
+  values,
+  accounts,
+  members,
+  onChange,
+}: ExpenseFiltersProps) {
   return (
     <div className="card filters">
       <div className="field">

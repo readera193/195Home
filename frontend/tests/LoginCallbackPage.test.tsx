@@ -53,14 +53,18 @@ describe('LoginCallbackPage', () => {
 
     renderCallback('?code=the-code&state=evil');
 
-    await waitFor(() => expect(notify.notifyError).toHaveBeenCalledWith(expect.stringContaining('state 不符')));
+    await waitFor(() =>
+      expect(notify.notifyError).toHaveBeenCalledWith(expect.stringContaining('state 不符')),
+    );
     expect(userApi.loginWithLine).not.toHaveBeenCalled();
   });
 
   it('使用者取消授權（error 參數）時顯示錯誤', async () => {
     renderCallback('?error=access_denied&state=abc');
 
-    await waitFor(() => expect(notify.notifyError).toHaveBeenCalledWith(expect.stringContaining('已取消')));
+    await waitFor(() =>
+      expect(notify.notifyError).toHaveBeenCalledWith(expect.stringContaining('已取消')),
+    );
     expect(userApi.loginWithLine).not.toHaveBeenCalled();
   });
 });

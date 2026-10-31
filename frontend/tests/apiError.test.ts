@@ -16,7 +16,12 @@ function problemError(data: unknown, status: number): AxiosError {
 describe('apiError', () => {
   it('從 Problem Details 取出 detail 與 code', () => {
     const err = problemError(
-      { status: 409, title: 'Conflict', detail: '您已屬於一個家庭群組', code: 'ALREADY_IN_A_GROUP' },
+      {
+        status: 409,
+        title: 'Conflict',
+        detail: '您已屬於一個家庭群組',
+        code: 'ALREADY_IN_A_GROUP',
+      },
       409,
     );
 

@@ -12,7 +12,8 @@ export default function LoginCallbackPage() {
   const auth = useAuth();
   const navigate = useNavigate();
   // 失敗時以對話框告知，確認後回登入頁
-  const fail = (message: string) => notifyError(message).then(() => navigate('/login', { replace: true }));
+  const fail = (message: string) =>
+    notifyError(message).then(() => navigate('/login', { replace: true }));
   // 授權碼僅能使用一次，避免 StrictMode 重複執行 effect
   const started = useRef(false);
 

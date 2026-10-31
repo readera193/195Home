@@ -51,7 +51,15 @@ export default function FamilyGroupPage() {
 
   async function handleKick(memberId: number) {
     if (!familyGroupId) return;
-    if (!(await confirmDialog({ title: '確定要將此成員移出群組嗎？', text: '移出後對方將被封鎖，無法再加入，需由管理員解除封鎖才能重新加入。', confirmText: '移出', danger: true }))) return;
+    if (
+      !(await confirmDialog({
+        title: '確定要將此成員移出群組嗎？',
+        text: '移出後對方將被封鎖，無法再加入，需由管理員解除封鎖才能重新加入。',
+        confirmText: '移出',
+        danger: true,
+      }))
+    )
+      return;
     await kickMember(familyGroupId, memberId);
     queryClient.invalidateQueries({ queryKey: ['members', familyGroupId] });
   }
@@ -67,7 +75,14 @@ export default function FamilyGroupPage() {
    */
   async function handleRestore(memberId: number, name: string) {
     if (!familyGroupId) return;
-    if (!(await confirmDialog({ title: `確定要解除「${name}」的封鎖嗎？`, text: `解除封鎖後，${name}可以再次使用邀請碼加入群組，不會自動加回成員。`, confirmText: '解除封鎖' }))) return;
+    if (
+      !(await confirmDialog({
+        title: `確定要解除「${name}」的封鎖嗎？`,
+        text: `解除封鎖後，${name}可以再次使用邀請碼加入群組，不會自動加回成員。`,
+        confirmText: '解除封鎖',
+      }))
+    )
+      return;
     await restoreMemberEligibility(familyGroupId, memberId);
     queryClient.invalidateQueries({ queryKey: ['members', familyGroupId] });
   }
@@ -88,7 +103,9 @@ export default function FamilyGroupPage() {
   // 管理者離開仍有其他在職成員的群組時，必須先指定下一位管理者（FR-029）
   async function handleLeave(memberId: number, isAdmin: boolean) {
     if (!familyGroupId) return;
-    const others = (members ?? []).filter((m) => m.status === 'ACTIVE' && m.familyMemberId !== memberId);
+    const others = (members ?? []).filter(
+      (m) => m.status === 'ACTIVE' && m.familyMemberId !== memberId,
+    );
     try {
       if (isAdmin && others.length > 0) {
         const newAdminMemberId = await selectOption({
@@ -102,7 +119,15 @@ export default function FamilyGroupPage() {
         if (newAdminMemberId === undefined) return;
         await leaveGroup(familyGroupId, memberId, newAdminMemberId);
       } else {
-        if (!(await confirmDialog({ title: '確定要離開此群組嗎？', text: '若您是最後一位成員，群組將自動解散。', confirmText: '離開', danger: true }))) return;
+        if (
+          !(await confirmDialog({
+            title: '確定要離開此群組嗎？',
+            text: '若您是最後一位成員，群組將自動解散。',
+            confirmText: '離開',
+            danger: true,
+          }))
+        )
+          return;
         await leaveGroup(familyGroupId, memberId);
       }
       queryClient.invalidateQueries({ queryKey: ['myFamily'] });
@@ -115,7 +140,15 @@ export default function FamilyGroupPage() {
   // 管理者直接把管理者身分交給另一位在職成員，自己降為一般成員（FR-032）
   async function handleTransferAdmin(memberId: number, name: string) {
     if (!familyGroupId) return;
-    if (!(await confirmDialog({ title: `確定要將管理者轉給「${name}」嗎？`, text: '轉移後您將變成一般成員，失去管理權限。', confirmText: '轉移', danger: true }))) return;
+    if (
+      !(await confirmDialog({
+        title: `確定要將管理者轉給「${name}」嗎？`,
+        text: '轉移後您將變成一般成員，失去管理權限。',
+        confirmText: '轉移',
+        danger: true,
+      }))
+    )
+      return;
     try {
       await transferAdmin(familyGroupId, memberId);
       queryClient.invalidateQueries({ queryKey: ['myFamily'] });
@@ -165,36 +198,67 @@ export default function FamilyGroupPage() {
                 <td>
                   <span
                     className={`badge ${
-                      member.status === 'ACTIVE' ? 'badge-success' : member.status === 'REMOVED' ? 'badge-danger' : ''
+                      member.status === 'ACTIVE'
+                        ? 'badge-success'
+                        : member.status === 'REMOVED'
+                          ? 'badge-danger'
+                          : ''
                     }`}
                   >
-                    {member.status === 'ACTIVE' ? '正常' : member.status === 'REMOVED' ? '已封鎖' : '已退出'}
+                    {member.status === 'ACTIVE'
+                      ? '正常'
+                      : member.status === 'REMOVED'
+                        ? '已封鎖'
+                        : '已退出'}
                   </span>
                 </td>
                 <td>
                   <div className="actions">
-                    {(isAdmin || member.familyMemberId === myFamily.familyMemberId) && member.status !== 'REMOVED' && (
-                      <button className="btn-secondary btn-sm" onClick={() => handleRename(member.familyMemberId, member.displayName)}>
-                        編輯
-                      </button>
-                    )}
-                    {member.status === 'ACTIVE' && member.familyMemberId === myFamily.familyMemberId && (
-                      <button className="btn-secondary btn-sm" onClick={() => handleLeave(member.familyMemberId, isAdmin)}>
-                        離開群組
-                      </button>
-                    )}
-                    {member.status === 'ACTIVE' && isAdmin && member.familyMemberId !== myFamily.familyMemberId && (
-                      <button className="btn-secondary btn-sm" onClick={() => handleTransferAdmin(member.familyMemberId, member.displayName)}>
-                        轉移管理員
-                      </button>
-                    )}
-                    {member.status === 'ACTIVE' && isAdmin && member.familyMemberId !== myFamily.familyMemberId && (
-                      <button className="btn-danger btn-sm" onClick={() => handleKick(member.familyMemberId)}>
-                        移出
-                      </button>
-                    )}
+                    {(isAdmin || member.familyMemberId === myFamily.familyMemberId) &&
+                      member.status !== 'REMOVED' && (
+                        <button
+                          className="btn-secondary btn-sm"
+                          onClick={() => handleRename(member.familyMemberId, member.displayName)}
+                        >
+                          編輯
+                        </button>
+                      )}
+                    {member.status === 'ACTIVE' &&
+                      member.familyMemberId === myFamily.familyMemberId && (
+                        <button
+                          className="btn-secondary btn-sm"
+                          onClick={() => handleLeave(member.familyMemberId, isAdmin)}
+                        >
+                          離開群組
+                        </button>
+                      )}
+                    {member.status === 'ACTIVE' &&
+                      isAdmin &&
+                      member.familyMemberId !== myFamily.familyMemberId && (
+                        <button
+                          className="btn-secondary btn-sm"
+                          onClick={() =>
+                            handleTransferAdmin(member.familyMemberId, member.displayName)
+                          }
+                        >
+                          轉移管理員
+                        </button>
+                      )}
+                    {member.status === 'ACTIVE' &&
+                      isAdmin &&
+                      member.familyMemberId !== myFamily.familyMemberId && (
+                        <button
+                          className="btn-danger btn-sm"
+                          onClick={() => handleKick(member.familyMemberId)}
+                        >
+                          移出
+                        </button>
+                      )}
                     {isAdmin && member.status === 'REMOVED' && (
-                      <button className="btn-secondary btn-sm" onClick={() => handleRestore(member.familyMemberId, member.displayName)}>
+                      <button
+                        className="btn-secondary btn-sm"
+                        onClick={() => handleRestore(member.familyMemberId, member.displayName)}
+                      >
                         解除封鎖
                       </button>
                     )}
@@ -218,7 +282,9 @@ export default function FamilyGroupPage() {
             <dd>{myFamily.name}</dd>
             <dt>我的角色</dt>
             <dd>
-              <span className={`badge ${isAdmin ? 'badge-primary' : ''}`}>{isAdmin ? '管理者' : '一般成員'}</span>
+              <span className={`badge ${isAdmin ? 'badge-primary' : ''}`}>
+                {isAdmin ? '管理者' : '一般成員'}
+              </span>
             </dd>
             <dt>
               邀請碼 <InfoTip text="可重複使用、無時限，分享給家人即可加入。" />
@@ -238,7 +304,9 @@ export default function FamilyGroupPage() {
             {inactiveMembers.length > 0 && (
               <details className="inactive-members">
                 <summary>已不在群組的成員（{inactiveMembers.length}）</summary>
-                <p className="muted hint">已封鎖：被管理員移出，無法再加入；已退出：自行離開，可使用邀請碼重新加入。</p>
+                <p className="muted hint">
+                  已封鎖：被管理員移出，無法再加入；已退出：自行離開，可使用邀請碼重新加入。
+                </p>
                 {renderTable(inactiveMembers)}
               </details>
             )}
@@ -259,7 +327,12 @@ export default function FamilyGroupPage() {
         <form className="inline-form" onSubmit={handleCreate}>
           <div className="field">
             <label htmlFor="groupName">群組名稱</label>
-            <input id="groupName" value={groupName} onChange={(e) => setGroupName(e.target.value)} required />
+            <input
+              id="groupName"
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+              required
+            />
           </div>
           <button type="submit">建立</button>
         </form>
@@ -270,7 +343,12 @@ export default function FamilyGroupPage() {
         <form className="inline-form" onSubmit={handleJoin}>
           <div className="field">
             <label htmlFor="inviteCode">邀請碼</label>
-            <input id="inviteCode" value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} required />
+            <input
+              id="inviteCode"
+              value={inviteCode}
+              onChange={(e) => setInviteCode(e.target.value)}
+              required
+            />
           </div>
           <button type="submit">加入</button>
         </form>

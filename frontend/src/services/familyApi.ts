@@ -69,17 +69,29 @@ export function leaveGroup(
 }
 
 /** 管理者直接指定另一位在職成員為管理者（FR-032）。 */
-export function transferAdmin(familyGroupId: number, newAdminMemberId: number): Promise<MemberView> {
+export function transferAdmin(
+  familyGroupId: number,
+  newAdminMemberId: number,
+): Promise<MemberView> {
   return apiClient
     .post(`/families/${familyGroupId}/transfer-admin`, { newAdminMemberId })
     .then((res) => res.data);
 }
 
-export function kickMember(familyGroupId: number, memberId: number): Promise<{ memberId: number; status: string }> {
-  return apiClient.post(`/families/${familyGroupId}/members/${memberId}/kick`).then((res) => res.data);
+export function kickMember(
+  familyGroupId: number,
+  memberId: number,
+): Promise<{ memberId: number; status: string }> {
+  return apiClient
+    .post(`/families/${familyGroupId}/members/${memberId}/kick`)
+    .then((res) => res.data);
 }
 
-export function renameMember(familyGroupId: number, memberId: number, displayName: string): Promise<MemberView> {
+export function renameMember(
+  familyGroupId: number,
+  memberId: number,
+  displayName: string,
+): Promise<MemberView> {
   return apiClient
     .put(`/families/${familyGroupId}/members/${memberId}/display-name`, { displayName })
     .then((res) => res.data);
