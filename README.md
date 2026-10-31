@@ -1,5 +1,7 @@
 # 家庭共享支出平台（195Home）
 
+[![CI](https://github.com/readera193/195Home/actions/workflows/ci.yml/badge.svg)](https://github.com/readera193/195Home/actions/workflows/ci.yml)
+
 家庭成員共同記帳、篩選查看、統計月結，並透過 LINE Bot 收到每月支出匯總或主動查詢。
 
 **線上 Demo**：https://p01--app-service--pxrw8nyd5f89.code.run/ （登入頁點「Demo 體驗」即可，免帳號）
@@ -99,8 +101,18 @@ sequenceDiagram
 | API 錯誤格式 | RFC 9457 Problem Details | 前端以單一邏輯處理所有錯誤 |
 | 部署 | GitHub Actions → GHCR → Northflank | CI 通過後自動部署 |
 
+## 設計重點
+
+- **兩個服務、單一資料庫**：LINE Bot 與主要業務分開部署，服務間只有一條帶內部密鑰的同步 REST（[ADR 0002](docs/adr/0002-two-services-sync-rest.md)）。
+- **併發編輯鎖**：以條件式 `UPDATE` 取得鎖並設 TTL，不引入分散式鎖元件；update/delete 的剩餘時間窗與改進方向有明確記錄（[ADR 0003](docs/adr/0003-expense-edit-lock.md)）。
+- **顯式 SQL**：MyBatis + Flyway，搭配 port/adapter 分層（[ADR 0001](docs/adr/0001-mybatis-over-jpa.md)）。
+- **無密碼登入與本地驗證 JWT**：角色與在職狀態不進 token，避免舊權限殘留（[ADR 0004](docs/adr/0004-auth-line-login-jwt.md)）。
+- **容錯排程**：每月推播對每位成員獨立處理，單一成員失敗只記錄 FAILED，不中斷整批。
+- **可測試的時間**：兩個服務都注入 `Clock`，不直接呼叫 `now()`。
+
 ## 更多文件
 
 - [開發、測試與部署](docs/DEVELOPMENT.md)
 - [測試策略](TESTING.md)
+- [架構決策紀錄（ADR）](docs/adr/)
 - [規格與設計文件](specs/001-family-expense-tracking/)

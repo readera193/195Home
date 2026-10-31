@@ -5,7 +5,7 @@
 兩種並行，無帳號密碼。
 
 - **Demo 體驗**：登入頁的「Demo 體驗（免登入）」按鈕，後端 `POST /api/auth/demo` 一鍵建立隨機帳號，並自動建立家庭群組（登入者為管理者，另有爸爸、媽媽、小明、小美 4 位示範成員）、5 個支付帳戶與範例支出（見 `DemoLoginService`）。由環境變數 `DEMO_LOGIN_ENABLED` 控制（dev profile 預設開啟，其他環境預設關閉），前端透過 `GET /api/auth/config` 決定是否顯示按鈕。Demo 帳號沒有真實 LINE ID，月結推播會自動略過。展示環境請勿放入真實資料。公開環境另有保護：`POST /api/auth/demo` 每小時限流（每 IP 20 次、全站 300 次，`app.demo-login.max-per-client-per-hour` / `max-total-per-hour`），並每小時清除超過 24 小時（`retention-hours`）的 Demo 資料（`DemoDataCleanupScheduler`）。
-- **LINE 登入**：前端建置時設定 `VITE_LINE_CHANNEL_ID` 才會顯示「使用 LINE 登入」按鈕，導向 LINE 授權頁，回到 `/login/callback` 後以授權碼呼叫 `POST /api/auth/line`，後端由 `LineOAuthLoginClient` 換取 profile；後端需 `LINE_LOGIN_CHANNEL_ID`／`LINE_LOGIN_CHANNEL_SECRET`／`LINE_LOGIN_REDIRECT_URI`（prod 缺少即啟動失敗）。本機 Docker：複製 `line.env.example` 為 `.env` 並填入 LINE 憑證，再 `docker compose up -d --build`；不用 Docker 時可在 `frontend/.env.local` 設定 `VITE_LINE_CHANNEL_ID` 並於 LINE Developers Console 登錄 `http://localhost:5173/login/callback`。
+- **LINE 登入**：前端建置時設定 `VITE_LINE_CHANNEL_ID` 才會顯示「使用 LINE 登入」按鈕，導向 LINE 授權頁，回到 `/login/callback` 後以授權碼呼叫 `POST /api/auth/line`，後端由 `LineOAuthLoginClient` 換取 profile；後端需 `LINE_LOGIN_CHANNEL_ID`／`LINE_LOGIN_CHANNEL_SECRET`／`LINE_LOGIN_REDIRECT_URI`（prod 缺少即啟動失敗）。本機 Docker：複製 `.env.example` 為 `.env` 並填入 LINE 憑證，再 `docker compose up -d --build`；不用 Docker 時可在 `frontend/.env.local` 設定 `VITE_LINE_CHANNEL_ID` 並於 LINE Developers Console 登錄 `http://localhost:5173/login/callback`。
 
 ### LINE 登入流程
 
@@ -175,3 +175,14 @@ config/                     # Spring 設定類別
 ```
 
 依賴方向：presentation → application → domain；infrastructure 實作 application 定義的 port，application 不直接依賴 infrastructure。app-service 依業務領域分模組，模組內再依上述分層；statistics 無持久化，因此沒有 infrastructure。
+
+## 已知限制與取捨
+
+- **併發的「先查後寫」**：加入／建立群組、群組名稱與邀請碼都是先查再寫，併發時可能漏過檢查；資料庫的唯一約束會兜底，並由 `GlobalExceptionHandler` 把 `DuplicateKeyException` 轉成 409。尚未對「每位使用者同時只能有一個在職成員身分」建立資料庫層約束。
+- **編輯鎖**：取得鎖用條件式 `UPDATE`（5 分鐘 TTL），但 `update`／`delete` 是「先檢查鎖再寫入」，鎖逾時的瞬間存在很小的競態窗口；改進方向見 [ADR 0003](adr/0003-expense-edit-lock.md)。
+- **分頁使用 `OFFSET`**：家庭資料量下足夠，資料量大時應改用 keyset 分頁。
+- **Demo 登入**：在單一交易內逐筆新增上百筆範例支出，並以記憶體計數限流（重啟歸零、多實例不共用）；單一實例與目前流量下足夠。
+- **Token 存在 `localStorage`**：容易受 XSS 影響，但改用 HttpOnly Cookie 需另行處理 CSRF，對此規模屬過度設計。
+- **JWT 無法由伺服器撤銷**：登出只是前端丟棄 token，有效期 2 小時。
+- **`ExpenseRecord` 偏向資料物件**：鎖與金額規則多半在 Service；不做大規模重構，之後可逐步把規則移進領域物件。
+- **程式碼格式**：後端以 spotless 套用 google-java-format（AOSP 風格），`./mvnw spotless:apply` 可自動格式化，格式化的 commit 已列入 `.git-blame-ignore-revs`；前端以 Prettier 統一格式（`npm run format`），CI 以 `npm run format:check` 檢查。
