@@ -5,6 +5,7 @@ import com.family195home.notification.application.MonthlySummaryFormatter;
 import com.family195home.notification.application.NotificationLogRepository;
 import com.family195home.notification.application.dto.LineBindingView;
 import com.family195home.notification.application.dto.MonthlySummaryView;
+import com.family195home.notification.config.RequestIdFilter;
 import com.family195home.notification.domain.NotificationLog;
 import com.family195home.notification.domain.NotificationStatus;
 import com.family195home.notification.infrastructure.client.AppServiceClient;
@@ -15,8 +16,10 @@ import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -55,6 +58,14 @@ public class MonthlyNotificationScheduler {
     @Scheduled(cron = "0 0 23 L * ?", zone = "Asia/Taipei")
     public void sendMonthlySummaries() {
         String yearMonth = YearMonth.now(clock.withZone(ZoneId.of("Asia/Taipei"))).toString();
+        // 排程沒有請求，每次執行給一個 requestId，讓整批推播與對 app-service 的呼叫能在日誌中串起來
+        String runId = "monthly-" + yearMonth + "-" + UUID.randomUUID().toString().substring(0, 8);
+        try (MDC.MDCCloseable ignored = MDC.putCloseable(RequestIdFilter.MDC_KEY, runId)) {
+            sendAll(yearMonth);
+        }
+    }
+
+    private void sendAll(String yearMonth) {
         List<LineBindingView> bindings = appServiceClient.findAllBindings();
         // 若某家庭當下無任何已綁定 LINE 的成員，該家庭不會出現在 bindings 中，等同自動略過（見 spec.md Edge Cases）
         // 同一家庭的多位成員共用同一份彙總，避免重複呼叫 app-service

@@ -186,3 +186,11 @@ config/                     # Spring 設定類別
 - **JWT 無法由伺服器撤銷**：登出只是前端丟棄 token，有效期 2 小時。
 - **`ExpenseRecord` 偏向資料物件**：鎖與金額規則多半在 Service；不做大規模重構，之後可逐步把規則移進領域物件。
 - **程式碼格式**：後端以 spotless 套用 google-java-format（AOSP 風格），`./mvnw spotless:apply` 可自動格式化，格式化的 commit 已列入 `.git-blame-ignore-revs`；前端以 Prettier 統一格式（`npm run format`），CI 以 `npm run format:check` 檢查。
+
+## 日誌與 requestId
+
+- 兩個服務都有 `RequestIdFilter`：請求若帶 `X-Request-Id`（限英數與 `._-`、最長 64 字元，避免日誌注入）就沿用，否則產生 UUID；寫入 MDC，並放進回應標頭 `X-Request-Id`。
+- 日誌格式以 `logging.pattern.level` 輸出 `[requestId]`；沒有請求的背景工作則為空的 `[]`。
+- notification-service 呼叫 app-service 會轉送 requestId；每月推播排程每次執行會指定 `monthly-<年月>-<8碼>` 作為 id。
+- 使用者回報問題時，請對方提供回應標頭中的 `X-Request-Id`，即可在日誌中找到該請求，以及它在另一個服務留下的紀錄。
+- 需要 JSON 結構化日誌時，可在 prod 設定 `logging.structured.format.console`（Spring Boot 3.5 內建，會自動帶出 MDC）。
