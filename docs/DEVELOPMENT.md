@@ -175,3 +175,14 @@ config/                     # Spring 設定類別
 ```
 
 依賴方向：presentation → application → domain；infrastructure 實作 application 定義的 port，application 不直接依賴 infrastructure。app-service 依業務領域分模組，模組內再依上述分層；statistics 無持久化，因此沒有 infrastructure。
+
+## 已知限制與取捨
+
+- **併發的「先查後寫」**：加入／建立群組、群組名稱與邀請碼都是先查再寫，併發時可能漏過檢查；資料庫的唯一約束會兜底，並由 `GlobalExceptionHandler` 把 `DuplicateKeyException` 轉成 409。尚未對「每位使用者同時只能有一個在職成員身分」建立資料庫層約束。
+- **編輯鎖**：取得鎖用條件式 `UPDATE`（5 分鐘 TTL），但 `update`／`delete` 是「先檢查鎖再寫入」，鎖逾時的瞬間存在很小的競態窗口；改進方向見 [ADR 0003](adr/0003-expense-edit-lock.md)。
+- **分頁使用 `OFFSET`**：家庭資料量下足夠，資料量大時應改用 keyset 分頁。
+- **Demo 登入**：在單一交易內逐筆新增上百筆範例支出，並以記憶體計數限流（重啟歸零、多實例不共用）；單一實例與目前流量下足夠。
+- **Token 存在 `localStorage`**：容易受 XSS 影響，但改用 HttpOnly Cookie 需另行處理 CSRF，對此規模屬過度設計。
+- **JWT 無法由伺服器撤銷**：登出只是前端丟棄 token，有效期 2 小時。
+- **`ExpenseRecord` 偏向資料物件**：鎖與金額規則多半在 Service；不做大規模重構，之後可逐步把規則移進領域物件。
+- **程式碼格式**：後端以 spotless 套用 google-java-format（AOSP 風格），`./mvnw spotless:apply` 可自動格式化，格式化的 commit 已列入 `.git-blame-ignore-revs`；前端以 Prettier 統一格式（`npm run format`），CI 以 `npm run format:check` 檢查。
