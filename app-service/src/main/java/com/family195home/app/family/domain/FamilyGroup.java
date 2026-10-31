@@ -10,10 +10,10 @@ public class FamilyGroup {
     private String inviteCode;
     private LocalDateTime createdAt;
 
-    public FamilyGroup() {
-    }
+    public FamilyGroup() {}
 
-    public FamilyGroup(String name, FamilyGroupStatus status, String inviteCode, LocalDateTime createdAt) {
+    public FamilyGroup(
+            String name, FamilyGroupStatus status, String inviteCode, LocalDateTime createdAt) {
         this.name = name;
         this.status = status;
         this.inviteCode = inviteCode;

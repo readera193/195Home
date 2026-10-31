@@ -1,22 +1,21 @@
 package com.family195home.notification.presentation;
 
-import java.time.Clock;
-import com.family195home.notification.infrastructure.client.AppServiceClient;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import com.family195home.notification.application.dto.AccountSummaryView;
 import com.family195home.notification.application.dto.BindingResult;
 import com.family195home.notification.application.dto.MonthlySummaryView;
+import com.family195home.notification.infrastructure.client.AppServiceClient;
 import com.linecorp.bot.client.LineMessagingClient;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
+import java.time.Clock;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 class LineWebhookControllerTest {
 
@@ -26,7 +25,11 @@ class LineWebhookControllerTest {
     @BeforeEach
     void setUp() {
         appServiceClient = mock(AppServiceClient.class);
-        controller = new LineWebhookController(appServiceClient, mock(LineMessagingClient.class), Clock.systemDefaultZone());
+        controller =
+                new LineWebhookController(
+                        appServiceClient,
+                        mock(LineMessagingClient.class),
+                        Clock.systemDefaultZone());
     }
 
     @Test
@@ -35,7 +38,12 @@ class LineWebhookControllerTest {
         when(appServiceClient.findByLineUserId("line-user-1"))
                 .thenReturn(Optional.of(new BindingResult(1L, 10L)));
         when(appServiceClient.getMonthlySummary(10L, "2026-07"))
-                .thenReturn(new MonthlySummaryView(10L, "2026-07", List.of(new AccountSummaryView(1L, "現金", -350)), -350));
+                .thenReturn(
+                        new MonthlySummaryView(
+                                10L,
+                                "2026-07",
+                                List.of(new AccountSummaryView(1L, "現金", -350)),
+                                -350));
 
         String reply = controller.determineReply("2026-07", "line-user-1");
 
@@ -61,7 +69,8 @@ class LineWebhookControllerTest {
 
     @Test
     void determineReply_repliesFriendlyMessageWhenAppServiceFails() {
-        when(appServiceClient.findByLineUserId("line-user-1")).thenThrow(new RuntimeException("boom"));
+        when(appServiceClient.findByLineUserId("line-user-1"))
+                .thenThrow(new RuntimeException("boom"));
 
         String reply = controller.determineReply("2026-07", "line-user-1");
 
@@ -79,10 +88,13 @@ class LineWebhookControllerTest {
     @Test
     void extractMonth_usesDatePickerParamsOrPlainYearMonthData() {
         YearMonth now = YearMonth.of(2026, 1);
-        assertThat(LineWebhookController.extractMonth("pick", Map.of("date", "2026-07-15"), now)).isEqualTo("2026-07");
+        assertThat(LineWebhookController.extractMonth("pick", Map.of("date", "2026-07-15"), now))
+                .isEqualTo("2026-07");
         assertThat(LineWebhookController.extractMonth("2026-06", null, now)).isEqualTo("2026-06");
-        assertThat(LineWebhookController.extractMonth("month=current", null, now)).isEqualTo("2026-01");
-        assertThat(LineWebhookController.extractMonth("month=previous", null, now)).isEqualTo("2025-12");
+        assertThat(LineWebhookController.extractMonth("month=current", null, now))
+                .isEqualTo("2026-01");
+        assertThat(LineWebhookController.extractMonth("month=previous", null, now))
+                .isEqualTo("2025-12");
         assertThat(LineWebhookController.extractMonth("other", null, now)).isNull();
     }
 }

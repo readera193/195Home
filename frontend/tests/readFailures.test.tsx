@@ -15,14 +15,23 @@ vi.mock('../src/services/statisticsApi');
 
 function show(page: React.ReactNode) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={client}><MemoryRouter>{page}</MemoryRouter></QueryClientProvider>);
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter>{page}</MemoryRouter>
+    </QueryClientProvider>,
+  );
 }
 
 describe('讀取失敗與重試', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(familyApi.getMyFamily).mockResolvedValue({
-      familyGroupId: 10, familyMemberId: 1, name: '測試家庭', role: 'MEMBER', status: 'ACTIVE', inviteCode: 'TEST',
+      familyGroupId: 10,
+      familyMemberId: 1,
+      name: '測試家庭',
+      role: 'MEMBER',
+      status: 'ACTIVE',
+      inviteCode: 'TEST',
     });
     vi.mocked(familyApi.getMembers).mockResolvedValue([]);
     vi.mocked(expenseApi.listAccounts).mockResolvedValue([]);
@@ -36,9 +45,15 @@ describe('讀取失敗與重試', () => {
   });
 
   it('支出讀取失敗後可以重試並恢復分頁清單', async () => {
-    vi.mocked(expenseApi.listExpenses).mockRejectedValueOnce(new Error('offline')).mockResolvedValue({
-      items: [], page: 0, size: 20, totalElements: 0, totalPages: 0,
-    });
+    vi.mocked(expenseApi.listExpenses)
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValue({
+        items: [],
+        page: 0,
+        size: 20,
+        totalElements: 0,
+        totalPages: 0,
+      });
     show(<ExpenseListPage />);
     expect(await screen.findByRole('alert')).toHaveTextContent('無法載入支出紀錄');
     fireEvent.click(screen.getByRole('button', { name: '重新載入' }));

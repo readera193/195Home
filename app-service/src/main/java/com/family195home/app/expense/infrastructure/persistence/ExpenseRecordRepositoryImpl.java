@@ -2,8 +2,6 @@ package com.family195home.app.expense.infrastructure.persistence;
 
 import com.family195home.app.expense.application.ExpenseRecordRepository;
 import com.family195home.app.expense.domain.ExpenseRecord;
-import org.springframework.stereotype.Repository;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
@@ -12,11 +10,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import org.springframework.stereotype.Repository;
 
 @Repository
 public class ExpenseRecordRepositoryImpl implements ExpenseRecordRepository {
 
-    private static final DateTimeFormatter YEAR_MONTH_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM");
+    private static final DateTimeFormatter YEAR_MONTH_FORMAT =
+            DateTimeFormatter.ofPattern("yyyy-MM");
 
     private final ExpenseRecordMapper mapper;
 
@@ -56,25 +56,49 @@ public class ExpenseRecordRepositoryImpl implements ExpenseRecordRepository {
     }
 
     @Override
-    public List<ExpenseRecord> findByFilter(Long familyGroupId, Long paymentAccountId, Long authorMemberId, String month) {
+    public List<ExpenseRecord> findByFilter(
+            Long familyGroupId, Long paymentAccountId, Long authorMemberId, String month) {
         MonthRange range = MonthRange.parse(month);
-        return mapper.selectByFilter(familyGroupId, paymentAccountId, authorMemberId, range.start(), range.endExclusive());
+        return mapper.selectByFilter(
+                familyGroupId,
+                paymentAccountId,
+                authorMemberId,
+                range.start(),
+                range.endExclusive());
     }
 
     @Override
     public List<ExpenseRecord> findPageByFilter(
-            Long familyGroupId, Long paymentAccountId, Long authorMemberId,
-            LocalDate startDate, LocalDate endDate, int offset, int limit) {
+            Long familyGroupId,
+            Long paymentAccountId,
+            Long authorMemberId,
+            LocalDate startDate,
+            LocalDate endDate,
+            int offset,
+            int limit) {
         return mapper.selectPageByFilter(
-                familyGroupId, paymentAccountId, authorMemberId,
-                startOf(startDate), endExclusiveOf(endDate), offset, limit);
+                familyGroupId,
+                paymentAccountId,
+                authorMemberId,
+                startOf(startDate),
+                endExclusiveOf(endDate),
+                offset,
+                limit);
     }
 
     @Override
     public long countByFilter(
-            Long familyGroupId, Long paymentAccountId, Long authorMemberId, LocalDate startDate, LocalDate endDate) {
+            Long familyGroupId,
+            Long paymentAccountId,
+            Long authorMemberId,
+            LocalDate startDate,
+            LocalDate endDate) {
         return mapper.countByFilter(
-                familyGroupId, paymentAccountId, authorMemberId, startOf(startDate), endExclusiveOf(endDate));
+                familyGroupId,
+                paymentAccountId,
+                authorMemberId,
+                startOf(startDate),
+                endExclusiveOf(endDate));
     }
 
     /** 起日當天 00:00；為 null 時不限下界。 */
@@ -94,7 +118,9 @@ public class ExpenseRecordRepositoryImpl implements ExpenseRecordRepository {
                 return new MonthRange(null, null);
             }
             YearMonth yearMonth = YearMonth.parse(month, YEAR_MONTH_FORMAT);
-            return new MonthRange(yearMonth.atDay(1).atStartOfDay(), yearMonth.plusMonths(1).atDay(1).atStartOfDay());
+            return new MonthRange(
+                    yearMonth.atDay(1).atStartOfDay(),
+                    yearMonth.plusMonths(1).atDay(1).atStartOfDay());
         }
     }
 

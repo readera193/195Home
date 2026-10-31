@@ -2,9 +2,8 @@ package com.family195home.notification.infrastructure.persistence;
 
 import com.family195home.notification.application.NotificationLogRepository;
 import com.family195home.notification.domain.NotificationLog;
-import org.springframework.stereotype.Repository;
-
 import java.util.List;
+import org.springframework.stereotype.Repository;
 
 @Repository
 public class NotificationLogRepositoryImpl implements NotificationLogRepository {

@@ -1,19 +1,18 @@
 package com.family195home.app.demo;
 
-import java.time.Clock;
 import com.family195home.app.family.application.UserService;
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.util.List;
-
 /**
- * 清除超過保留時間的 Demo 資料（群組、成員、支付帳戶、支出紀錄與 Demo 帳號），避免公開展示環境資料無限成長。
- * 每次最多處理 {@link #BATCH_SIZE} 個群組，剩下的留給下一輪，避免單一交易過大。
+ * 清除超過保留時間的 Demo 資料（群組、成員、支付帳戶、支出紀錄與 Demo 帳號），避免公開展示環境資料無限成長。 每次最多處理 {@link #BATCH_SIZE}
+ * 個群組，剩下的留給下一輪，避免單一交易過大。
  */
 @Service
 public class DemoDataCleanupService {
@@ -35,7 +34,9 @@ public class DemoDataCleanupService {
         this.clock = clock;
     }
 
-    /** @return 本次刪除的群組數 */
+    /**
+     * @return 本次刪除的群組數
+     */
     @Transactional
     public int cleanup() {
         return cleanup(LocalDateTime.now(clock).minusHours(retentionHours));

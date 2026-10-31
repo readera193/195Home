@@ -19,7 +19,9 @@ public class LineMessageSenderImpl implements LineMessageSender {
     @Override
     public void pushText(String lineUserId, String text) {
         try {
-            lineMessagingClient.pushMessage(new PushMessage(lineUserId, new TextMessage(text))).get();
+            lineMessagingClient
+                    .pushMessage(new PushMessage(lineUserId, new TextMessage(text)))
+                    .get();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new LineMessageSendException("LINE 推播被中斷", e);

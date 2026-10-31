@@ -1,19 +1,18 @@
 package com.family195home.app.family.application;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import com.family195home.app.family.domain.FamilyMember;
 import com.family195home.app.family.domain.MemberRole;
 import com.family195home.app.family.domain.MemberStatus;
 import com.family195home.app.family.domain.User;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 class LineBindingServiceTest {
 
@@ -32,9 +31,11 @@ class LineBindingServiceTest {
     void findByLineUserId_returnsActiveMembership() {
         User user = user(10L, "line-user-1");
         when(userRepository.findByLineUserId("line-user-1")).thenReturn(Optional.of(user));
-        when(familyMemberRepository.findActiveByUserId(10L)).thenReturn(Optional.of(member(1L, 20L, 10L)));
+        when(familyMemberRepository.findActiveByUserId(10L))
+                .thenReturn(Optional.of(member(1L, 20L, 10L)));
 
-        Optional<LineBindingService.BindingResult> result = lineBindingService.findByLineUserId("line-user-1");
+        Optional<LineBindingService.BindingResult> result =
+                lineBindingService.findByLineUserId("line-user-1");
 
         assertThat(result).isPresent();
         assertThat(result.get().familyMemberId()).isEqualTo(1L);
@@ -51,7 +52,8 @@ class LineBindingServiceTest {
 
     @Test
     void findByLineUserId_emptyWhenUserHasNoActiveFamily() {
-        when(userRepository.findByLineUserId("line-user-1")).thenReturn(Optional.of(user(10L, "line-user-1")));
+        when(userRepository.findByLineUserId("line-user-1"))
+                .thenReturn(Optional.of(user(10L, "line-user-1")));
         when(familyMemberRepository.findActiveByUserId(10L)).thenReturn(Optional.empty());
 
         assertThat(lineBindingService.findByLineUserId("line-user-1")).isEmpty();
@@ -59,8 +61,10 @@ class LineBindingServiceTest {
 
     @Test
     void findAllBoundMembers_skipsUsersWithoutActiveFamily() {
-        when(userRepository.findAll()).thenReturn(List.of(user(10L, "line-a"), user(11L, "line-b")));
-        when(familyMemberRepository.findActiveByUserId(10L)).thenReturn(Optional.of(member(1L, 20L, 10L)));
+        when(userRepository.findAll())
+                .thenReturn(List.of(user(10L, "line-a"), user(11L, "line-b")));
+        when(familyMemberRepository.findActiveByUserId(10L))
+                .thenReturn(Optional.of(member(1L, 20L, 10L)));
         when(familyMemberRepository.findActiveByUserId(11L)).thenReturn(Optional.empty());
 
         List<LineBindingService.BoundMember> result = lineBindingService.findAllBoundMembers();
@@ -70,9 +74,12 @@ class LineBindingServiceTest {
 
     @Test
     void findAllBoundMembers_skipsDemoUsers() {
-        when(userRepository.findAll()).thenReturn(List.of(user(10L, "line-a"), user(11L, "demo-1234")));
-        when(familyMemberRepository.findActiveByUserId(10L)).thenReturn(Optional.of(member(1L, 20L, 10L)));
-        when(familyMemberRepository.findActiveByUserId(11L)).thenReturn(Optional.of(member(2L, 20L, 11L)));
+        when(userRepository.findAll())
+                .thenReturn(List.of(user(10L, "line-a"), user(11L, "demo-1234")));
+        when(familyMemberRepository.findActiveByUserId(10L))
+                .thenReturn(Optional.of(member(1L, 20L, 10L)));
+        when(familyMemberRepository.findActiveByUserId(11L))
+                .thenReturn(Optional.of(member(2L, 20L, 11L)));
 
         assertThat(lineBindingService.findAllBoundMembers())
                 .containsExactly(new LineBindingService.BoundMember(1L, 20L, "line-a"));
@@ -85,7 +92,13 @@ class LineBindingServiceTest {
     }
 
     private static FamilyMember member(Long id, Long groupId, Long userId) {
-        FamilyMember member = new FamilyMember(groupId, userId, MemberStatus.ACTIVE, MemberRole.MEMBER, LocalDateTime.now());
+        FamilyMember member =
+                new FamilyMember(
+                        groupId,
+                        userId,
+                        MemberStatus.ACTIVE,
+                        MemberRole.MEMBER,
+                        LocalDateTime.now());
         member.setId(id);
         return member;
     }

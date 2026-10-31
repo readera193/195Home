@@ -1,27 +1,25 @@
 package com.family195home.app.expense.application;
 
-import java.time.Clock;
-import com.family195home.app.shared.ApiException;
-import com.family195home.app.shared.ErrorKind;
-import com.family195home.app.expense.domain.PaymentAccount;
-import com.family195home.app.expense.domain.PaymentAccountStatus;
-import com.family195home.app.family.domain.FamilyMember;
-import com.family195home.app.family.domain.MemberRole;
-import com.family195home.app.family.domain.MemberStatus;
-import com.family195home.app.family.application.FamilyAccess;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
-import java.time.LocalDateTime;
-import java.util.Optional;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-class PaymentAccountServiceTest {
+import com.family195home.app.expense.domain.PaymentAccount;
+import com.family195home.app.expense.domain.PaymentAccountStatus;
+import com.family195home.app.family.application.FamilyAccess;
+import com.family195home.app.family.domain.FamilyMember;
+import com.family195home.app.family.domain.MemberRole;
+import com.family195home.app.family.domain.MemberStatus;
+import com.family195home.app.shared.ApiException;
+import com.family195home.app.shared.ErrorKind;
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
+class PaymentAccountServiceTest {
 
     private PaymentAccountRepository paymentAccountRepository;
     private ExpenseRecordRepository expenseRecordRepository;
@@ -33,24 +31,33 @@ class PaymentAccountServiceTest {
         paymentAccountRepository = mock(PaymentAccountRepository.class);
         expenseRecordRepository = mock(ExpenseRecordRepository.class);
         familyAccess = mock(FamilyAccess.class);
-        service = new PaymentAccountService(paymentAccountRepository, expenseRecordRepository, familyAccess, Clock.systemDefaultZone());
+        service =
+                new PaymentAccountService(
+                        paymentAccountRepository,
+                        expenseRecordRepository,
+                        familyAccess,
+                        Clock.systemDefaultZone());
     }
 
     @Test
     void create_rejectsRegularMember() {
         // FR-003：一般成員不可建立支付帳戶
         when(familyAccess.requireAdmin(10L, 5L))
-                .thenThrow(new ApiException(ErrorKind.FORBIDDEN, "NOT_GROUP_ADMIN", "僅群組管理者可執行此操作"));
+                .thenThrow(
+                        new ApiException(ErrorKind.FORBIDDEN, "NOT_GROUP_ADMIN", "僅群組管理者可執行此操作"));
 
         assertThatThrownBy(() -> service.create(10L, 5L, "現金"))
-                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("NOT_GROUP_ADMIN"));
+                .isInstanceOfSatisfying(
+                        ApiException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("NOT_GROUP_ADMIN"));
         verify(paymentAccountRepository, never()).save(any());
     }
 
     @Test
     void create_byAdmin_savesAccountWithAdminAsCreator() {
         FamilyMember admin = member(1L, MemberRole.ADMIN);
-        when(familyAccess.requireAdmin(10L, 5L)).thenReturn(new FamilyAccess.MemberRef(admin.getId()));
+        when(familyAccess.requireAdmin(10L, 5L))
+                .thenReturn(new FamilyAccess.MemberRef(admin.getId()));
         when(familyAccess.groupState(10L)).thenReturn(FamilyAccess.GroupState.ACTIVE);
 
         PaymentAccount result = service.create(10L, 5L, "現金");
@@ -68,7 +75,9 @@ class PaymentAccountServiceTest {
         when(familyAccess.groupState(10L)).thenReturn(FamilyAccess.GroupState.DISSOLVED);
 
         assertThatThrownBy(() -> service.create(10L, 5L, "現金"))
-                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("GROUP_DISSOLVED"));
+                .isInstanceOfSatisfying(
+                        ApiException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("GROUP_DISSOLVED"));
     }
 
     @Test
@@ -87,10 +96,13 @@ class PaymentAccountServiceTest {
     void rename_rejectsRegularMember() {
         stubAccount(3L, 10L);
         when(familyAccess.requireAdmin(10L, 5L))
-                .thenThrow(new ApiException(ErrorKind.FORBIDDEN, "NOT_GROUP_ADMIN", "僅群組管理者可執行此操作"));
+                .thenThrow(
+                        new ApiException(ErrorKind.FORBIDDEN, "NOT_GROUP_ADMIN", "僅群組管理者可執行此操作"));
 
         assertThatThrownBy(() -> service.rename(3L, 5L, "銀行帳戶"))
-                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("NOT_GROUP_ADMIN"));
+                .isInstanceOfSatisfying(
+                        ApiException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("NOT_GROUP_ADMIN"));
         verify(paymentAccountRepository, never()).update(any());
     }
 
@@ -110,10 +122,13 @@ class PaymentAccountServiceTest {
     void disable_rejectsRegularMember() {
         stubAccount(3L, 10L);
         when(familyAccess.requireAdmin(10L, 5L))
-                .thenThrow(new ApiException(ErrorKind.FORBIDDEN, "NOT_GROUP_ADMIN", "僅群組管理者可執行此操作"));
+                .thenThrow(
+                        new ApiException(ErrorKind.FORBIDDEN, "NOT_GROUP_ADMIN", "僅群組管理者可執行此操作"));
 
         assertThatThrownBy(() -> service.disable(3L, 5L))
-                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("NOT_GROUP_ADMIN"));
+                .isInstanceOfSatisfying(
+                        ApiException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("NOT_GROUP_ADMIN"));
     }
 
     @Test
@@ -148,10 +163,13 @@ class PaymentAccountServiceTest {
     void enable_rejectsRegularMember() {
         stubAccount(3L, 10L);
         when(familyAccess.requireAdmin(10L, 5L))
-                .thenThrow(new ApiException(ErrorKind.FORBIDDEN, "NOT_GROUP_ADMIN", "僅群組管理者可執行此操作"));
+                .thenThrow(
+                        new ApiException(ErrorKind.FORBIDDEN, "NOT_GROUP_ADMIN", "僅群組管理者可執行此操作"));
 
         assertThatThrownBy(() -> service.enable(3L, 5L))
-                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("NOT_GROUP_ADMIN"));
+                .isInstanceOfSatisfying(
+                        ApiException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("NOT_GROUP_ADMIN"));
         verify(paymentAccountRepository, never()).update(any());
     }
 
@@ -165,7 +183,9 @@ class PaymentAccountServiceTest {
         when(familyAccess.groupState(10L)).thenReturn(FamilyAccess.GroupState.DISSOLVED);
 
         assertThatThrownBy(() -> service.enable(3L, 5L))
-                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("GROUP_DISSOLVED"));
+                .isInstanceOfSatisfying(
+                        ApiException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("GROUP_DISSOLVED"));
         verify(paymentAccountRepository, never()).update(any());
     }
 
@@ -201,19 +221,24 @@ class PaymentAccountServiceTest {
         when(expenseRecordRepository.existsByPaymentAccountId(3L)).thenReturn(true);
 
         assertThatThrownBy(() -> service.delete(3L, 5L))
-                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("ACCOUNT_IN_USE"));
+                .isInstanceOfSatisfying(
+                        ApiException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("ACCOUNT_IN_USE"));
         verify(paymentAccountRepository, never()).delete(any());
     }
 
     private PaymentAccount stubAccount(Long accountId, Long groupId) {
-        PaymentAccount account = new PaymentAccount(1L, groupId, "現金", PaymentAccountStatus.ACTIVE, LocalDateTime.now());
+        PaymentAccount account =
+                new PaymentAccount(
+                        1L, groupId, "現金", PaymentAccountStatus.ACTIVE, LocalDateTime.now());
         account.setId(accountId);
         when(paymentAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
         return account;
     }
 
     private FamilyMember member(Long id, MemberRole role) {
-        FamilyMember member = new FamilyMember(10L, id * 100, MemberStatus.ACTIVE, role, LocalDateTime.now());
+        FamilyMember member =
+                new FamilyMember(10L, id * 100, MemberStatus.ACTIVE, role, LocalDateTime.now());
         member.setId(id);
         return member;
     }

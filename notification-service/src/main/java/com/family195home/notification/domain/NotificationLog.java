@@ -14,10 +14,10 @@ public class NotificationLog {
     private LocalDateTime lastAttemptAt;
     private String errorMessage;
 
-    public NotificationLog() {
-    }
+    public NotificationLog() {}
 
-    public NotificationLog(Long familyGroupId, Long familyMemberId, String lineUserId, String yearMonth) {
+    public NotificationLog(
+            Long familyGroupId, Long familyMemberId, String lineUserId, String yearMonth) {
         this.familyGroupId = familyGroupId;
         this.familyMemberId = familyMemberId;
         this.lineUserId = lineUserId;

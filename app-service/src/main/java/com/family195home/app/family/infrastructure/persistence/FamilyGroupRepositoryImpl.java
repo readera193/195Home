@@ -2,9 +2,8 @@ package com.family195home.app.family.infrastructure.persistence;
 
 import com.family195home.app.family.application.FamilyGroupRepository;
 import com.family195home.app.family.domain.FamilyGroup;
-import org.springframework.stereotype.Repository;
-
 import java.util.Optional;
+import org.springframework.stereotype.Repository;
 
 @Repository
 public class FamilyGroupRepositoryImpl implements FamilyGroupRepository {

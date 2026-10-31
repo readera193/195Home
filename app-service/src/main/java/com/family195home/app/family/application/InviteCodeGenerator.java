@@ -1,8 +1,7 @@
 package com.family195home.app.family.application;
 
-import org.springframework.stereotype.Component;
-
 import java.security.SecureRandom;
+import org.springframework.stereotype.Component;
 
 /** 產生家庭群組邀請碼：使用 SecureRandom，字元集排除易混淆的 0/O、1/I。 */
 @Component

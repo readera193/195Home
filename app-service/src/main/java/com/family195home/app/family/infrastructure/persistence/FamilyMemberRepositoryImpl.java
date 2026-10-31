@@ -2,10 +2,9 @@ package com.family195home.app.family.infrastructure.persistence;
 
 import com.family195home.app.family.application.FamilyMemberRepository;
 import com.family195home.app.family.domain.FamilyMember;
-import org.springframework.stereotype.Repository;
-
 import java.util.List;
 import java.util.Optional;
+import org.springframework.stereotype.Repository;
 
 @Repository
 public class FamilyMemberRepositoryImpl implements FamilyMemberRepository {
@@ -53,7 +52,9 @@ public class FamilyMemberRepositoryImpl implements FamilyMemberRepository {
     }
 
     @Override
-    public Optional<FamilyMember> findEarliestOtherActiveMember(Long familyGroupId, Long excludeMemberId) {
-        return Optional.ofNullable(mapper.selectEarliestOtherActiveMember(familyGroupId, excludeMemberId));
+    public Optional<FamilyMember> findEarliestOtherActiveMember(
+            Long familyGroupId, Long excludeMemberId) {
+        return Optional.ofNullable(
+                mapper.selectEarliestOtherActiveMember(familyGroupId, excludeMemberId));
     }
 }

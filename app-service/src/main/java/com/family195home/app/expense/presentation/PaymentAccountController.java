@@ -1,22 +1,21 @@
 package com.family195home.app.expense.presentation;
 
-import io.swagger.v3.oas.annotations.tags.Tag;
+import com.family195home.app.expense.application.PaymentAccountService;
 import com.family195home.app.expense.domain.PaymentAccount;
 import com.family195home.app.expense.domain.PaymentAccountStatus;
 import com.family195home.app.expense.presentation.dto.CreateAccountRequest;
 import com.family195home.app.expense.presentation.dto.PaymentAccountResponse;
 import com.family195home.app.expense.presentation.dto.UpdateAccountRequest;
-import com.family195home.app.expense.application.PaymentAccountService;
 import com.family195home.app.family.application.FamilyAccess;
 import com.family195home.app.shared.AuthenticatedUser;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
+import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import java.util.Set;
 
 @Tag(name = "支付帳戶", description = "群組層級的支付帳戶；新增、改名、停用、刪除限管理者")
 @RestController
@@ -26,16 +25,20 @@ public class PaymentAccountController {
     private final PaymentAccountService paymentAccountService;
     private final FamilyAccess familyAccess;
 
-    public PaymentAccountController(PaymentAccountService paymentAccountService, FamilyAccess familyAccess) {
+    public PaymentAccountController(
+            PaymentAccountService paymentAccountService, FamilyAccess familyAccess) {
         this.paymentAccountService = paymentAccountService;
         this.familyAccess = familyAccess;
     }
 
     @PostMapping
     public ResponseEntity<PaymentAccountResponse> create(
-            @AuthenticationPrincipal AuthenticatedUser caller, @Valid @RequestBody CreateAccountRequest request) {
+            @AuthenticationPrincipal AuthenticatedUser caller,
+            @Valid @RequestBody CreateAccountRequest request) {
         // FR-003：限群組管理者；建立者身分由呼叫者自身決定，不接受前端傳入
-        PaymentAccount account = paymentAccountService.create(request.familyGroupId(), caller.userId(), request.name());
+        PaymentAccount account =
+                paymentAccountService.create(
+                        request.familyGroupId(), caller.userId(), request.name());
         return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(account, true));
     }
 
@@ -46,13 +49,15 @@ public class PaymentAccountController {
             @RequestParam(required = false) String status) {
         // FR-017：呼叫者須為該家庭群組成員，否則回傳 403
         familyAccess.requireMember(familyGroupId, caller.userId());
-        PaymentAccountStatus statusFilter = (status == null || status.isBlank() || "ALL".equalsIgnoreCase(status))
-                ? null
-                : PaymentAccountStatus.valueOf(status.toUpperCase());
+        PaymentAccountStatus statusFilter =
+                (status == null || status.isBlank() || "ALL".equalsIgnoreCase(status))
+                        ? null
+                        : PaymentAccountStatus.valueOf(status.toUpperCase());
         Set<Long> usedIds = paymentAccountService.findUsedAccountIds(familyGroupId);
-        List<PaymentAccountResponse> accounts = paymentAccountService.list(familyGroupId, statusFilter).stream()
-                .map(account -> toResponse(account, !usedIds.contains(account.getId())))
-                .toList();
+        List<PaymentAccountResponse> accounts =
+                paymentAccountService.list(familyGroupId, statusFilter).stream()
+                        .map(account -> toResponse(account, !usedIds.contains(account.getId())))
+                        .toList();
         return ResponseEntity.ok(accounts);
     }
 
@@ -61,11 +66,14 @@ public class PaymentAccountController {
             @AuthenticationPrincipal AuthenticatedUser caller,
             @PathVariable Long accountId,
             @Valid @RequestBody UpdateAccountRequest request) {
-        return ResponseEntity.ok(toResponse(paymentAccountService.rename(accountId, caller.userId(), request.name())));
+        return ResponseEntity.ok(
+                toResponse(
+                        paymentAccountService.rename(accountId, caller.userId(), request.name())));
     }
 
     @DeleteMapping("/{accountId}")
-    public ResponseEntity<Void> delete(@AuthenticationPrincipal AuthenticatedUser caller, @PathVariable Long accountId) {
+    public ResponseEntity<Void> delete(
+            @AuthenticationPrincipal AuthenticatedUser caller, @PathVariable Long accountId) {
         paymentAccountService.delete(accountId, caller.userId());
         return ResponseEntity.noContent().build();
     }
@@ -90,6 +98,10 @@ public class PaymentAccountController {
 
     private PaymentAccountResponse toResponse(PaymentAccount account, boolean deletable) {
         return new PaymentAccountResponse(
-                account.getId(), account.getFamilyMemberId(), account.getName(), account.getStatus().name(), deletable);
+                account.getId(),
+                account.getFamilyMemberId(),
+                account.getName(),
+                account.getStatus().name(),
+                deletable);
     }
 }

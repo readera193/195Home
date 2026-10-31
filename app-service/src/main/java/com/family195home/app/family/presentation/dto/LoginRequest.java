@@ -2,5 +2,4 @@ package com.family195home.app.family.presentation.dto;
 
 import jakarta.validation.constraints.NotBlank;
 
-public record LoginRequest(@NotBlank String code) {
-}
+public record LoginRequest(@NotBlank String code) {}

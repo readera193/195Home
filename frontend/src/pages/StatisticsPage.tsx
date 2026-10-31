@@ -21,19 +21,28 @@ export default function StatisticsPage() {
 
   const [month, setMonth] = useState(currentYearMonth());
 
-  const { data: summary, isLoading, isError, refetch, isFetching } = useQuery({
+  const {
+    data: summary,
+    isLoading,
+    isError,
+    refetch,
+    isFetching,
+  } = useQuery({
     queryKey: ['statistics', familyGroupId, month],
     queryFn: () => getMonthlySummary(familyGroupId!, month),
     enabled: !!familyGroupId,
   });
 
   if (familyQuery.isLoading) return <p role="status">載入中...</p>;
-  if (familyQuery.isError) return (
-    <div className="card" role="alert">
-      <p>無法載入家庭資料，請稍後再試。</p>
-      <button type="button" onClick={() => void familyQuery.refetch()}>重新載入</button>
-    </div>
-  );
+  if (familyQuery.isError)
+    return (
+      <div className="card" role="alert">
+        <p>無法載入家庭資料，請稍後再試。</p>
+        <button type="button" onClick={() => void familyQuery.refetch()}>
+          重新載入
+        </button>
+      </div>
+    );
 
   if (!familyGroupId) {
     return (
@@ -64,7 +73,9 @@ export default function StatisticsPage() {
       ) : isError ? (
         <div className="card" role="alert">
           <p>無法載入月結統計，請重新載入。</p>
-          <button type="button" disabled={isFetching} onClick={() => void refetch()}>重新載入</button>
+          <button type="button" disabled={isFetching} onClick={() => void refetch()}>
+            重新載入
+          </button>
         </div>
       ) : (
         <>

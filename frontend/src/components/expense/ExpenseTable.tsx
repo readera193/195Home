@@ -49,7 +49,9 @@ export default function ExpenseTable({ expenses, editingId, onEdit, onDelete }: 
                 <span className="badge">{expense.paymentAccountName}</span>
               </td>
               <td className="col-actions">
-                {expense.locked && editingId !== expense.expenseId && <span className="badge">編輯中</span>}{' '}
+                {expense.locked && editingId !== expense.expenseId && (
+                  <span className="badge">編輯中</span>
+                )}{' '}
                 <button
                   type="button"
                   className="btn-secondary"

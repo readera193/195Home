@@ -7,6 +7,5 @@ public interface TokenIssuer {
 
     IssuedToken issue(Long userId, String displayName);
 
-    record IssuedToken(String token, Instant expiresAt) {
-    }
+    record IssuedToken(String token, Instant expiresAt) {}
 }

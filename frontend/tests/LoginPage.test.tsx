@@ -73,7 +73,12 @@ describe('LoginPage', () => {
     const config = { headers: new AxiosHeaders() };
     vi.mocked(userApi.loginAsDemo).mockRejectedValue(
       new AxiosError('Request failed', 'ERR_BAD_REQUEST', config, null, {
-        data: { status: 404, title: 'Not Found', detail: 'Demo 體驗未開啟', code: 'DEMO_LOGIN_DISABLED' },
+        data: {
+          status: 404,
+          title: 'Not Found',
+          detail: 'Demo 體驗未開啟',
+          code: 'DEMO_LOGIN_DISABLED',
+        },
         status: 404,
         statusText: '',
         headers: {},
@@ -84,6 +89,8 @@ describe('LoginPage', () => {
     renderLoginPage();
     fireEvent.click(await screen.findByRole('button', { name: 'Demo 體驗（免登入）' }));
 
-    await waitFor(() => expect(notify.notifyError).toHaveBeenCalledWith(expect.stringContaining('Demo 體驗未開啟')));
+    await waitFor(() =>
+      expect(notify.notifyError).toHaveBeenCalledWith(expect.stringContaining('Demo 體驗未開啟')),
+    );
   });
 });

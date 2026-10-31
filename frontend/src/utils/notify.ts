@@ -5,11 +5,22 @@ const DANGER = '#dc2626';
 
 /** 錯誤提示（取代頁面內的 role="alert" 段落）。 */
 export function notifyError(message: string) {
-  return Swal.fire({ icon: 'error', title: '操作失敗', text: message, confirmButtonText: '知道了', confirmButtonColor: PRIMARY });
+  return Swal.fire({
+    icon: 'error',
+    title: '操作失敗',
+    text: message,
+    confirmButtonText: '知道了',
+    confirmButtonColor: PRIMARY,
+  });
 }
 
 /** 確認對話框（取代 window.confirm）；回傳使用者是否按下確認。 */
-export async function confirmDialog(options: { title: string; text?: string; confirmText?: string; danger?: boolean }) {
+export async function confirmDialog(options: {
+  title: string;
+  text?: string;
+  confirmText?: string;
+  danger?: boolean;
+}) {
   const result = await Swal.fire({
     icon: options.danger ? 'warning' : 'question',
     titleText: options.title,

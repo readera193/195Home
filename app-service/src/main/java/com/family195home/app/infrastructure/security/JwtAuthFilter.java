@@ -1,25 +1,22 @@
 package com.family195home.app.infrastructure.security;
 
+import com.family195home.app.shared.AuthenticatedUser;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.List;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import java.io.IOException;
-import java.util.List;
-import com.family195home.app.shared.AuthenticatedUser;
-
 /**
- * 對 /api/**（排除 /api/auth/**、/api/internal/**、靜態資源）
- * 以簽章密鑰本地驗證 JWT（見 research.md 決策 7）。
- * 驗證失敗（缺少/過期/簽章錯誤）不會在此丟出例外，而是保持未驗證狀態，
- * 交由 Spring Security 的 authorizeHttpRequests 規則統一回傳 401。
+ * 對 /api/**（排除 /api/auth/**、/api/internal/**、靜態資源） 以簽章密鑰本地驗證 JWT（見 research.md 決策 7）。
+ * 驗證失敗（缺少/過期/簽章錯誤）不會在此丟出例外，而是保持未驗證狀態， 交由 Spring Security 的 authorizeHttpRequests 規則統一回傳 401。
  */
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
@@ -31,7 +28,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+    protected void doFilterInternal(
+            HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         String path = request.getRequestURI();
         if (!path.startsWith("/api/internal/")) {

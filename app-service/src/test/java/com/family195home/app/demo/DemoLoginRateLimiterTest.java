@@ -1,17 +1,16 @@
 package com.family195home.app.demo;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 import com.family195home.app.shared.ApiException;
 import com.family195home.app.shared.ErrorKind;
-import org.junit.jupiter.api.Test;
-
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import org.junit.jupiter.api.Test;
 
 class DemoLoginRateLimiterTest {
 
@@ -46,10 +45,12 @@ class DemoLoginRateLimiterTest {
         limiter.acquire("1.1.1.1");
 
         assertThatThrownBy(() -> limiter.acquire("1.1.1.1"))
-                .isInstanceOfSatisfying(ApiException.class, e -> {
-                    assertThat(e.getKind()).isEqualTo(ErrorKind.TOO_MANY_REQUESTS);
-                    assertThat(e.getCode()).isEqualTo("DEMO_LOGIN_RATE_LIMITED");
-                });
+                .isInstanceOfSatisfying(
+                        ApiException.class,
+                        e -> {
+                            assertThat(e.getKind()).isEqualTo(ErrorKind.TOO_MANY_REQUESTS);
+                            assertThat(e.getCode()).isEqualTo("DEMO_LOGIN_RATE_LIMITED");
+                        });
         assertThatCode(() -> limiter.acquire("2.2.2.2")).doesNotThrowAnyException();
     }
 

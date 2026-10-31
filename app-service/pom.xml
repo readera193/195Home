@@ -124,12 +124,12 @@
         <artifactId>spotless-maven-plugin</artifactId>
         <version>2.44.5</version>
         <configuration>
-          <!-- 本專案既有風格為 4 空格、單行可較長，不套用 google-java-format 以免產生巨大 diff；
-               只檢查不影響可讀性的基本規則 -->
           <java>
+            <googleJavaFormat>
+              <version>1.25.2</version>
+              <style>AOSP</style>
+            </googleJavaFormat>
             <removeUnusedImports/>
-            <trimTrailingWhitespace/>
-            <endWithNewline/>
           </java>
         </configuration>
         <executions>

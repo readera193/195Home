@@ -1,10 +1,10 @@
 package com.family195home.app.statistics.presentation;
 
-import io.swagger.v3.oas.annotations.tags.Tag;
 import com.family195home.app.family.application.FamilyAccess;
 import com.family195home.app.shared.AuthenticatedUser;
-import com.family195home.app.statistics.presentation.dto.MonthlySummaryResponse;
 import com.family195home.app.statistics.application.StatisticsService;
+import com.family195home.app.statistics.presentation.dto.MonthlySummaryResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,7 +30,8 @@ public class StatisticsController {
             @RequestParam String month) {
         // FR-017：確認呼叫者屬於該家庭群組，避免跨家庭資料外洩
         familyAccess.requireMember(familyGroupId, caller.userId());
-        return ResponseEntity.ok(MonthlySummaryResponse.from(statisticsService.summarize(familyGroupId, month)));
+        return ResponseEntity.ok(
+                MonthlySummaryResponse.from(statisticsService.summarize(familyGroupId, month)));
     }
 
     // 僅供 notification-service 呼叫（X-Internal-Token）：家庭歸屬已由呼叫方依 LINE 綁定關係決定，
@@ -38,6 +39,7 @@ public class StatisticsController {
     @GetMapping("/api/internal/statistics/monthly")
     public ResponseEntity<MonthlySummaryResponse> internalMonthly(
             @RequestParam Long familyGroupId, @RequestParam String month) {
-        return ResponseEntity.ok(MonthlySummaryResponse.from(statisticsService.summarize(familyGroupId, month)));
+        return ResponseEntity.ok(
+                MonthlySummaryResponse.from(statisticsService.summarize(familyGroupId, month)));
     }
 }

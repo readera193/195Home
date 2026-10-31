@@ -3,9 +3,17 @@ import Swal from 'sweetalert2';
 import { confirmDialog, promptText } from '../src/utils/notify';
 
 beforeEach(() => {
-  vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
+  vi.stubGlobal('matchMedia', () => ({
+    matches: false,
+    addEventListener() {},
+    removeEventListener() {},
+  }));
 });
-afterEach(() => { Swal.close(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => {
+  Swal.close();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 describe('使用者文字不會被對話框解析成 HTML', () => {
   it('確認視窗將名稱與說明當作純文字', async () => {

@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
-import { updateExpense, type ExpenseResponse, type PaymentAccountResponse } from '../../services/expenseApi';
+import {
+  updateExpense,
+  type ExpenseResponse,
+  type PaymentAccountResponse,
+} from '../../services/expenseApi';
 import { getErrorMessage } from '../../utils/apiError';
 import { validateAmountAndNote } from '../../utils/expenseValidation';
 import { notifyError } from '../../utils/notify';
@@ -14,7 +18,13 @@ interface EditExpenseFormProps {
   onSaved: () => void | Promise<void>;
 }
 
-export default function EditExpenseForm({ familyGroupId, expense, accounts, onCancel, onSaved }: EditExpenseFormProps) {
+export default function EditExpenseForm({
+  familyGroupId,
+  expense,
+  accounts,
+  onCancel,
+  onSaved,
+}: EditExpenseFormProps) {
   const [amount, setAmount] = useState(String(expense.amount));
   const [note, setNote] = useState(expense.note);
   const [accountId, setAccountId] = useState(String(expense.paymentAccountId));
@@ -51,7 +61,12 @@ export default function EditExpenseForm({ familyGroupId, expense, accounts, onCa
       <h2>編輯支出</h2>
       <div className="field">
         <label htmlFor="editAmount">編輯金額</label>
-        <input id="editAmount" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+        <input
+          id="editAmount"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          required
+        />
       </div>
       <div className="field">
         <label htmlFor="editNote">編輯說明</label>
@@ -59,7 +74,12 @@ export default function EditExpenseForm({ familyGroupId, expense, accounts, onCa
       </div>
       <div className="field">
         <label htmlFor="editAccount">編輯支付帳戶</label>
-        <select id="editAccount" value={accountId} onChange={(e) => setAccountId(e.target.value)} required>
+        <select
+          id="editAccount"
+          value={accountId}
+          onChange={(e) => setAccountId(e.target.value)}
+          required
+        >
           {accounts?.map((account) => (
             <option key={account.accountId} value={account.accountId}>
               {account.name}

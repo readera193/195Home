@@ -90,7 +90,9 @@ describe('ExpenseListPage 分頁', () => {
     fireEvent.click(screen.getByRole('button', { name: '下一頁' }));
 
     await waitFor(() => expect(screen.getByText('第二頁項目')).toBeInTheDocument());
-    expect(expenseApi.listExpenses).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, size: 20 }));
+    expect(expenseApi.listExpenses).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 1, size: 20 }),
+    );
     expect(screen.getByRole('button', { name: '下一頁' })).toBeDisabled();
   });
 });
@@ -121,10 +123,16 @@ describe('ExpenseListPage 新增支出表單', () => {
 
   async function fillAndSubmit(amount: string) {
     fireEvent.click(await screen.findByRole('button', { name: '新增支出' }));
-    await waitFor(() => expect(within(screen.getByLabelText('支付帳戶')).getByRole('option', { name: '現金' })).toBeInTheDocument());
+    await waitFor(() =>
+      expect(
+        within(screen.getByLabelText('支付帳戶')).getByRole('option', { name: '現金' }),
+      ).toBeInTheDocument(),
+    );
 
     fireEvent.change(screen.getByLabelText(/^金額/), { target: { value: amount } });
-    fireEvent.change(screen.getByLabelText('說明', { selector: 'input' }), { target: { value: '午餐' } });
+    fireEvent.change(screen.getByLabelText('說明', { selector: 'input' }), {
+      target: { value: '午餐' },
+    });
     fireEvent.change(screen.getByLabelText('支付帳戶'), { target: { value: '100' } });
     fireEvent.click(screen.getByRole('button', { name: '新增' }));
   }
@@ -251,7 +259,12 @@ describe('ExpenseListPage 編輯／刪除', () => {
     const config = { headers: new AxiosHeaders() };
     vi.mocked(expenseApi.lockExpense).mockRejectedValue(
       new AxiosError('Conflict', 'ERR_BAD_REQUEST', config, null, {
-        data: { status: 409, title: 'Conflict', detail: '此紀錄目前正被編輯中，請稍後再試', code: 'RECORD_LOCKED' },
+        data: {
+          status: 409,
+          title: 'Conflict',
+          detail: '此紀錄目前正被編輯中，請稍後再試',
+          code: 'RECORD_LOCKED',
+        },
         status: 409,
         statusText: '',
         headers: {},
@@ -262,7 +275,11 @@ describe('ExpenseListPage 編輯／刪除', () => {
     renderPage();
     fireEvent.click(await screen.findByRole('button', { name: '編輯 午餐' }));
 
-    await waitFor(() => expect(notify.notifyError).toHaveBeenCalledWith(expect.stringContaining('此紀錄目前正被編輯中')));
+    await waitFor(() =>
+      expect(notify.notifyError).toHaveBeenCalledWith(
+        expect.stringContaining('此紀錄目前正被編輯中'),
+      ),
+    );
     expect(screen.queryByRole('form', { name: '編輯支出' })).not.toBeInTheDocument();
   });
 

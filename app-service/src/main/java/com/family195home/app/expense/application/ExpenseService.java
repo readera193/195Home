@@ -1,25 +1,24 @@
 package com.family195home.app.expense.application;
 
-import java.time.Clock;
-import com.family195home.app.shared.ApiException;
-import com.family195home.app.shared.ErrorKind;
-import com.family195home.app.shared.PagedResult;
 import com.family195home.app.expense.domain.ExpenseRecord;
 import com.family195home.app.expense.domain.PaymentAccount;
 import com.family195home.app.expense.domain.PaymentAccountStatus;
 import com.family195home.app.family.application.FamilyAccess;
+import com.family195home.app.shared.ApiException;
+import com.family195home.app.shared.ErrorKind;
+import com.family195home.app.shared.PagedResult;
+import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.List;
-
 /**
- * 支出紀錄核心邏輯（US2）。與 family 模組之間一律透過 {@link FamilyAccess} 的
- * public 方法同進程呼叫（見 research.md 決策 7），不透過 HTTP。
+ * 支出紀錄核心邏輯（US2）。與 family 模組之間一律透過 {@link FamilyAccess} 的 public 方法同進程呼叫（見 research.md 決策 7），不透過
+ * HTTP。
  */
 @Service
 public class ExpenseService {
@@ -48,7 +47,13 @@ public class ExpenseService {
 
     // FR-004, FR-005, FR-006, FR-016, FR-018
     @Transactional
-    public ExpenseRecord create(Long familyGroupId, Long authorMemberId, Long paymentAccountId, BigDecimal amount, String note, LocalDateTime occurredAt) {
+    public ExpenseRecord create(
+            Long familyGroupId,
+            Long authorMemberId,
+            Long paymentAccountId,
+            BigDecimal amount,
+            String note,
+            LocalDateTime occurredAt) {
         var groupState = familyAccess.groupState(familyGroupId);
         if (groupState == FamilyAccess.GroupState.NOT_FOUND) {
             throw new ApiException(ErrorKind.NOT_FOUND, "GROUP_NOT_FOUND", "找不到家庭群組");
@@ -71,7 +76,8 @@ public class ExpenseService {
         record.setAuthorMemberId(authorMemberId);
         record.setAmount(intAmount);
         record.setNote(note);
-        record.setOccurredAt(occurredAt != null ? occurredAt : LocalDateTime.now(clock)); // FR-005/FR-006
+        record.setOccurredAt(
+                occurredAt != null ? occurredAt : LocalDateTime.now(clock)); // FR-005/FR-006
         LocalDateTime now = LocalDateTime.now(clock);
         record.setCreatedAt(now);
         record.setUpdatedAt(now);
@@ -82,32 +88,53 @@ public class ExpenseService {
     // FR-007~FR-010、SC-003：分頁列表；page 從 0 起算，size 上限 MAX_PAGE_SIZE
     @Transactional(readOnly = true)
     public PagedResult<ExpenseRecord> listPage(
-            Long familyGroupId, Long paymentAccountId, Long authorMemberId,
-            LocalDate startDate, LocalDate endDate, int page, int size) {
+            Long familyGroupId,
+            Long paymentAccountId,
+            Long authorMemberId,
+            LocalDate startDate,
+            LocalDate endDate,
+            int page,
+            int size) {
         if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
-            throw new ApiException(ErrorKind.BAD_REQUEST, "INVALID_PAGE_PARAMS",
+            throw new ApiException(
+                    ErrorKind.BAD_REQUEST,
+                    "INVALID_PAGE_PARAMS",
                     "page 須 >= 0，size 須介於 1 到 " + MAX_PAGE_SIZE);
         }
         if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
             throw new ApiException(ErrorKind.BAD_REQUEST, "INVALID_DATE_RANGE", "起始日期不可晚於結束日期");
         }
-        long total = expenseRecordRepository.countByFilter(
-                familyGroupId, paymentAccountId, authorMemberId, startDate, endDate);
-        List<ExpenseRecord> items = expenseRecordRepository.findPageByFilter(
-                familyGroupId, paymentAccountId, authorMemberId, startDate, endDate, page * size, size);
+        long total =
+                expenseRecordRepository.countByFilter(
+                        familyGroupId, paymentAccountId, authorMemberId, startDate, endDate);
+        List<ExpenseRecord> items =
+                expenseRecordRepository.findPageByFilter(
+                        familyGroupId,
+                        paymentAccountId,
+                        authorMemberId,
+                        startDate,
+                        endDate,
+                        page * size,
+                        size);
         return PagedResult.of(items, page, size, total);
     }
 
     /** 不分頁的完整查詢，供 statistics 模組彙總整月資料使用。 */
     @Transactional(readOnly = true)
-    public List<ExpenseRecord> list(Long familyGroupId, Long paymentAccountId, Long authorMemberId, String month) {
-        return expenseRecordRepository.findByFilter(familyGroupId, paymentAccountId, authorMemberId, month);
+    public List<ExpenseRecord> list(
+            Long familyGroupId, Long paymentAccountId, Long authorMemberId, String month) {
+        return expenseRecordRepository.findByFilter(
+                familyGroupId, paymentAccountId, authorMemberId, month);
     }
 
     @Transactional(readOnly = true)
     public ExpenseRecord findRequired(Long id) {
-        return expenseRecordRepository.findById(id)
-                .orElseThrow(() -> new ApiException(ErrorKind.NOT_FOUND, "EXPENSE_NOT_FOUND", "找不到支出紀錄"));
+        return expenseRecordRepository
+                .findById(id)
+                .orElseThrow(
+                        () ->
+                                new ApiException(
+                                        ErrorKind.NOT_FOUND, "EXPENSE_NOT_FOUND", "找不到支出紀錄"));
     }
 
     // FR-027：條件式 UPDATE 取得鎖，5 分鐘 TTL（見 research.md 決策 3）
@@ -118,7 +145,8 @@ public class ExpenseService {
             throw new ApiException(ErrorKind.FORBIDDEN, "EXPENSE_NOT_IN_GROUP", "此支出紀錄不屬於該家庭群組");
         }
         LocalDateTime now = LocalDateTime.now(clock);
-        int updated = expenseRecordRepository.tryLock(expenseId, callerMemberId, now, lockTtlMinutes);
+        int updated =
+                expenseRecordRepository.tryLock(expenseId, callerMemberId, now, lockTtlMinutes);
         if (updated == 0) {
             throw new ApiException(ErrorKind.CONFLICT, "RECORD_LOCKED", "此紀錄目前正被編輯中，請稍後再試");
         }
@@ -130,12 +158,14 @@ public class ExpenseService {
     @Transactional
     public void unlock(Long expenseId, Long callerUserId) {
         ExpenseRecord record = findRequired(expenseId);
-        FamilyAccess.MemberRef caller = familyAccess.requireMember(record.getFamilyGroupId(), callerUserId);
+        FamilyAccess.MemberRef caller =
+                familyAccess.requireMember(record.getFamilyGroupId(), callerUserId);
         if (record.getLockedByMemberId() == null) {
             return;
         }
         if (!record.getLockedByMemberId().equals(caller.memberId()) && isCurrentlyLocked(record)) {
-            throw new ApiException(ErrorKind.FORBIDDEN, "LOCK_NOT_HELD_BY_CALLER", "此紀錄正由其他成員編輯中，無法解除鎖定");
+            throw new ApiException(
+                    ErrorKind.FORBIDDEN, "LOCK_NOT_HELD_BY_CALLER", "此紀錄正由其他成員編輯中，無法解除鎖定");
         }
         expenseRecordRepository.releaseLock(expenseId);
     }
@@ -146,7 +176,14 @@ public class ExpenseService {
 
     // FR-019：群組任一在職成員皆可編輯/刪除任何紀錄；FR-027：須已持有鎖
     @Transactional
-    public ExpenseRecord update(Long familyGroupId, Long expenseId, Long callerUserId, Long paymentAccountId, BigDecimal amount, String note, LocalDateTime occurredAt) {
+    public ExpenseRecord update(
+            Long familyGroupId,
+            Long expenseId,
+            Long callerUserId,
+            Long paymentAccountId,
+            BigDecimal amount,
+            String note,
+            LocalDateTime occurredAt) {
         ExpenseRecord record = requireRecordInGroup(familyGroupId, expenseId, callerUserId);
         requireLockHeldByCaller(record, familyGroupId, callerUserId);
         // 沿用原帳戶時不重新檢查狀態，讓歷史紀錄在帳戶停用後仍可編輯其他欄位
@@ -175,7 +212,8 @@ public class ExpenseService {
 
     // FR-017、FR-019：呼叫者須為該群組在職成員，且紀錄須屬於該群組；不限制新增者本人。
     // 紀錄屬於其他群組屬授權問題而非資源不存在，與 NOT_GROUP_MEMBER 一致回傳 403
-    private ExpenseRecord requireRecordInGroup(Long familyGroupId, Long expenseId, Long callerUserId) {
+    private ExpenseRecord requireRecordInGroup(
+            Long familyGroupId, Long expenseId, Long callerUserId) {
         ExpenseRecord record = findRequired(expenseId);
         familyAccess.requireMember(familyGroupId, callerUserId);
         if (!familyGroupId.equals(record.getFamilyGroupId())) {
@@ -184,17 +222,26 @@ public class ExpenseService {
         return record;
     }
 
-    private void requireLockHeldByCaller(ExpenseRecord record, Long familyGroupId, Long callerUserId) {
+    private void requireLockHeldByCaller(
+            ExpenseRecord record, Long familyGroupId, Long callerUserId) {
         FamilyAccess.MemberRef caller = familyAccess.requireMember(familyGroupId, callerUserId);
-        if (record.getLockedByMemberId() == null || !record.getLockedByMemberId().equals(caller.memberId())) {
+        if (record.getLockedByMemberId() == null
+                || !record.getLockedByMemberId().equals(caller.memberId())) {
             throw new ApiException(ErrorKind.FORBIDDEN, "LOCK_NOT_HELD_BY_CALLER", "請先取得編輯鎖定後再操作");
         }
     }
 
     // FR-003、FR-022：支付帳戶須存在、屬於同一群組且為啟用狀態；他組帳戶視為授權問題回傳 403
     private void requireUsableAccount(Long familyGroupId, Long paymentAccountId) {
-        PaymentAccount account = paymentAccountRepository.findById(paymentAccountId)
-                .orElseThrow(() -> new ApiException(ErrorKind.NOT_FOUND, "ACCOUNT_NOT_FOUND", "找不到支付帳戶"));
+        PaymentAccount account =
+                paymentAccountRepository
+                        .findById(paymentAccountId)
+                        .orElseThrow(
+                                () ->
+                                        new ApiException(
+                                                ErrorKind.NOT_FOUND,
+                                                "ACCOUNT_NOT_FOUND",
+                                                "找不到支付帳戶"));
         if (!familyGroupId.equals(account.getFamilyGroupId())) {
             throw new ApiException(ErrorKind.FORBIDDEN, "ACCOUNT_NOT_IN_GROUP", "此支付帳戶不屬於該家庭群組");
         }
@@ -206,7 +253,8 @@ public class ExpenseService {
     // FR-016：金額必須為整數（不接受小數點），可正可負可零
     private int toIntegerAmount(BigDecimal amount) {
         if (amount.stripTrailingZeros().scale() > 0) {
-            throw new ApiException(ErrorKind.BAD_REQUEST, "AMOUNT_MUST_BE_INTEGER", "金額必須為整數，不支援小數點");
+            throw new ApiException(
+                    ErrorKind.BAD_REQUEST, "AMOUNT_MUST_BE_INTEGER", "金額必須為整數，不支援小數點");
         }
         try {
             return amount.intValueExact();

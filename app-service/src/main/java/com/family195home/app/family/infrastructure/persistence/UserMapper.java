@@ -1,10 +1,9 @@
 package com.family195home.app.family.infrastructure.persistence;
 
 import com.family195home.app.family.domain.User;
+import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-
-import java.util.List;
 
 @Mapper
 public interface UserMapper {

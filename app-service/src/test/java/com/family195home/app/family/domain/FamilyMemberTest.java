@@ -1,15 +1,15 @@
 package com.family195home.app.family.domain;
 
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.LocalDateTime;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
 
 class FamilyMemberTest {
 
     private FamilyMember admin() {
-        return new FamilyMember(10L, 1L, MemberStatus.ACTIVE, MemberRole.ADMIN, LocalDateTime.now());
+        return new FamilyMember(
+                10L, 1L, MemberStatus.ACTIVE, MemberRole.ADMIN, LocalDateTime.now());
     }
 
     @Test
@@ -48,7 +48,9 @@ class FamilyMemberTest {
 
     @Test
     void promoteAndDemote_changeRole() {
-        FamilyMember member = new FamilyMember(10L, 2L, MemberStatus.ACTIVE, MemberRole.MEMBER, LocalDateTime.now());
+        FamilyMember member =
+                new FamilyMember(
+                        10L, 2L, MemberStatus.ACTIVE, MemberRole.MEMBER, LocalDateTime.now());
 
         member.promoteToAdmin();
         assertThat(member.isAdmin()).isTrue();

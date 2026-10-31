@@ -107,7 +107,13 @@ export default function ExpenseListPage() {
       await refreshExpenses();
       return;
     }
-    if (!(await confirmDialog({ title: `確定要刪除「${expense.note}」嗎？`, confirmText: '刪除', danger: true }))) {
+    if (
+      !(await confirmDialog({
+        title: `確定要刪除「${expense.note}」嗎？`,
+        confirmText: '刪除',
+        danger: true,
+      }))
+    ) {
       try {
         await unlockExpense(expense.expenseId);
       } catch {
@@ -124,7 +130,13 @@ export default function ExpenseListPage() {
     await refreshExpenses();
   }
 
-  const { data: expensePage, isLoading, isError, refetch, isFetching } = useQuery({
+  const {
+    data: expensePage,
+    isLoading,
+    isError,
+    refetch,
+    isFetching,
+  } = useQuery({
     queryKey: [
       'expenses',
       familyGroupId,
@@ -150,12 +162,15 @@ export default function ExpenseListPage() {
   const totalPages = expensePage?.totalPages ?? 0;
 
   if (familyQuery.isLoading) return <p role="status">載入中...</p>;
-  if (familyQuery.isError) return (
-    <div className="card" role="alert">
-      <p>無法載入家庭資料，請稍後再試。</p>
-      <button type="button" onClick={() => void familyQuery.refetch()}>重新載入</button>
-    </div>
-  );
+  if (familyQuery.isError)
+    return (
+      <div className="card" role="alert">
+        <p>無法載入家庭資料，請稍後再試。</p>
+        <button type="button" onClick={() => void familyQuery.refetch()}>
+          重新載入
+        </button>
+      </div>
+    );
 
   if (!familyGroupId) {
     return (
@@ -184,7 +199,12 @@ export default function ExpenseListPage() {
         />
       )}
 
-      <ExpenseFilters values={filters} accounts={accounts} members={members} onChange={handleFilterChange} />
+      <ExpenseFilters
+        values={filters}
+        accounts={accounts}
+        members={members}
+        onChange={handleFilterChange}
+      />
 
       {editing && (
         <EditExpenseForm
@@ -202,7 +222,9 @@ export default function ExpenseListPage() {
       ) : isError ? (
         <div className="card" role="alert">
           <p>無法載入支出紀錄，請重新載入。</p>
-          <button type="button" disabled={isFetching} onClick={() => void refetch()}>重新載入</button>
+          <button type="button" disabled={isFetching} onClick={() => void refetch()}>
+            重新載入
+          </button>
         </div>
       ) : (
         <ExpenseTable
@@ -215,7 +237,12 @@ export default function ExpenseListPage() {
 
       {expensePage && !isError && (
         <nav className="pagination" aria-label="分頁">
-          <button type="button" className="btn-secondary" onClick={() => setPage((p) => p - 1)} disabled={isFetching || page === 0}>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => setPage((p) => p - 1)}
+            disabled={isFetching || page === 0}
+          >
             上一頁
           </button>
           <span>

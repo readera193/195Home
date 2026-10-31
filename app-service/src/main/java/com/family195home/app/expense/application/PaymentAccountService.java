@@ -1,23 +1,20 @@
 package com.family195home.app.expense.application;
 
-import java.time.Clock;
-import com.family195home.app.shared.ApiException;
-import com.family195home.app.shared.ErrorKind;
 import com.family195home.app.expense.domain.PaymentAccount;
 import com.family195home.app.expense.domain.PaymentAccountStatus;
 import com.family195home.app.family.application.FamilyAccess;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
+import com.family195home.app.shared.ApiException;
+import com.family195home.app.shared.ErrorKind;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-/**
- * 支付帳戶為群組層級，新增／改名／停用／啟用／刪除一律限該群組管理者（FR-003、FR-022）。
- */
+/** 支付帳戶為群組層級，新增／改名／停用／啟用／刪除一律限該群組管理者（FR-003、FR-022）。 */
 @Service
 public class PaymentAccountService {
 
@@ -47,8 +44,13 @@ public class PaymentAccountService {
         if (groupState == FamilyAccess.GroupState.DISSOLVED) {
             throw new ApiException(ErrorKind.CONFLICT, "GROUP_DISSOLVED", "此家庭群組已解散，無法新增支付帳戶");
         }
-        PaymentAccount account = new PaymentAccount(
-                admin.memberId(), familyGroupId, name, PaymentAccountStatus.ACTIVE, LocalDateTime.now(clock));
+        PaymentAccount account =
+                new PaymentAccount(
+                        admin.memberId(),
+                        familyGroupId,
+                        name,
+                        PaymentAccountStatus.ACTIVE,
+                        LocalDateTime.now(clock));
         paymentAccountRepository.save(account);
         return account;
     }
@@ -95,7 +97,8 @@ public class PaymentAccountService {
     // FR-022（限 ADMIN）：重新啟用已停用帳戶；群組已解散拒絕（FR-018），已啟用者冪等
     public PaymentAccount enable(Long accountId, Long callerUserId) {
         PaymentAccount account = requireAccountAsAdmin(accountId, callerUserId);
-        if (familyAccess.groupState(account.getFamilyGroupId()) == FamilyAccess.GroupState.DISSOLVED) {
+        if (familyAccess.groupState(account.getFamilyGroupId())
+                == FamilyAccess.GroupState.DISSOLVED) {
             throw new ApiException(ErrorKind.CONFLICT, "GROUP_DISSOLVED", "此家庭群組已解散，無法啟用支付帳戶");
         }
         if (account.getStatus() != PaymentAccountStatus.ACTIVE) {
@@ -115,8 +118,15 @@ public class PaymentAccountService {
     }
 
     private PaymentAccount requireAccountAsAdmin(Long accountId, Long callerUserId) {
-        PaymentAccount account = paymentAccountRepository.findById(accountId)
-                .orElseThrow(() -> new ApiException(ErrorKind.NOT_FOUND, "ACCOUNT_NOT_FOUND", "找不到支付帳戶"));
+        PaymentAccount account =
+                paymentAccountRepository
+                        .findById(accountId)
+                        .orElseThrow(
+                                () ->
+                                        new ApiException(
+                                                ErrorKind.NOT_FOUND,
+                                                "ACCOUNT_NOT_FOUND",
+                                                "找不到支付帳戶"));
         familyAccess.requireAdmin(account.getFamilyGroupId(), callerUserId);
         return account;
     }

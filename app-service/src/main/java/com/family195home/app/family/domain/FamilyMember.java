@@ -12,10 +12,14 @@ public class FamilyMember {
     private LocalDateTime joinedAt;
     private LocalDateTime leftAt;
 
-    public FamilyMember() {
-    }
+    public FamilyMember() {}
 
-    public FamilyMember(Long familyGroupId, Long userId, MemberStatus status, MemberRole role, LocalDateTime joinedAt) {
+    public FamilyMember(
+            Long familyGroupId,
+            Long userId,
+            MemberStatus status,
+            MemberRole role,
+            LocalDateTime joinedAt) {
         this.familyGroupId = familyGroupId;
         this.userId = userId;
         this.status = status;

@@ -1,15 +1,5 @@
 package com.family195home.app.family.application;
 
-import java.time.Clock;
-import com.family195home.app.family.domain.User;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.util.Optional;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -17,6 +7,15 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import com.family195home.app.family.domain.User;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class UserServiceTest {
 
@@ -30,7 +29,9 @@ class UserServiceTest {
         userRepository = mock(UserRepository.class);
         lineLoginClient = mock(LineLoginClient.class);
         tokenIssuer = mock(TokenIssuer.class);
-        userService = new UserService(userRepository, lineLoginClient, tokenIssuer, Clock.systemDefaultZone());
+        userService =
+                new UserService(
+                        userRepository, lineLoginClient, tokenIssuer, Clock.systemDefaultZone());
     }
 
     @Test
@@ -38,12 +39,15 @@ class UserServiceTest {
         // FR-024：首次以 LINE 登入自動建立帳號
         when(lineLoginClient.fetchProfile("code")).thenReturn(new LineProfile("line-1", "小明"));
         when(userRepository.findByLineUserId("line-1")).thenReturn(Optional.empty());
-        when(userRepository.save(any(User.class))).thenAnswer(inv -> {
-            User saved = inv.getArgument(0);
-            saved.setId(7L);
-            return saved;
-        });
-        when(tokenIssuer.issue(7L, "小明")).thenReturn(new TokenIssuer.IssuedToken("jwt", Instant.now()));
+        when(userRepository.save(any(User.class)))
+                .thenAnswer(
+                        inv -> {
+                            User saved = inv.getArgument(0);
+                            saved.setId(7L);
+                            return saved;
+                        });
+        when(tokenIssuer.issue(7L, "小明"))
+                .thenReturn(new TokenIssuer.IssuedToken("jwt", Instant.now()));
 
         UserService.LoginResult result = userService.loginWithLine("code");
 
@@ -58,7 +62,8 @@ class UserServiceTest {
         existing.setId(7L);
         when(lineLoginClient.fetchProfile("code")).thenReturn(new LineProfile("line-1", "新暱稱"));
         when(userRepository.findByLineUserId("line-1")).thenReturn(Optional.of(existing));
-        when(tokenIssuer.issue(7L, "新暱稱")).thenReturn(new TokenIssuer.IssuedToken("jwt", Instant.now()));
+        when(tokenIssuer.issue(7L, "新暱稱"))
+                .thenReturn(new TokenIssuer.IssuedToken("jwt", Instant.now()));
 
         UserService.LoginResult result = userService.loginWithLine("code");
 
@@ -75,7 +80,8 @@ class UserServiceTest {
         existing.setDisplayNameCustomized(true);
         when(lineLoginClient.fetchProfile("code")).thenReturn(new LineProfile("line-1", "LINE 暱稱"));
         when(userRepository.findByLineUserId("line-1")).thenReturn(Optional.of(existing));
-        when(tokenIssuer.issue(7L, "自訂名")).thenReturn(new TokenIssuer.IssuedToken("jwt", Instant.now()));
+        when(tokenIssuer.issue(7L, "自訂名"))
+                .thenReturn(new TokenIssuer.IssuedToken("jwt", Instant.now()));
 
         UserService.LoginResult result = userService.loginWithLine("code");
 
@@ -85,12 +91,15 @@ class UserServiceTest {
 
     @Test
     void loginAsDemo_createsRandomDemoUserEachTime() {
-        when(userRepository.save(any(User.class))).thenAnswer(inv -> {
-            User saved = inv.getArgument(0);
-            saved.setId(9L);
-            return saved;
-        });
-        when(tokenIssuer.issue(any(), any())).thenReturn(new TokenIssuer.IssuedToken("jwt", Instant.now()));
+        when(userRepository.save(any(User.class)))
+                .thenAnswer(
+                        inv -> {
+                            User saved = inv.getArgument(0);
+                            saved.setId(9L);
+                            return saved;
+                        });
+        when(tokenIssuer.issue(any(), any()))
+                .thenReturn(new TokenIssuer.IssuedToken("jwt", Instant.now()));
 
         UserService.LoginResult first = userService.loginAsDemo();
         userService.loginAsDemo();
@@ -99,8 +108,11 @@ class UserServiceTest {
         assertThat(first.token()).isEqualTo("jwt");
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
         verify(userRepository, times(2)).save(captor.capture());
-        assertThat(captor.getAllValues()).allSatisfy(u ->
-                assertThat(u.getLineUserId()).startsWith(UserService.DEMO_LINE_USER_ID_PREFIX));
+        assertThat(captor.getAllValues())
+                .allSatisfy(
+                        u ->
+                                assertThat(u.getLineUserId())
+                                        .startsWith(UserService.DEMO_LINE_USER_ID_PREFIX));
         assertThat(captor.getAllValues().get(0).getLineUserId())
                 .isNotEqualTo(captor.getAllValues().get(1).getLineUserId());
     }

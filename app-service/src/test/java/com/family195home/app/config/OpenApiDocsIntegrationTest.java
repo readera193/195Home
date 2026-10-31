@@ -1,5 +1,10 @@
 package com.family195home.app.config;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -12,11 +17,6 @@ import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 /** 驗證 OpenAPI 文件可免登入取得，且只列出對外 API（不含內部 API）。 */
 @Testcontainers
 @ActiveProfiles("test")
@@ -26,10 +26,11 @@ class OpenApiDocsIntegrationTest {
 
     @Container
     @SuppressWarnings("resource")
-    static MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.4")
-            .withDatabaseName("appdb")
-            .withUsername("app")
-            .withPassword("app");
+    static MySQLContainer<?> mysql =
+            new MySQLContainer<>("mysql:8.4")
+                    .withDatabaseName("appdb")
+                    .withUsername("app")
+                    .withPassword("app");
 
     @DynamicPropertySource
     static void datasourceProperties(DynamicPropertyRegistry registry) {
@@ -38,8 +39,7 @@ class OpenApiDocsIntegrationTest {
         registry.add("spring.datasource.password", mysql::getPassword);
     }
 
-    @Autowired
-    private MockMvc mockMvc;
+    @Autowired private MockMvc mockMvc;
 
     @Test
     void apiDocs_areAvailableWithoutLogin_andExcludeInternalApi() throws Exception {
@@ -49,7 +49,8 @@ class OpenApiDocsIntegrationTest {
                 .andExpect(jsonPath("$.paths['/api/expenses']").exists())
                 .andExpect(jsonPath("$.paths['/api/expenses/{expenseId}/lock']").exists())
                 .andExpect(jsonPath("$.paths['/api/internal/line-bindings']").doesNotExist())
-                .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.scheme").value("bearer"));
+                .andExpect(
+                        jsonPath("$.components.securitySchemes.bearerAuth.scheme").value("bearer"));
     }
 
     @Test
