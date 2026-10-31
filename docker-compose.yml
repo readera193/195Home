@@ -1,4 +1,5 @@
-# 本機 Docker 環境。LINE 為選用：在 .env（範本 line.env.example）填入 LINE 憑證後，
+# 本機 Docker 環境。所有密碼與密鑰都可在 .env 覆寫（範本 .env.example），未設定時使用僅限本機的開發預設值。
+# LINE 為選用：在 .env（範本 .env.example）填入 LINE 憑證後，
 # 登入頁會同時出現「使用 LINE 登入」與「Demo 體驗」；未填則只有 Demo 體驗。
 # 修改 .env 後須重新建置前端才會生效：docker compose up -d --build
 #
@@ -11,17 +12,18 @@ services:
     image: mysql:8.4
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
       MYSQL_DATABASE: appdb
       MYSQL_USER: app
-      MYSQL_PASSWORD: app
+      MYSQL_PASSWORD: ${APP_DB_PASSWORD:-app}
+      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:-notification}
     volumes:
       - mysql-data:/var/lib/mysql
-      - ./scripts/init-notificationdb.sql:/docker-entrypoint-initdb.d/10-notificationdb.sql:ro
+      - ./scripts/init-notificationdb.sh:/docker-entrypoint-initdb.d/10-notificationdb.sh:ro
     ports:
       - "127.0.0.1:3307:3306"
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p\"$$MYSQL_ROOT_PASSWORD\""]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -43,9 +45,9 @@ services:
       DB_PORT: "3306"
       APPDB_NAME: appdb
       DB_USERNAME: app
-      DB_PASSWORD: app
-      JWT_SECRET: dev-only-secret-key-change-me-please-32bytes+
-      INTERNAL_TOKEN: dev-only-internal-token-change-me
+      DB_PASSWORD: ${APP_DB_PASSWORD:-app}
+      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-key-change-me-please-32bytes+}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-dev-only-internal-token-change-me}
       DEMO_LOGIN_ENABLED: ${DEMO_LOGIN_ENABLED:-true}
       LINE_LOGIN_CHANNEL_ID: ${LINE_LOGIN_CHANNEL_ID:-}
       LINE_LOGIN_CHANNEL_SECRET: ${LINE_LOGIN_CHANNEL_SECRET:-}
@@ -72,9 +74,9 @@ services:
       DB_PORT: "3306"
       NOTIFICATIONDB_NAME: notificationdb
       DB_USERNAME: notification
-      DB_PASSWORD: notification
+      DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:-notification}
       APP_SERVICE_BASE_URL: http://app-service:8080
-      INTERNAL_TOKEN: dev-only-internal-token-change-me
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-dev-only-internal-token-change-me}
       LINE_CHANNEL_TOKEN: ${LINE_CHANNEL_TOKEN:-dev-placeholder-token}
       LINE_CHANNEL_SECRET: ${LINE_CHANNEL_SECRET:-dev-placeholder-secret}
     ports:
