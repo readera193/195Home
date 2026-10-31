@@ -1,7 +1,7 @@
 # 0003 支出編輯鎖以條件式 UPDATE 實作
 
-- 狀態：採用（含已知限制）
-- 日期：2026-10-31（整理自 research.md 決策 3）
+- 狀態：採用
+- 日期：2026-10-31（整理自 research.md 決策 3；update／delete 的原子化於同日補上）
 
 ## 背景
 
@@ -9,17 +9,25 @@
 
 ## 決定
 
-在 `expense_records` 加上 `locked_by_member_id`、`locked_at`。取得鎖時執行單一條件式 UPDATE：
+在 `expense_records` 加上 `locked_by_member_id`、`locked_at`，所有「檢查鎖」都和「寫入」合成同一個條件式 SQL，讓資料庫的列鎖保證原子性：
 
 ```sql
+-- 取得鎖：未鎖定或鎖已逾時（5 分鐘 TTL）才會成功
 UPDATE expense_records SET locked_by_member_id = ?, locked_at = ?
-WHERE id = ? AND (locked_by_member_id IS NULL OR locked_at < ?)  -- ? = 現在 - 5 分鐘
+WHERE id = ? AND (locked_by_member_id IS NULL OR locked_at < ?)
+
+-- 更新：仍持有鎖才會寫入，並在同一個 UPDATE 釋放鎖
+UPDATE expense_records SET ..., locked_by_member_id = NULL, locked_at = NULL
+WHERE id = ? AND locked_by_member_id = ?
+
+-- 刪除：仍持有鎖才會刪除
+DELETE FROM expense_records WHERE id = ? AND locked_by_member_id = ?
 ```
 
-影響筆數為 1 才算取得鎖，同時搶鎖時有且只有一人成功（資料庫的列鎖保證）。鎖有 5 分鐘 TTL，使用者異常關閉頁面也不會永久鎖死。更新與刪除需持有自己的鎖。
+影響筆數為 1 才算成功；0 代表鎖已不在呼叫者手上，回 403 `LOCK_NOT_HELD_BY_CALLER`。Service 仍會先做一次檢查，是為了在多數情況下給出明確的錯誤，真正的保證來自條件式 SQL。
 
 ## 影響
 
-- 好處：只靠現有 MySQL 就能互斥；實作與測試都簡單。
-- 已知限制：`update`／`delete` 目前是「先檢查鎖再寫入」兩步驟，鎖在兩步之間逾時並被他人取得的時間窗很小但存在。鎖逾時後的覆寫也無法完全防止。
-- 可改進方向：把 update／delete 也改成 `UPDATE ... WHERE id = ? AND locked_by_member_id = ?`，以影響筆數判斷是否仍持有鎖，使「檢查」與「寫入」變成同一個原子操作。尚未實作。
+- 好處：只靠現有 MySQL 就能互斥；同時搶鎖有且只有一人成功；鎖在「檢查」與「寫入」之間逾時並被他人取得時，原持有者的寫入會落空而不是覆寫對方的內容。
+- 代價：TTL 到期後鎖會被視為可搶，原持有者若在到期後才送出，只要鎖尚未被別人取得仍可成功；若已被取得則失敗，使用者需重新取得鎖再操作。
+- 驗證：`ExpenseRecordMapperIntegrationTest` 在真實 MySQL 驗證「非持鎖者寫入／刪除影響 0 列、持鎖者更新同時釋放鎖」。

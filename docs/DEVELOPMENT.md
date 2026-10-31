@@ -179,7 +179,7 @@ config/                     # Spring 設定類別
 ## 已知限制與取捨
 
 - **併發的「先查後寫」**：加入／建立群組、群組名稱與邀請碼都是先查再寫，併發時可能漏過檢查；資料庫的唯一約束會兜底，並由 `GlobalExceptionHandler` 把 `DuplicateKeyException` 轉成 409。尚未對「每位使用者同時只能有一個在職成員身分」建立資料庫層約束。
-- **編輯鎖**：取得鎖用條件式 `UPDATE`（5 分鐘 TTL），但 `update`／`delete` 是「先檢查鎖再寫入」，鎖逾時的瞬間存在很小的競態窗口；改進方向見 [ADR 0003](adr/0003-expense-edit-lock.md)。
+- **編輯鎖**：取得鎖、更新、刪除都是條件式 SQL（5 分鐘 TTL），不使用分散式鎖；TTL 到期後若鎖尚未被他人取得，原持有者仍可寫入。細節見 [ADR 0003](adr/0003-expense-edit-lock.md)。
 - **分頁使用 `OFFSET`**：家庭資料量下足夠，資料量大時應改用 keyset 分頁。
 - **Demo 登入**：在單一交易內逐筆新增上百筆範例支出，並以記憶體計數限流（重啟歸零、多實例不共用）；單一實例與目前流量下足夠。
 - **Token 存在 `localStorage`**：容易受 XSS 影響，但改用 HttpOnly Cookie 需另行處理 CSRF，對此規模屬過度設計。
