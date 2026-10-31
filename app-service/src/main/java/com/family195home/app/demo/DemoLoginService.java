@@ -134,7 +134,7 @@ public class DemoLoginService {
             LocalDateTime occurredAt) {
         expenseService.create(
                 group.getId(),
-                member.getId(),
+                member.getUserId(),
                 accounts[sample.accountIndex()].getId(),
                 BigDecimal.valueOf(sample.amount()),
                 sample.note(),

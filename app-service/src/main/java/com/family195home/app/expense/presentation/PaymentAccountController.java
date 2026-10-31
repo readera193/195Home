@@ -6,7 +6,6 @@ import com.family195home.app.expense.domain.PaymentAccountStatus;
 import com.family195home.app.expense.presentation.dto.CreateAccountRequest;
 import com.family195home.app.expense.presentation.dto.PaymentAccountResponse;
 import com.family195home.app.expense.presentation.dto.UpdateAccountRequest;
-import com.family195home.app.family.application.FamilyAccess;
 import com.family195home.app.shared.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -23,12 +22,9 @@ import org.springframework.web.bind.annotation.*;
 public class PaymentAccountController {
 
     private final PaymentAccountService paymentAccountService;
-    private final FamilyAccess familyAccess;
 
-    public PaymentAccountController(
-            PaymentAccountService paymentAccountService, FamilyAccess familyAccess) {
+    public PaymentAccountController(PaymentAccountService paymentAccountService) {
         this.paymentAccountService = paymentAccountService;
-        this.familyAccess = familyAccess;
     }
 
     @PostMapping
@@ -47,15 +43,15 @@ public class PaymentAccountController {
             @AuthenticationPrincipal AuthenticatedUser caller,
             @RequestParam Long familyGroupId,
             @RequestParam(required = false) String status) {
-        // FR-017：呼叫者須為該家庭群組成員，否則回傳 403
-        familyAccess.requireMember(familyGroupId, caller.userId());
         PaymentAccountStatus statusFilter =
                 (status == null || status.isBlank() || "ALL".equalsIgnoreCase(status))
                         ? null
                         : PaymentAccountStatus.valueOf(status.toUpperCase());
+        List<PaymentAccount> found =
+                paymentAccountService.list(familyGroupId, caller.userId(), statusFilter);
         Set<Long> usedIds = paymentAccountService.findUsedAccountIds(familyGroupId);
         List<PaymentAccountResponse> accounts =
-                paymentAccountService.list(familyGroupId, statusFilter).stream()
+                found.stream()
                         .map(account -> toResponse(account, !usedIds.contains(account.getId())))
                         .toList();
         return ResponseEntity.ok(accounts);

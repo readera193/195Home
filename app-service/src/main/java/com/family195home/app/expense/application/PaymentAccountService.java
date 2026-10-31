@@ -56,7 +56,10 @@ public class PaymentAccountService {
     }
 
     @Transactional(readOnly = true)
-    public List<PaymentAccount> list(Long familyGroupId, PaymentAccountStatus status) {
+    public List<PaymentAccount> list(
+            Long familyGroupId, Long callerUserId, PaymentAccountStatus status) {
+        // FR-017：呼叫者須為該家庭群組成員，否則回傳 403
+        familyAccess.requireMember(familyGroupId, callerUserId);
         return paymentAccountRepository.findByGroupId(familyGroupId, status);
     }
 

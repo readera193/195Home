@@ -7,7 +7,6 @@ import com.family195home.app.expense.presentation.dto.CreateExpenseRequest;
 import com.family195home.app.expense.presentation.dto.ExpenseResponse;
 import com.family195home.app.expense.presentation.dto.LockResponse;
 import com.family195home.app.expense.presentation.dto.UpdateExpenseRequest;
-import com.family195home.app.family.application.FamilyAccess;
 import com.family195home.app.shared.AuthenticatedUser;
 import com.family195home.app.shared.PagedResult;
 import io.swagger.v3.oas.annotations.Operation;
@@ -28,27 +27,21 @@ public class ExpenseController {
 
     private final ExpenseService expenseService;
     private final PaymentAccountService paymentAccountService;
-    private final FamilyAccess familyAccess;
 
     public ExpenseController(
-            ExpenseService expenseService,
-            PaymentAccountService paymentAccountService,
-            FamilyAccess familyAccess) {
+            ExpenseService expenseService, PaymentAccountService paymentAccountService) {
         this.expenseService = expenseService;
         this.paymentAccountService = paymentAccountService;
-        this.familyAccess = familyAccess;
     }
 
     @PostMapping
     public ResponseEntity<ExpenseResponse> create(
             @AuthenticationPrincipal AuthenticatedUser caller,
             @Valid @RequestBody CreateExpenseRequest request) {
-        FamilyAccess.MemberRef member =
-                familyAccess.requireMember(request.familyGroupId(), caller.userId());
         ExpenseRecord record =
                 expenseService.create(
                         request.familyGroupId(),
-                        member.memberId(),
+                        caller.userId(),
                         request.paymentAccountId(),
                         request.amount(),
                         request.note(),
@@ -68,22 +61,19 @@ public class ExpenseController {
                     LocalDate endDate,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "" + ExpenseService.DEFAULT_PAGE_SIZE) int size) {
-        // FR-017：家庭範圍隔離，呼叫者須為該家庭群組成員，否則回傳 403
-        familyAccess.requireMember(familyGroupId, caller.userId());
-        // 帳戶名稱整個群組只查一次（避免每筆紀錄各查一次 N+1）
+        PagedResult<ExpenseRecord> records =
+                expenseService.listPage(
+                        familyGroupId,
+                        caller.userId(),
+                        paymentAccountId,
+                        authorMemberId,
+                        startDate,
+                        endDate,
+                        page,
+                        size);
+        // 帳戶名稱整個群組只查一次（避免每筆紀錄各查一次 N+1）；須在成員檢查之後才查
         Map<Long, String> accountNames = paymentAccountService.nameById(familyGroupId);
-        PagedResult<ExpenseResponse> responses =
-                expenseService
-                        .listPage(
-                                familyGroupId,
-                                paymentAccountId,
-                                authorMemberId,
-                                startDate,
-                                endDate,
-                                page,
-                                size)
-                        .map(record -> toResponse(record, accountNames));
-        return ResponseEntity.ok(responses);
+        return ResponseEntity.ok(records.map(record -> toResponse(record, accountNames)));
     }
 
     @Operation(summary = "更新支出", description = "須已持有編輯鎖；成功後自動釋放。更換支付帳戶時帳戶須屬於同群組且為啟用狀態。")
@@ -122,8 +112,7 @@ public class ExpenseController {
             @AuthenticationPrincipal AuthenticatedUser caller,
             @PathVariable Long expenseId,
             @RequestParam Long familyGroupId) {
-        FamilyAccess.MemberRef member = familyAccess.requireMember(familyGroupId, caller.userId());
-        ExpenseRecord record = expenseService.lock(familyGroupId, expenseId, member.memberId());
+        ExpenseRecord record = expenseService.lock(familyGroupId, expenseId, caller.userId());
         return ResponseEntity.ok(
                 new LockResponse(
                         record.getId(), record.getLockedByMemberId(), record.getLockedAt()));

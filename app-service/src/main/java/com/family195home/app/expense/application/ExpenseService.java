@@ -49,11 +49,13 @@ public class ExpenseService {
     @Transactional
     public ExpenseRecord create(
             Long familyGroupId,
-            Long authorMemberId,
+            Long callerUserId,
             Long paymentAccountId,
             BigDecimal amount,
             String note,
             LocalDateTime occurredAt) {
+        // FR-017：呼叫者須為該家庭群組成員（新增者由呼叫者自身決定，不接受前端傳入）
+        FamilyAccess.MemberRef author = familyAccess.requireMember(familyGroupId, callerUserId);
         var groupState = familyAccess.groupState(familyGroupId);
         if (groupState == FamilyAccess.GroupState.NOT_FOUND) {
             throw new ApiException(ErrorKind.NOT_FOUND, "GROUP_NOT_FOUND", "找不到家庭群組");
@@ -73,7 +75,7 @@ public class ExpenseService {
         ExpenseRecord record = new ExpenseRecord();
         record.setFamilyGroupId(familyGroupId);
         record.setPaymentAccountId(paymentAccountId);
-        record.setAuthorMemberId(authorMemberId);
+        record.setAuthorMemberId(author.memberId());
         record.setAmount(intAmount);
         record.setNote(note);
         record.setOccurredAt(
@@ -89,12 +91,15 @@ public class ExpenseService {
     @Transactional(readOnly = true)
     public PagedResult<ExpenseRecord> listPage(
             Long familyGroupId,
+            Long callerUserId,
             Long paymentAccountId,
             Long authorMemberId,
             LocalDate startDate,
             LocalDate endDate,
             int page,
             int size) {
+        // FR-017：家庭範圍隔離，呼叫者須為該家庭群組成員，否則回傳 403
+        familyAccess.requireMember(familyGroupId, callerUserId);
         if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
             throw new ApiException(
                     ErrorKind.BAD_REQUEST,
@@ -139,14 +144,15 @@ public class ExpenseService {
 
     // FR-027：條件式 UPDATE 取得鎖，5 分鐘 TTL（見 research.md 決策 3）
     @Transactional
-    public ExpenseRecord lock(Long familyGroupId, Long expenseId, Long callerMemberId) {
+    public ExpenseRecord lock(Long familyGroupId, Long expenseId, Long callerUserId) {
+        FamilyAccess.MemberRef caller = familyAccess.requireMember(familyGroupId, callerUserId);
         ExpenseRecord target = findRequired(expenseId);
         if (!familyGroupId.equals(target.getFamilyGroupId())) {
             throw new ApiException(ErrorKind.FORBIDDEN, "EXPENSE_NOT_IN_GROUP", "此支出紀錄不屬於該家庭群組");
         }
         LocalDateTime now = LocalDateTime.now(clock);
         int updated =
-                expenseRecordRepository.tryLock(expenseId, callerMemberId, now, lockTtlMinutes);
+                expenseRecordRepository.tryLock(expenseId, caller.memberId(), now, lockTtlMinutes);
         if (updated == 0) {
             throw new ApiException(ErrorKind.CONFLICT, "RECORD_LOCKED", "此紀錄目前正被編輯中，請稍後再試");
         }
