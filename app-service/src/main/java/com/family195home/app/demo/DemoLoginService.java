@@ -11,6 +11,12 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +33,9 @@ public class DemoLoginService {
     private static final String[] ACCOUNT_NAMES = {"現金", "中信", "國泰", "三信", "富邦"};
 
     private static final int MAX_PER_DAY = 5;
+
+    // 本月至少保證的紀錄筆數（各屬不同帳戶）
+    private static final int GUARANTEED_CURRENT_MONTH = 3;
 
     // 登入者為管理者，另加入這幾位示範成員，範例支出會隨機分配給所有成員
     private static final String[] MEMBER_NAMES = {"爸爸", "媽媽", "小明", "小美"};
@@ -123,7 +132,31 @@ public class DemoLoginService {
                 createExpense(group, author, accounts, sample, randomTimeOn(now, day));
             }
         }
+        // 月初時隨機結果可能讓本月幾乎沒有資料，另保證本月有幾筆分屬不同帳戶的紀錄，首頁統計才有內容可看
+        LocalDate monthStart = today.withDayOfMonth(1);
+        for (SampleExpense sample : pickDistinctAccountSamples(GUARANTEED_CURRENT_MONTH)) {
+            LocalDate day = monthStart.plusDays(random.nextInt(today.getDayOfMonth()));
+            FamilyMember author = members[random.nextInt(members.length)];
+            createExpense(group, author, accounts, sample, randomTimeOn(now, day));
+        }
         return result;
+    }
+
+    /** 隨機挑選 count 筆樣板，且各自屬於不同支付帳戶。 */
+    private static List<SampleExpense> pickDistinctAccountSamples(int count) {
+        List<SampleExpense> shuffled = new ArrayList<>(Arrays.asList(SAMPLES));
+        Collections.shuffle(shuffled, ThreadLocalRandom.current());
+        Set<Integer> usedAccounts = new HashSet<>();
+        List<SampleExpense> picked = new ArrayList<>();
+        for (SampleExpense sample : shuffled) {
+            if (picked.size() == count) {
+                break;
+            }
+            if (usedAccounts.add(sample.accountIndex())) {
+                picked.add(sample);
+            }
+        }
+        return picked;
     }
 
     private void createExpense(

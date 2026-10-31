@@ -36,11 +36,12 @@ export async function confirmDialog(options: {
 }
 
 /** 單行文字輸入對話框（取代 window.prompt）；取消時回傳 undefined。 */
-export async function promptText(title: string, value: string) {
+export async function promptText(title: string, value: string, maxLength?: number) {
   const result = await Swal.fire({
     titleText: title,
     input: 'text',
     inputValue: value,
+    inputAttributes: maxLength ? { maxlength: String(maxLength) } : undefined,
     showCancelButton: true,
     confirmButtonText: '確定',
     cancelButtonText: '取消',
