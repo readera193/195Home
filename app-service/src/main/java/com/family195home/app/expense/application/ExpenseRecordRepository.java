@@ -11,9 +11,11 @@ public interface ExpenseRecordRepository {
 
     ExpenseRecord save(ExpenseRecord record);
 
-    void update(ExpenseRecord record);
+    /** 僅當鎖仍由 lockHolderMemberId 持有時才更新並釋放鎖，回傳影響列數（0 表示鎖已不在該成員手上）。 */
+    int updateIfLockHeld(ExpenseRecord record, Long lockHolderMemberId);
 
-    void delete(Long id);
+    /** 僅當鎖仍由 lockHolderMemberId 持有時才刪除，回傳影響列數。 */
+    int deleteIfLockHeld(Long id, Long lockHolderMemberId);
 
     Optional<ExpenseRecord> findById(Long id);
 

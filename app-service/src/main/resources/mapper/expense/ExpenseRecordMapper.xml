@@ -23,11 +23,14 @@
             (#{familyGroupId}, #{paymentAccountId}, #{authorMemberId}, #{amount}, #{note}, #{occurredAt}, #{createdAt}, #{updatedAt})
     </insert>
 
-    <update id="update" parameterType="com.family195home.app.expense.domain.ExpenseRecord">
+    <!-- 檢查鎖與寫入合為同一個 UPDATE（見 docs/adr/0003）：鎖在檢查與寫入之間逾時並被他人取得時，影響列數為 0。
+         成功時一併釋放鎖。 -->
+    <update id="updateIfLockHeld">
         UPDATE expense_records
-        SET payment_account_id = #{paymentAccountId}, amount = #{amount}, note = #{note},
-            occurred_at = #{occurredAt}, updated_at = #{updatedAt}
-        WHERE id = #{id}
+        SET payment_account_id = #{record.paymentAccountId}, amount = #{record.amount}, note = #{record.note},
+            occurred_at = #{record.occurredAt}, updated_at = #{record.updatedAt},
+            locked_by_member_id = NULL, locked_at = NULL
+        WHERE id = #{record.id} AND locked_by_member_id = #{lockHolderMemberId}
     </update>
 
     <select id="countByPaymentAccountId" resultType="int">
@@ -38,8 +41,8 @@
         SELECT DISTINCT payment_account_id FROM expense_records WHERE family_group_id = #{familyGroupId}
     </select>
 
-    <delete id="deleteById">
-        DELETE FROM expense_records WHERE id = #{id}
+    <delete id="deleteByIdIfLockHeld">
+        DELETE FROM expense_records WHERE id = #{id} AND locked_by_member_id = #{lockHolderMemberId}
     </delete>
 
     <select id="selectById" resultMap="ExpenseRecordResultMap">

@@ -47,6 +47,8 @@ class ExpenseServiceTest {
         // 預設任何人皆為成員，且 memberId 與 userId 相同；個別測試可覆寫
         when(familyAccess.requireMember(anyLong(), anyLong()))
                 .thenAnswer(inv -> new FamilyAccess.MemberRef(inv.getArgument(1)));
+        when(expenseRecordRepository.updateIfLockHeld(any(), anyLong())).thenReturn(1);
+        when(expenseRecordRepository.deleteIfLockHeld(anyLong(), anyLong())).thenReturn(1);
         stubAccount(100L, 10L, PaymentAccountStatus.ACTIVE);
         stubAccount(200L, 10L, PaymentAccountStatus.ACTIVE);
     }
@@ -115,7 +117,7 @@ class ExpenseServiceTest {
                 .isInstanceOfSatisfying(
                         ApiException.class,
                         e -> assertThat(e.getCode()).isEqualTo("ACCOUNT_NOT_IN_GROUP"));
-        verify(expenseRecordRepository, never()).update(any());
+        verify(expenseRecordRepository, never()).updateIfLockHeld(any(), any());
     }
 
     @Test
@@ -288,7 +290,7 @@ class ExpenseServiceTest {
 
         expenseService.delete(10L, 1L, 5L);
 
-        verify(expenseRecordRepository).delete(1L);
+        verify(expenseRecordRepository).deleteIfLockHeld(1L, 2L);
     }
 
     @Test
@@ -324,7 +326,8 @@ class ExpenseServiceTest {
                 expenseService.update(10L, 1L, 5L, 200L, new BigDecimal("-500"), "更新後備註", null);
 
         assertThat(result.getAmount()).isEqualTo(-500);
-        verify(expenseRecordRepository).releaseLock(1L);
+        // 更新與釋放鎖是同一個條件式 UPDATE，以持鎖成員（管理者 memberId=1）為條件
+        verify(expenseRecordRepository).updateIfLockHeld(any(), eq(1L));
     }
 
     private FamilyMember member(Long memberId, Long userId, MemberRole role) {
@@ -523,5 +526,35 @@ class ExpenseServiceTest {
                         ApiException.class,
                         e -> assertThat(e.getCode()).isEqualTo("NOT_GROUP_MEMBER"));
         verify(expenseRecordRepository, never()).tryLock(anyLong(), anyLong(), any(), anyLong());
+    }
+
+    @Test
+    void update_rejectsWhenLockLostBetweenCheckAndWrite() {
+        // 檢查時鎖仍屬於呼叫者，但寫入前鎖已逾時被他人取得 => 條件式 UPDATE 影響 0 列，不可覆寫
+        ExpenseRecord record = expenseRecord(1L, 10L, 100L);
+        record.setLockedByMemberId(5L);
+        record.setLockedAt(LocalDateTime.now());
+        when(expenseRecordRepository.findById(1L)).thenReturn(Optional.of(record));
+        when(expenseRecordRepository.updateIfLockHeld(any(), eq(5L))).thenReturn(0);
+
+        assertThatThrownBy(
+                        () -> expenseService.update(10L, 1L, 5L, 100L, BigDecimal.TEN, "備註", null))
+                .isInstanceOfSatisfying(
+                        ApiException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("LOCK_NOT_HELD_BY_CALLER"));
+    }
+
+    @Test
+    void delete_rejectsWhenLockLostBetweenCheckAndWrite() {
+        ExpenseRecord record = expenseRecord(1L, 10L, 100L);
+        record.setLockedByMemberId(5L);
+        record.setLockedAt(LocalDateTime.now());
+        when(expenseRecordRepository.findById(1L)).thenReturn(Optional.of(record));
+        when(expenseRecordRepository.deleteIfLockHeld(1L, 5L)).thenReturn(0);
+
+        assertThatThrownBy(() -> expenseService.delete(10L, 1L, 5L))
+                .isInstanceOfSatisfying(
+                        ApiException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("LOCK_NOT_HELD_BY_CALLER"));
     }
 }

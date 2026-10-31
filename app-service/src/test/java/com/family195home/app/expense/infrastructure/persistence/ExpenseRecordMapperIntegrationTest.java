@@ -107,6 +107,50 @@ class ExpenseRecordMapperIntegrationTest {
     }
 
     @Test
+    void conditionalWrite_onlySucceedsForTheCurrentLockHolder() {
+        FamilyGroup group =
+                new FamilyGroup(
+                        "條件寫入測試家庭", FamilyGroupStatus.ACTIVE, "ITCODE03", LocalDateTime.now());
+        familyGroupMapper.insert(group);
+        PaymentAccount account =
+                new PaymentAccount(
+                        1L, group.getId(), "現金", PaymentAccountStatus.ACTIVE, LocalDateTime.now());
+        paymentAccountMapper.insert(account);
+        LocalDateTime now = LocalDateTime.now();
+        ExpenseRecord record = new ExpenseRecord();
+        record.setFamilyGroupId(group.getId());
+        record.setPaymentAccountId(account.getId());
+        record.setAuthorMemberId(1L);
+        record.setAmount(100);
+        record.setNote("原本");
+        record.setOccurredAt(now);
+        record.setCreatedAt(now);
+        record.setUpdatedAt(now);
+        expenseRecordMapper.insert(record);
+        expenseRecordMapper.tryLock(record.getId(), 1L, now, now.minusMinutes(5));
+
+        // 鎖屬於成員 1：成員 2 的寫入與刪除都落空，內容不變、鎖仍在
+        record.setNote("被覆寫");
+        assertThat(expenseRecordMapper.updateIfLockHeld(record, 2L)).isEqualTo(0);
+        assertThat(expenseRecordMapper.deleteByIdIfLockHeld(record.getId(), 2L)).isEqualTo(0);
+        ExpenseRecord untouched = expenseRecordMapper.selectById(record.getId());
+        assertThat(untouched.getNote()).isEqualTo("原本");
+        assertThat(untouched.getLockedByMemberId()).isEqualTo(1L);
+
+        // 持鎖者成員 1：更新成功，並在同一個 UPDATE 釋放鎖
+        assertThat(expenseRecordMapper.updateIfLockHeld(record, 1L)).isEqualTo(1);
+        ExpenseRecord updated = expenseRecordMapper.selectById(record.getId());
+        assertThat(updated.getNote()).isEqualTo("被覆寫");
+        assertThat(updated.getLockedByMemberId()).isNull();
+
+        // 鎖已釋放後，再以舊鎖持有者身分刪除也要落空；重新取得鎖後才能刪除
+        assertThat(expenseRecordMapper.deleteByIdIfLockHeld(record.getId(), 1L)).isEqualTo(0);
+        expenseRecordMapper.tryLock(record.getId(), 1L, now, now.minusMinutes(5));
+        assertThat(expenseRecordMapper.deleteByIdIfLockHeld(record.getId(), 1L)).isEqualTo(1);
+        assertThat(expenseRecordMapper.selectById(record.getId())).isNull();
+    }
+
+    @Test
     void pageQuery_ordersNewestFirstWithStableTieBreakAndCountsAll() {
         FamilyGroup group =
                 new FamilyGroup(

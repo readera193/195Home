@@ -191,7 +191,8 @@ public class ExpenseService {
             String note,
             LocalDateTime occurredAt) {
         ExpenseRecord record = requireRecordInGroup(familyGroupId, expenseId, callerUserId);
-        requireLockHeldByCaller(record, familyGroupId, callerUserId);
+        FamilyAccess.MemberRef caller =
+                requireLockHeldByCaller(record, familyGroupId, callerUserId);
         // 沿用原帳戶時不重新檢查狀態，讓歷史紀錄在帳戶停用後仍可編輯其他欄位
         if (!paymentAccountId.equals(record.getPaymentAccountId())) {
             requireUsableAccount(familyGroupId, paymentAccountId);
@@ -204,16 +205,17 @@ public class ExpenseService {
             record.setOccurredAt(occurredAt);
         }
         record.setUpdatedAt(LocalDateTime.now(clock));
-        expenseRecordRepository.update(record);
-        expenseRecordRepository.releaseLock(record.getId());
+        // 檢查鎖與寫入是同一個條件式 UPDATE（並一併釋放鎖），避免鎖在兩步之間逾時被他人取得後仍覆寫
+        requireWritten(expenseRecordRepository.updateIfLockHeld(record, caller.memberId()));
         return record;
     }
 
     @Transactional
     public void delete(Long familyGroupId, Long expenseId, Long callerUserId) {
         ExpenseRecord record = requireRecordInGroup(familyGroupId, expenseId, callerUserId);
-        requireLockHeldByCaller(record, familyGroupId, callerUserId);
-        expenseRecordRepository.delete(expenseId);
+        FamilyAccess.MemberRef caller =
+                requireLockHeldByCaller(record, familyGroupId, callerUserId);
+        requireWritten(expenseRecordRepository.deleteIfLockHeld(expenseId, caller.memberId()));
     }
 
     // FR-017、FR-019：呼叫者須為該群組在職成員，且紀錄須屬於該群組；不限制新增者本人。
@@ -228,12 +230,21 @@ public class ExpenseService {
         return record;
     }
 
-    private void requireLockHeldByCaller(
+    private FamilyAccess.MemberRef requireLockHeldByCaller(
             ExpenseRecord record, Long familyGroupId, Long callerUserId) {
         FamilyAccess.MemberRef caller = familyAccess.requireMember(familyGroupId, callerUserId);
         if (record.getLockedByMemberId() == null
                 || !record.getLockedByMemberId().equals(caller.memberId())) {
             throw new ApiException(ErrorKind.FORBIDDEN, "LOCK_NOT_HELD_BY_CALLER", "請先取得編輯鎖定後再操作");
+        }
+        return caller;
+    }
+
+    /** 條件式寫入影響 0 列，代表檢查之後鎖已被他人取得（或紀錄已不存在），視同未持有鎖。 */
+    private static void requireWritten(int affectedRows) {
+        if (affectedRows == 0) {
+            throw new ApiException(
+                    ErrorKind.FORBIDDEN, "LOCK_NOT_HELD_BY_CALLER", "編輯鎖已失效，請重新取得後再操作");
         }
     }
 
