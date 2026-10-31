@@ -13,6 +13,7 @@ frontend/coverage/
 # Env / secrets
 .env
 .env.*
+!.env.example
 
 # IDE / OS
 .idea/
