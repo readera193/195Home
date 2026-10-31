@@ -85,7 +85,7 @@ export default function PaymentAccountsPage() {
   }
 
   async function handleRename(accountId: number, currentName: string) {
-    const newName = (await promptText('新的帳戶名稱', currentName))?.trim();
+    const newName = (await promptText('新的帳戶名稱', currentName, 100))?.trim();
     if (!newName || newName === currentName) return;
     return runAdminAction(() => renameAccount(accountId, newName), '修改支付帳戶失敗');
   }
@@ -138,6 +138,7 @@ export default function PaymentAccountsPage() {
               id="accountName"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              maxLength={100}
               required
               autoFocus
             />

@@ -92,7 +92,7 @@ export default function FamilyGroupPage() {
   // 一般成員可編輯自己的名稱；管理者可編輯所有成員的名稱（後端亦會驗證）
   async function handleRename(memberId: number, currentName: string) {
     if (!familyGroupId) return;
-    const name = (await promptText('編輯顯示名稱', currentName))?.trim();
+    const name = (await promptText('編輯顯示名稱', currentName, 50))?.trim();
     if (!name || name === currentName) return;
     try {
       await renameMember(familyGroupId, memberId, name);
@@ -336,6 +336,7 @@ export default function FamilyGroupPage() {
               id="groupName"
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
+              maxLength={100}
               required
             />
           </div>
